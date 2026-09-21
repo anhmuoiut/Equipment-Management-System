@@ -17,9 +17,9 @@ import 'server-only';
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import { AppError, type ErrorCode } from '@/lib/errors';
-import { supabaseAuthClient } from '@/lib/supabase/server';
+import { getCurrentSession } from '@/lib/auth/session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { assertAction, type ActionPermission, type Role, type UserProfile } from '@/lib/permissions';
+import { assertPermission, type PermissionCode, type Role, type UserProfile } from '@/lib/permissions';
 
 export type AuthContext = {
   requestId: string;
@@ -30,8 +30,8 @@ export type AuthContext = {
 type Options = {
   /** Role được phép. Mặc định: cả 3 role đã đăng nhập. */
   role?: readonly Role[];
-  /** Action permission bắt buộc (mục 32). */
-  action?: ActionPermission;
+  /** Permission catalog code bắt buộc (mục 32). Admin luôn bypass. */
+  action?: PermissionCode | string;
   /** Chỉ dùng cho /api/health. Mọi route nghiệp vụ đều phải xác thực. */
   allowAnonymous?: true;
 };
@@ -107,25 +107,32 @@ export function withAuth(handler: Handler, options: Options = {}) {
         });
       }
 
-      // 1. Session
-      const auth = await supabaseAuthClient();
-      const { data: userData, error: userErr } = await auth.auth.getUser();
-      if (userErr || !userData.user) throw new AppError('UNAUTHORIZED');
-      userId = userData.user.id;
+      // 1. Session — Supabase Auth cookie, or (for auth_provider = 'local'
+      //    accounts, which have no Supabase Auth row) our own signed cookie.
+      const session = await getCurrentSession();
+      if (!session) throw new AppError('UNAUTHORIZED');
+      userId = session.userId;
 
-      // 2. Profile — MỘT query duy nhất cho role + is_active + action permission
-      //    (mục 3c). Không tách thành nhiều round-trip: mỗi request đã phải trả
-      //    giá cold start trên Vercel free rồi.
-      const { data: profile, error: profErr } = await supabaseAdmin()
-        .from('user_profiles')
-        .select(
-          'id, full_name, email, username, role, is_active, must_change_password, can_create, can_move, can_detach, can_archive',
-        )
-        .eq('id', userId)
-        .maybeSingle<UserProfile>();
+      // 2. Profile + permission grants — hai query song song thay vì một, vì
+      //    V2 tách permission ra bảng riêng (catalog mở rộng được). Cả hai
+      //    đều là lookup theo user_id đã index sẵn, chi phí không đáng kể.
+      const db = supabaseAdmin();
+      const [{ data: profile, error: profErr }, { data: grants, error: grantsErr }] = await Promise.all([
+        db.from('user_profiles')
+          .select('id, full_name, email, username, role, is_active, must_change_password, token_version')
+          .eq('id', userId)
+          .maybeSingle<Omit<UserProfile, 'permissions'> & { token_version: number }>(),
+        db.from('user_permissions').select('permission_code').eq('user_id', userId),
+      ]);
 
-      if (profErr) throw new AppError('SERVER_ERROR', { stage: 'load_profile' });
+      if (profErr || grantsErr) throw new AppError('SERVER_ERROR', { stage: 'load_profile' });
       if (!profile) throw new AppError('UNAUTHORIZED');
+
+      // 2a. A local-account cookie signed before the last password change
+      //     (reset or self-service) must not still work.
+      if (session.tokenVersion !== null && session.tokenVersion !== profile.token_version) {
+        throw new AppError('UNAUTHORIZED');
+      }
 
       // 3. Tài khoản bị deactivate không thao tác được dù session cũ còn hạn.
       if (!profile.is_active) throw new AppError('USER_INACTIVE');
@@ -135,10 +142,12 @@ export function withAuth(handler: Handler, options: Options = {}) {
         throw new AppError('FORBIDDEN', { required_role: options.role });
       }
 
-      // 5. Action permission
-      if (options.action) assertAction(profile, options.action);
+      const fullProfile: UserProfile = { ...profile, permissions: (grants ?? []).map((g) => g.permission_code) };
 
-      return await handler(req, { requestId, profile, params });
+      // 5. Action permission
+      if (options.action) assertPermission(fullProfile, options.action);
+
+      return await handler(req, { requestId, profile: fullProfile, params });
     } catch (e) {
       if (e instanceof AppError) {
         if (e.status >= 500) {

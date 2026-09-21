@@ -1,6 +1,6 @@
 # Equipment Management
 
-Web app nội bộ quản lý Machine / Base / Fixture / Equipment, thay cách ghi chép bằng Excel.
+Web app nội bộ quản lý Tester / Base / Fixture / Equipment, thay cách ghi chép bằng Excel.
 
 Triển khai theo **Spec v0.9**. Mọi quyết định kiến trúc trong code đều có chú thích trỏ về số mục trong spec — khi sửa code, sửa spec trước.
 
@@ -21,7 +21,7 @@ Triển khai theo **Spec v0.9**. Mọi quyết định kiến trúc trong code �
 | 6 | Chuỗi phân cấp, drawer chi tiết, thao tác cấu trúc | ✅ Xong |
 | 7 | (RPC — đã xong ở Phase 1) | ✅ Xong |
 | 8 | Lịch sử thay đổi | ✅ Xong |
-| 8b | **Giao diện Quản trị** (users, preset, location, field, lỗi) | ⬜ API xong, UI chưa |
+| 8b | **Giao diện Quản trị** (users, preset, location, field, lỗi) | ✅ Xong |
 | 9 | Migration script từ Excel + reconcile.sql | ⬜ Chưa làm |
 | 10 | Backup workflow + keepalive | ✅ Xong |
 
@@ -30,11 +30,45 @@ Còn lại: giao diện Quản trị (API đã sẵn, gọi bằng curl được
 
 ---
 
+## Run on macOS
+
+Use Node.js 24.9 or newer. From the outer `Inventory Managerment` folder,
+double-click `Start-App.command`, keep its Terminal window open, and open the
+Local URL shown when Next.js reports Ready (normally http://127.0.0.1:3000).
+Press Control+C in Terminal to stop. `Start-App.cmd` is the Windows launcher.
+
+To start manually from this folder:
+
+```bash
+npm ci
+npm run dev -- --hostname 127.0.0.1
+```
+
+Keep your existing `.env.local` to use the same Supabase project and accounts.
+Changing computers does not require rerunning database migrations or seeding
+the admin account. For a new configuration, copy `.env.example` to `.env.local`
+and fill in the Supabase values before starting.
+
+Do not reuse `node_modules` or `.next` from Windows: they contain platform-specific
+dependencies and generated output. Install dependencies separately on each OS
+with `npm ci` and let Next.js rebuild its cache. The original Windows dependencies
+and caches from the Mac setup are preserved in the outer `.runtime-backups` folder.
+
+For OneDrive, mark the source folder as **Always Keep on This Device** before
+running it. Prefer a separate working copy outside OneDrive on each computer so
+Windows and macOS do not overwrite each other's `node_modules` and `.next`.
+
 ## Chạy lần đầu
 
 ```bash
 npm install
 cp .env.example .env.local     # điền giá trị từ Supabase → Settings → API
+```
+
+Điền thêm `LOCAL_AUTH_SECRET` — một chuỗi ngẫu nhiên bất kỳ, ít nhất 32 ký tự, giữ bí mật như `SUPABASE_SERVICE_ROLE_KEY`. Dùng để ký session cho tài khoản **Local** (mục "Tài khoản Local" bên dưới). Sinh nhanh bằng:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
 ### 1. Database
@@ -47,8 +81,11 @@ database/migrations/002_indexes.sql
 database/migrations/003_rls_lockdown.sql
 database/migrations/004_functions.sql
 database/migrations/005_usernames.sql
+database/migrations/006_local_auth.sql
 database/seed/001_seed.sql        ← SỬA TRƯỚC KHI CHẠY
 ```
+
+`006_local_auth.sql` thêm tài khoản **Local** (username/password tự app quản lý, không qua Supabase Auth — dùng cho self-service signup, xem bên dưới). Bắt buộc với bản cài mới; dự án đang chạy chỉ cần chạy thêm file này một lần.
 
 `001_seed.sql` chứa danh sách location và dropdown option **mẫu**. Đây là 2 trong 6 thứ mục 54 nói phải chốt trước khi code — thay bằng dữ liệu thật của nhà máy.
 
@@ -196,10 +233,11 @@ email internally. Usernames allow 1-64 lowercase letters, numbers, dots,
 underscores, plus signs and hyphens, beginning with a letter or number. Login and
 account creation normalize entered names to lowercase.
 
-POST /api/admin/users now requires username separately from email, for example:
+POST /api/admin/users now requires username separately from email, plus the
+account's real password and its permissions set one-by-one (no presets), for example:
 
 ```json
-{"full_name":"Example User","username":"example.user","email":"contact@example.com","role":"viewer","preset":"read_only"}
+{"full_name":"Example User","username":"example.user","email":"contact@example.com","password":"a-strong-password","role":"viewer","can_create":false,"can_move":false,"can_detach":false,"can_archive":false,"editable_fields":[]}
 ```
 
 For a new installation, seed-first-admin.ts accepts an optional final username:
@@ -213,3 +251,32 @@ After applying the migration and starting localhost:3000, run
 `node scripts/test-username-login.mjs` with Node 24 and the configured .env.local.
 It creates a temporary viewer whose username differs from the email prefix,
 verifies login, profile and header, then removes that temporary account.
+
+## Local accounts (self-service signup, migration 006)
+
+Every account used to be a real Supabase Auth account (`auth_provider =
+'supabase'`), created by an admin. Migration 006 adds a second kind,
+`auth_provider = 'local'`: username + password chosen by the user themself
+on the login page ("Request an account"), stored and verified by the app
+directly (`lib/auth/password.ts`, scrypt — no auth.users row at all) with
+its own signed session cookie (`lib/auth/localSession.ts`) instead of a
+Supabase session. Admin accounts should still be created the normal way
+(Quản trị → Người dùng → New user) and keep using Supabase Auth.
+
+A submitted request lands with `is_active = false` and every action
+permission off — it cannot sign in until an admin reactivates it from the
+Users screen (same button used to un-deactivate anyone else; there's no
+separate approval queue). The Users table's **Account** column shows
+"Supabase", "Local" or "Local · pending" so it's obvious which is which.
+
+Requires `LOCAL_AUTH_SECRET` in `.env.local` (see above). Changing that
+value signs every local-account session out at once — treat it like
+`SUPABASE_SERVICE_ROLE_KEY`, not like a config toggle.
+
+**Known gaps, not built yet:** no self-service "forgot password" for local
+accounts (an admin resets it from the Users screen, same as any account);
+no email collected or verified for local accounts by design; the SQL
+integration suite under `database/test/` predates the V2 schema
+(`database/full_reset.sql`) — types/level/status are now `type_id`/
+`level_id`/`status_id` master-data references instead of free text, and it
+needs a rewrite before it passes again.

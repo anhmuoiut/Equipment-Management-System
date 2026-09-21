@@ -4,7 +4,7 @@ import { parseBody } from '@/lib/validators/equipment';
 import { z } from 'zod';
 
 export const GET = withAuth(async (_req, { requestId }) => ok(await listLocations(false), requestId),
-  { role: ['admin'] });
+  { role: ['admin', 'user'], action: 'master_data.manage' });
 
 export const POST = withAuth(
   async (req, { requestId, profile }) => {
@@ -18,5 +18,5 @@ export const POST = withAuth(
     );
     return ok(await createLocation(body, profile.id, requestId), requestId);
   },
-  { role: ['admin'] },
+  { role: ['admin', 'user'], action: 'master_data.manage' },
 );

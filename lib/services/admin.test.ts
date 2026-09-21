@@ -21,6 +21,14 @@ vi.mock('@/lib/supabase/admin', () => ({
       };
       if (table === 'field_permissions') return {
         delete: () => ({ eq: async () => ({ error: null }) }),
+        insert: async () => ({ error: null }),
+      };
+      if (table === 'permissions') return {
+        select: () => ({ data: [], error: null }),
+      };
+      if (table === 'user_permissions') return {
+        delete: () => ({ eq: async () => ({ error: null }) }),
+        insert: async () => ({ error: null }),
       };
       if (table === 'audit_log') return { insert: async () => ({ error: null }) };
       throw new Error('Unexpected table: ' + table);
@@ -28,7 +36,12 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }));
 import { createUser } from './admin';
-const input = { full_name: 'Test User', username: ' Man_Tran ', email: 'different@company.test', role: 'viewer', preset: 'read_only' } as const;
+const input = {
+  full_name: 'Test User', username: ' Man_Tran ', email: 'different@company.test',
+  password: 'a-strong-password', role: 'viewer' as const,
+  permissions: [] as string[],
+  editable_fields: [] as string[],
+};
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.emailLookup.mockResolvedValue({ data: null, error: null });

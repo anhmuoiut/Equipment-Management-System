@@ -10,5 +10,5 @@ export const POST = withAuth(
     );
     return ok(result, requestId);
   },
-  { role: ['admin', 'user'], action: 'move' },
+  { role: ['admin', 'user'], action: 'equipment.move' },
 );

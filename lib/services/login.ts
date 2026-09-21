@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseAuthClient } from '@/lib/supabase/server';
 import { AppError } from '@/lib/errors';
 import { normalizeUsername } from '@/lib/auth/username';
+import { verifyPassword } from '@/lib/auth/password';
+import { setLocalSessionCookie } from '@/lib/auth/session';
 
 // A bounded per-instance guard supplements Supabase Auth's own rate limits.
 // It is not a shared, deployment-wide rate limiter.
@@ -27,20 +29,30 @@ export async function loginWithUsername(input: { username?: unknown; password?: 
 
   // Never send the resolved email, service key or session tokens in a JSON response.
   const { data, error } = await supabaseAdmin().from('user_profiles')
-    .select('id,email,is_active')
+    .select('id,email,is_active,auth_provider,password_hash,token_version')
     .eq('username', username)
     .limit(2);
   if (error) throw new AppError('SERVER_ERROR');
   // Fail closed if the stored username is missing, inactive or ambiguous.
   if (data?.length !== 1 || !data[0]?.is_active) throw new AppError('INVALID_CREDENTIALS');
+  const account = data[0];
+
+  if (account.auth_provider === 'local') {
+    if (!account.password_hash || !(await verifyPassword(input.password, account.password_hash))) {
+      throw new AppError('INVALID_CREDENTIALS');
+    }
+    await setLocalSessionCookie(account.id, account.token_version);
+    attempts.delete(username);
+    return;
+  }
 
   const auth = await supabaseAuthClient();
-  const result = await auth.auth.signInWithPassword({ email: data[0].email, password: input.password });
+  const result = await auth.auth.signInWithPassword({ email: account.email!, password: input.password });
   if (result.error) {
     if (result.error.status === 429) throw new AppError('LOGIN_RATE_LIMITED');
     throw new AppError('INVALID_CREDENTIALS');
   }
-  if (result.data.user?.id !== data[0].id) {
+  if (result.data.user?.id !== account.id) {
     await auth.auth.signOut();
     throw new AppError('INVALID_CREDENTIALS');
   }

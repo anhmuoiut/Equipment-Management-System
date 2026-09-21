@@ -1,17 +1,33 @@
 /**
- * Kiểm tra quyền — Spec v0.9 mục 29–32.
+ * Kiểm tra quyền — V2.
  *
- * Nguyên tắc V1:
+ * Nguyên tắc (unchanged from V1):
  *   - Mọi user đã đăng nhập XEM ĐƯỢC mọi field is_visible.
- *     field_permissions chỉ quyết định quyền SỬA (mục 30).
- *   - Admin toàn quyền, không phụ thuộc field_permissions.
+ *     field_permissions chỉ quyết định quyền SỬA.
+ *   - Admin toàn quyền, không phụ thuộc permission catalog hay field_permissions.
  *   - Viewer chỉ xem.
  *   - Không có record trong field_permissions → deny.
+ *
+ * What's new in V2: the four fixed can_create/can_move/can_detach/can_archive
+ * booleans are gone. Action permission is now an open-ended catalog
+ * (`permissions` table + `user_permissions` grants) — a permission is just a
+ * string code ('equipment.create', 'calibration.view', …) an account either
+ * holds or doesn't. Adding a new gate anywhere in the app is a catalog row
+ * plus a `hasPermission` check, never a new column.
  */
 import { AppError } from '@/lib/errors';
-import type { ActionPermission } from './presets';
 
 export type Role = 'admin' | 'user' | 'viewer';
+
+/** Catalog codes currently checked anywhere in the app. Not an exhaustive
+ *  list of every row in `permissions` (the catalog can grow via seed data
+ *  alone), just the ones application code actually gates on — kept as a
+ *  union for editor autocomplete / typo safety at call sites. */
+export type PermissionCode =
+  | 'equipment.create' | 'equipment.move' | 'equipment.detach' | 'equipment.archive'
+  | 'repair.view' | 'repair.create' | 'repair.update'
+  | 'calibration.view' | 'calibration.create' | 'calibration.update'
+  | 'master_data.manage' | 'field.manage' | 'user.manage';
 
 export type UserProfile = {
   id: string;
@@ -21,36 +37,31 @@ export type UserProfile = {
   role: Role;
   is_active: boolean;
   must_change_password: boolean;
-  can_create: boolean;
-  can_move: boolean;
-  can_detach: boolean;
-  can_archive: boolean;
-};
-
-const ACTION_COLUMN: Record<ActionPermission, keyof UserProfile> = {
-  create: 'can_create',
-  move: 'can_move',
-  detach: 'can_detach',
-  archive: 'can_archive',
+  /** Permission codes granted to this account. Meaningless for role='admin',
+   *  which bypasses every check regardless of what's in here. */
+  permissions: string[];
 };
 
 export function isAdmin(p: UserProfile): boolean {
   return p.role === 'admin';
 }
 
-/** Restore là Admin-only, không có cột riêng (mục 32). */
+/** Restore là Admin-only, không có permission code riêng. */
 export function canRestore(p: UserProfile): boolean {
   return isAdmin(p);
 }
 
-export function canDoAction(p: UserProfile, action: ActionPermission): boolean {
-  if (p.role === 'viewer') return false;
+export function hasPermission(p: UserProfile, code: PermissionCode | string): boolean {
   if (isAdmin(p)) return true;
-  return p[ACTION_COLUMN[action]] === true;
+  // "Viewer chỉ xem": a viewer never needs an explicit grant for a read-only
+  // ('.view') code — the same exception History has always had — but is
+  // still hard-blocked from every mutating code, same as V1.
+  if (p.role === 'viewer') return code.endsWith('.view');
+  return p.permissions.includes(code);
 }
 
-export function assertAction(p: UserProfile, action: ActionPermission): void {
-  if (!canDoAction(p, action)) throw new AppError('FORBIDDEN', { action });
+export function assertPermission(p: UserProfile, code: PermissionCode | string): void {
+  if (!hasPermission(p, code)) throw new AppError('FORBIDDEN', { action: code });
 }
 
 /**
@@ -78,5 +89,3 @@ export function assertFields(
     throw new AppError('FIELD_PERMISSION_DENIED', { denied_fields: denied });
   }
 }
-
-export type { ActionPermission };

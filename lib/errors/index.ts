@@ -8,6 +8,7 @@
 
 export const ERROR_CODES = {
   INVALID_CREDENTIALS: { status: 401, message: 'Username or password is incorrect.' },
+  CURRENT_PASSWORD_INCORRECT: { status: 401, message: 'Current password is incorrect.' },
   LOGIN_RATE_LIMITED: { status: 429, message: 'Too many attempts. Please try again shortly.' },
   USERNAME_ALREADY_EXISTS: { status: 409, message: 'This username is already in use.' },
   UNAUTHORIZED:                   { status: 401, message: 'Bạn chưa đăng nhập.' },
@@ -24,6 +25,7 @@ export const ERROR_CODES = {
   MOVE_TARGET_ARCHIVED:           { status: 409, message: 'Không thể gắn vào một thiết bị đã archive.' },
   DEPTH_LIMIT_EXCEEDED:           { status: 409, message: 'Cây thiết bị vượt quá 50 tầng. Dữ liệu có thể đang bị lỗi — báo Admin.' },
   LOCATION_REQUIRED:              { status: 400, message: 'Cần chọn Location.' },
+  REMARK_REQUIRED_FOR_STATUS:     { status: 400, message: 'Trạng thái này bắt buộc phải có Remark.' },
   LOCATION_INHERITED_READ_ONLY:   { status: 409, message: 'Thiết bị này đang có Parent nên Location tự động theo Parent. Dùng Move, Swap hoặc Detach để đổi.' },
   OPTIMISTIC_CONFLICT:            { status: 409, message: 'Dữ liệu đã bị người khác thay đổi. Vui lòng tải lại trước khi sửa tiếp.' },
   LOCK_TIMEOUT:                   { status: 409, message: 'Có người đang thao tác trên nhánh thiết bị này. Vui lòng thử lại sau vài giây.' },

@@ -12,7 +12,40 @@ Chạy SQL ở: Supabase Dashboard → SQL Editor (chọn đúng **production**,
 
 Dùng giao diện: Quản trị → Người dùng → Cấp lại mật khẩu. Mật khẩu hiện **một lần**, gửi cho họ qua kênh nội bộ.
 
+Nút này hoạt động cho **cả hai loại tài khoản** (cột "Account" trong bảng):
+- **Supabase** — admin tự tạo (mục 27), đăng nhập bằng email thật qua Supabase Auth.
+- **Local** — người dùng tự đăng ký ở trang đăng nhập ("Request an account"), username/password do app tự lưu và xác thực (`lib/auth/password.ts`), không có email, không có tài khoản Supabase Auth nào đứng sau.
+
 Hệ thống không gửi email — đó là quyết định có chủ đích (mục 27), không phải thiếu sót.
+
+Nếu giao diện hỏng và cần sửa tay: tài khoản **Supabase** đổi mật khẩu bằng `auth.users.encrypted_password` (xem mục 1a). Tài khoản **Local** thì KHÔNG có gì trong `auth.users` — sửa trực tiếp `user_profiles.password_hash`:
+
+```sql
+-- chỉ dùng cho tài khoản auth_provider = 'local'
+select username, auth_provider from public.user_profiles where username = 'ten_dang_nhap';
+```
+
+Việc tự tay băm mật khẩu scrypt đúng định dạng app cần (`scrypt:<saltHex>:<hashHex>`) không làm được bằng SQL thường — trường hợp này ưu tiên sửa qua giao diện; chỉ nhờ người viết code nếu giao diện thật sự không dùng được.
+
+---
+
+## 1a. Đặt lại mật khẩu tài khoản Supabase bằng tay (khi giao diện không dùng được)
+
+```sql
+update auth.users
+set encrypted_password = crypt('MatKhauMoi123', gen_salt('bf'))
+where email = 'nguoi@congty.com';
+```
+
+Chỉ áp dụng cho tài khoản **Supabase** (admin). Không có tác dụng với tài khoản **Local**.
+
+---
+
+## 1b. Duyệt yêu cầu tài khoản mới (self-service signup)
+
+Ai cũng vào được trang đăng nhập và bấm "Request an account" để tự tạo tài khoản **Local**. Tài khoản này luôn tạo ra ở trạng thái **is_active = false** và quyền **Viewer / read-only** — không đăng nhập được, không sửa được gì cho tới khi Admin duyệt.
+
+Duyệt: Quản trị → Người dùng, tìm dòng có nhãn **"Local · pending"**, bấm **Reactivate** — đúng nút dùng để kích hoạt lại người bị vô hiệu hoá, không có hàng đợi riêng. Sau khi duyệt, đổi Role/Preset nếu cần (mặc định chỉ xem được).
 
 ---
 

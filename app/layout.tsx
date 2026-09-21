@@ -3,8 +3,8 @@ import './globals.css';
 import { PreferencesProvider } from '@/components/Preferences';
 
 export const metadata: Metadata = {
-  title: 'Jabil | Equipment Management',
-  description: 'Machine / Base / Fixture / Equipment',
+  title: 'Jabil | SolarEdge Equipment Management',
+  description: 'Test Engineering - SolarEdge workcell'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,7 +1,6 @@
 import { withAuth, ok } from '@/lib/auth/withAuth';
 import { listUsers, createUser } from '@/lib/services/admin';
 import { parseBody } from '@/lib/validators/equipment';
-import { PRESET_KEYS } from '@/lib/permissions/presets';
 import { z } from 'zod';
 import { normalizeUsername } from '@/lib/auth/username';
 
@@ -11,10 +10,12 @@ const createUserSchema = z.object({
   username: z.string().refine(value => normalizeUsername(value) !== null, {
     message: 'Use 1-64 letters, numbers, dots, underscores, plus signs or hyphens; start with a letter or number.',
   }),
+  password: z.string().min(10).max(256),
   employee_id: z.string().max(50).nullish(),
-  department: z.string().max(100).nullish(),
+  department_id: z.string().uuid().nullish(),
   role: z.enum(['admin', 'user', 'viewer']),
-  preset: z.enum(PRESET_KEYS as [string, ...string[]]),
+  permissions: z.array(z.string()),
+  editable_fields: z.array(z.string()),
 });
 
 export const GET = withAuth(async (_req, { requestId }) => ok(await listUsers(), requestId),
@@ -23,18 +24,16 @@ export const GET = withAuth(async (_req, { requestId }) => ok(await listUsers(),
 /**
  * Tạo user trực tiếp — V1 không có Account Request workflow (mục 27).
  *
- * temp_password trả về ĐÚNG MỘT LẦN. Không lưu plaintext, không hiển thị lại.
- * Admin gửi cho user qua kênh nội bộ (Lark/Teams). Không phụ thuộc email:
- * Notification nằm trong Out of Scope và SMTP built-in của Supabase có rate
- * limit quá thấp để dùng thật.
+ * The admin sets the account's real password directly in the form; it is
+ * never generated or shown back. Không phụ thuộc email: Notification nằm
+ * trong Out of Scope và SMTP built-in của Supabase có rate limit quá thấp
+ * để dùng thật.
  */
 export const POST = withAuth(
   async (req, { requestId, profile }) => {
     const body = parseBody(createUserSchema, await req.json());
     const result = await createUser(body as never, profile.id, requestId);
-    return ok(result, requestId, {
-      notice: 'Mật khẩu tạm chỉ hiển thị một lần. Sao chép và gửi cho người dùng ngay.',
-    });
+    return ok(result, requestId);
   },
   { role: ['admin'] },
 );

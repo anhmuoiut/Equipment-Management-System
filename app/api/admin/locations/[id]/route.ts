@@ -16,5 +16,5 @@ export const PUT = withAuth(
     );
     return ok(await updateLocation(params.id!, body, profile.id, requestId), requestId);
   },
-  { role: ['admin'] },
+  { role: ['admin', 'user'], action: 'master_data.manage' },
 );

@@ -32,7 +32,7 @@ async function main() {
 
   const { data: existing, error: lookupError } = await db.from('user_profiles')
     .select('id').eq('username', username).limit(1);
-  if (lookupError) throw new Error('Apply migration 005_usernames.sql before creating an admin.');
+  if (lookupError) throw new Error('Run database/full_reset.sql before creating an admin.');
   if (existing?.length) throw new Error('Username already exists.');
 
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
@@ -46,6 +46,9 @@ async function main() {
     process.exit(1);
   }
 
+  // role='admin' alone bypasses every permission check in the app (mục 17) —
+  // there is no user_permissions row an admin needs, the same way an admin
+  // was never given field_permissions rows either.
   const { error: profErr } = await db.from('user_profiles').insert({
     id: data.user.id,
     full_name: fullName,
@@ -54,7 +57,6 @@ async function main() {
     role: 'admin',
     is_active: true,
     must_change_password: true,
-    can_create: true, can_move: true, can_detach: true, can_archive: true,
   });
   if (profErr) {
     await db.auth.admin.deleteUser(data.user.id);

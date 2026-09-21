@@ -8,5 +8,5 @@ export const POST = withAuth(
     const body = parseBody(versionOnlySchema, await req.json());
     return ok(await detachEquipment(params.id!, body.version, profile.id, requestId), requestId);
   },
-  { role: ['admin', 'user'], action: 'detach' },
+  { role: ['admin', 'user'], action: 'equipment.detach' },
 );

@@ -8,5 +8,5 @@ export const POST = withAuth(
     const body = parseBody(versionOnlySchema, await req.json());
     return ok(await archiveEquipment(params.id!, body.version, profile.id, requestId), requestId);
   },
-  { role: ['admin', 'user'], action: 'archive' },
+  { role: ['admin', 'user'], action: 'equipment.archive' },
 );
