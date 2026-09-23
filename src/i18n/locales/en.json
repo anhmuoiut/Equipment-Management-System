@@ -104,6 +104,8 @@
     "alreadyHaveAccount": "Already have an account? Sign in"
   },
   "loginBrand": {
+    "workcell": "SOLAREDGE WORKCELL",
+    "motto": "TRACK · MANAGE · ENSURE · MAXIMIZE",
     "division": "TEST ENGINEERING",
     "headlineLine1": "TE - SOLAREDGE",
     "headlineLine2": "Equipment Management",

@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserPlus, UserRound } from 'lucide-react';
 import { PreferenceControls } from '@/components/Preferences';
+import { JabilLogo } from '@/components/JabilLogo';
+import './login.css';
 import { safeLoginDestination } from '@/lib/auth/username';
 
 function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
@@ -38,11 +40,17 @@ function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="login-form">
-      <div className="login-icon"><LockKeyhole size={24} aria-hidden="true" /></div>
-      <p className="eyebrow">{t('login.yourWorkspace')}</p>
-      <h1>{t('login.welcomeBack')}</h1>
-      <p className="login-description">{t('login.description')}</p>
+    <form onSubmit={submit} className="login-form" aria-label={t('login.signIn')} aria-busy={busy}>
+      <div className="solar-identity">
+        <SolarMark />
+        <div className="solar-identity-copy">
+          <p className="solar-overline">{t('loginBrand.division')}</p>
+          <h1>TE-Solar<span>Edge</span></h1>
+          <p className="solar-subtitle">{t('loginBrand.headlineLine2')}</p>
+        </div>
+        <div className="solar-spectrum" aria-hidden="true" />
+        <p className="solar-motto">{t('loginBrand.motto')}</p>
+      </div>
 
       <label htmlFor="username">{t('login.username')}</label>
       <div className="login-input">
@@ -253,22 +261,45 @@ function AuthPanel() {
     : <SignupForm onBackToSignIn={() => setMode('signin')} />;
 }
 
+// A small vector mark stays crisp on both phone and desktop displays.
+function SolarMark() {
+  return (
+    <svg className="solar-mark" viewBox="0 0 180 140" fill="none" aria-hidden="true" focusable="false">
+      <g fill="currentColor">
+        {Array.from({ length: 10 }, (_, i) => (
+          <rect key={i} x="49" y="39" width="17" height="22" rx="3" transform={`rotate(${i * 36} 57.5 86)`} />
+        ))}
+        <circle cx="57.5" cy="86" r="36" />
+      </g>
+      <circle cx="57.5" cy="86" r="22" className="solar-gear-center" />
+      <g stroke="var(--jabil-picton)" strokeWidth="6" strokeLinecap="round">
+        <path d="M90 51a29 29 0 0 1 57 0" />
+        <path d="M118 6v10M84 15l5 9M152 15l-5 9M164 40l9-4" strokeWidth="4" />
+      </g>
+      <path d="M89 57h82l-32 61H56z" fill="var(--jabil-picton)" stroke="var(--solar-mark-ground)" strokeWidth="5" strokeLinejoin="round" />
+      <path d="M116 58l-32 59M144 58l-32 59M74 87h80" stroke="var(--solar-mark-ground)" strokeWidth="4" />
+      <path d="M68 124h66" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function LoginPage() {
   const { t } = useTranslation();
   return (
-    <main className="login-page">
-      <section className="login-brand">
-        <div className="login-hero-image" role="presentation" />
-        <span className="brand-division-tag">{t('loginBrand.division')}</span>
+    <main className="login-page solar-login">
+      <div className="solar-scene" aria-hidden="true" />
+      <div className="solar-atmosphere" aria-hidden="true" />
+      <section className="login-brand" aria-label={t('loginBrand.division')}>
         <div className="brand-content">
-          <h2>{t('loginBrand.headlineLine1')}<br />{t('loginBrand.headlineLine2')}</h2>
+          <JabilLogo />
+          <p className="solar-hero-kicker">{t('loginBrand.workcell')}</p>
+          <h2>{t('loginBrand.headlineLine2')}</h2>
+          <p className="brand-footer">{t('loginBrand.footer')}</p>
         </div>
-        <p className="brand-footer">{t('loginBrand.footer')}</p>
       </section>
-      <section className="login-main">
-        <div className="login-toolbar"><PreferenceControls /></div>
-        <div className="login-form-area"><Suspense fallback={<p>{t('common.loadingEllipsis')}</p>}><AuthPanel /></Suspense></div>
-        <footer className="login-footer">{t('nav.equipmentControlSystem')}</footer>
+      <section className="login-main" aria-label={t('login.yourWorkspace')}>
+        <div className="login-form-area"><Suspense fallback={<p role="status">{t('common.loadingEllipsis')}</p>}><AuthPanel /></Suspense></div>
+        <div className="solar-preferences"><PreferenceControls /></div>
       </section>
     </main>
   );

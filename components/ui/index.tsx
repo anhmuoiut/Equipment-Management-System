@@ -18,13 +18,6 @@ export function Button({
   loading?: boolean;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const pad = size === 'sm' ? 'px-2.5 py-1 text-[12px]' : 'px-3.5 py-1.5 text-[13px]';
-  const style =
-    variant === 'primary'
-      ? { background: 'var(--machine)', color: '#fff', borderColor: 'var(--machine)' }
-      : variant === 'danger'
-        ? { background: 'transparent', color: 'var(--alert)', borderColor: 'var(--alert)' }
-        : { background: 'var(--panel)', color: 'var(--ink)', borderColor: 'var(--rule)' };
-
   // Explicit per-variant hover/pressed state (ui-requirements.md 2.4) —
   // replaces the removed global `button:hover { filter: brightness(.97) }`,
   // which applied a uniform darken to every button regardless of variant
@@ -39,10 +32,11 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      style={{ ...style, ...rest.style }}
+      style={rest.style}
       className={`ui-button ui-button--${size} ${stateClass} border font-medium disabled:opacity-40 ${pad} ${rest.className ?? ''}`}
     >
       {loading && <Loader2 size={size === 'sm' ? 13 : 15} aria-hidden="true" className="ui-spin" />}
+      {variant === 'danger' && !loading && <TriangleAlert size={14} aria-hidden="true" />}
       {children}
     </button>
   );
@@ -57,7 +51,9 @@ export function Tag({ text, tone = 'neutral' }: { text: string; tone?: 'neutral'
         ? { background: 'var(--machine-tint)', color: 'var(--ok)', borderColor: 'var(--ok)' }
         : { background: 'transparent', color: 'var(--ink-2)', borderColor: 'var(--rule)' };
   return (
-    <span className="ui-tag border px-1.5 py-[1px] text-[11px] font-medium" style={c}>
+    <span className="ui-tag border px-1.5 py-[1px] text-[11px] font-medium" data-tone={tone} style={c}>
+      {tone === 'warn' && <TriangleAlert size={12} aria-hidden="true" />}
+      {tone === 'ok' && <CheckCircle2 size={12} aria-hidden="true" />}
       {text}
     </span>
   );
@@ -74,7 +70,8 @@ export function Notice({
         ? { borderColor: 'var(--warn)', background: 'var(--warn-tint)', color: 'var(--warn)' }
         : { borderColor: 'var(--machine)', background: 'var(--machine-tint)', color: 'var(--ok)' };
   return (
-    <div className="flex items-start gap-3 border-l-2 py-2 pl-3 pr-2 text-[13px]" style={c}>
+    <div className="ui-notice flex items-start gap-3 border-l-2 py-2 pl-3 pr-2 text-[13px]" data-tone={tone} role={tone === 'alert' ? 'alert' : 'status'} style={c}>
+      {tone === 'info' ? <Info size={18} className="shrink-0" aria-hidden="true" /> : <TriangleAlert size={18} className="shrink-0" aria-hidden="true" />}
       <div className="flex-1">{children}</div>
       {onDismiss && (
         <button onClick={onDismiss} className="text-[11px] underline" style={{ color: 'inherit' }}>
@@ -141,7 +138,7 @@ export function Modal({
   return (
     <div className="modal-overlay"
          data-action-dialog="true"
-         style={{ background: 'rgba(18,25,26,0.35)' }}
+         style={{ background: 'var(--overlay)' }}
          onClick={(e) => { e.stopPropagation(); onClose(); }}>
       <div
         ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title}

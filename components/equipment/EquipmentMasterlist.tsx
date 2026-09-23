@@ -474,7 +474,7 @@ export function EquipmentMasterlist({ archivedOnly }: { archivedOnly: boolean })
       {openTarget && me && (
         <div
           className="equipment-detail-overlay"
-          style={{ background: 'rgba(18,25,26,0.45)' }}
+          style={{ background: 'var(--overlay)' }}
           onClick={() => setOpenTarget(null)}
           role="presentation"
         >

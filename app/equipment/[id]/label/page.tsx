@@ -35,7 +35,7 @@ export default function EquipmentLabelPage({ params }: { params: Promise<{ id: s
 
   useEffect(() => {
     const url = `${window.location.origin}/equipment/${id}`;
-    void QRCode.toDataURL(url, { width: 240, margin: 1 }).then(setQrDataUrl);
+    void QRCode.toDataURL(url, { width: 240, margin: 1, color: { dark: '#002B49', light: '#FFFFFF' } }).then(setQrDataUrl);
   }, [id]);
 
   if (error) {

@@ -1,5 +1,7 @@
 # UI layout review
 
+> Historical layout review. The current palette, typography and component styling are documented in [Jabil interface system](JABIL_UI.md). Screenshots below predate the September 23 brand redesign.
+
 Updated: 20 September 2026. Implemented in the current application.
 
 This redesign follows the reference's clear sidebar, pale table headers, neatly aligned rows and restrained spacing. All existing light/dark color variables, the Jabil logo and equipment status colors are preserved.

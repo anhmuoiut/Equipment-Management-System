@@ -4,34 +4,41 @@
 
 :root {
   color-scheme: light;
-  --machine: #0067b1;
-  --machine-dark: #00528e;
-  --machine-tint: #eaf3fc;
-  --navy: #0c2e4e;
-  --ink: #172e46;
-  --ink-2: #53677b;
-  --ink-3: #687c90;
-  --surface: #f3f6fa;
-  --panel: #ffffff;
-  --rule: #d3dfeb;
-  --rule-soft: #e9eff5;
-  --warn: #946000;
-  --warn-tint: #fff5dd;
-  --alert: #b33232;
-  --alert-tint: #fff0f0;
-  --ok: #0067a1;
+  --jabil-prussian: #002B49;
+  --jabil-white: #FFFFFF;
+  --jabil-picton: #3CB4E5;
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --machine: var(--jabil-prussian);
+  --machine-dark: color-mix(in srgb, var(--jabil-prussian) 85%, var(--jabil-picton));
+  --machine-tint: color-mix(in srgb, var(--jabil-picton) 10%, var(--jabil-white));
+  --navy: var(--jabil-prussian);
+  --ink: var(--jabil-prussian);
+  --ink-2: color-mix(in srgb, var(--jabil-prussian) 78%, var(--jabil-white));
+  --ink-3: color-mix(in srgb, var(--jabil-prussian) 68%, var(--jabil-white));
+  --surface: color-mix(in srgb, var(--jabil-prussian) 3%, var(--jabil-white));
+  --panel: var(--jabil-white);
+  --rule: color-mix(in srgb, var(--jabil-prussian) 17%, var(--jabil-white));
+  --rule-soft: color-mix(in srgb, var(--jabil-prussian) 8%, var(--jabil-white));
+  --warn: var(--ink);
+  --warn-tint: var(--machine-tint);
+  --alert: var(--ink);
+  --alert-tint: color-mix(in srgb, var(--jabil-prussian) 7%, var(--panel));
+  --ok: var(--ink);
+  --action-ink: var(--jabil-white);
+  --overlay: color-mix(in srgb, var(--jabil-prussian) 48%, transparent);
+  --shadow-panel: 0 4px 22px color-mix(in srgb, var(--jabil-prussian) 4%, transparent);
 
   /* On-brand surface tokens (ui-requirements.md 2.1) — the Header/Sidebar
-     sit on --navy in both themes, so these stay constant across themes
+     use dark navigation surfaces, so these stay constant across themes
      rather than living in the dark-mode block below; centralizes hex
      literals that used to be repeated across TopBar-related rules. */
-  --on-brand: #ffffff;
-  --on-brand-muted: #cfe1f2;
-  --on-brand-hover: #ffffff0c;
-  --on-brand-active: #ffffff12;
-  --on-brand-active-border: #ffffff20;
-  --on-brand-active-indicator: #5bb8ff;
-  --on-brand-focus: #52a8e9;
+  --on-brand: var(--jabil-white);
+  --on-brand-muted: color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white));
+  --on-brand-hover: color-mix(in srgb, var(--jabil-white) 4.71%, transparent);
+  --on-brand-active: color-mix(in srgb, var(--jabil-white) 7.06%, transparent);
+  --on-brand-active-border: color-mix(in srgb, var(--jabil-white) 12.55%, transparent);
+  --on-brand-active-indicator: var(--jabil-picton);
+  --on-brand-focus: var(--jabil-picton);
 
   /* Spacing scale (ui-requirements.md 2.2) — explicit px, not Tailwind's
      rem-based spacing utilities: the app's 14px root font-size would throw
@@ -61,34 +68,30 @@
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --machine: #247cc2;
-  --machine-dark: #1668a8;
-  --machine-tint: #16344e;
-  --navy: #09243d;
-  --ink: #e2edf8;
-  --ink-2: #b0c1d2;
-  --ink-3: #91a8bf;
-  --surface: #0c1825;
-  --panel: #122335;
-  --rule: #30465d;
-  --rule-soft: #21374b;
-  --warn: #f6c76c;
-  --warn-tint: #3a301d;
-  --alert: #ffaaaa;
-  --alert-tint: #3c242d;
-  --ok: #83c7ff;
+  --machine: var(--jabil-picton);
+  --machine-dark: color-mix(in srgb, var(--jabil-picton) 80%, var(--jabil-white));
+  --machine-tint: color-mix(in srgb, var(--jabil-picton) 14%, var(--jabil-prussian));
+  --ink: var(--jabil-white);
+  --ink-2: color-mix(in srgb, var(--jabil-white) 85%, var(--jabil-prussian));
+  --ink-3: color-mix(in srgb, var(--jabil-white) 70%, var(--jabil-prussian));
+  --surface: var(--jabil-prussian);
+  --panel: color-mix(in srgb, var(--jabil-white) 5%, var(--jabil-prussian));
+  --rule: color-mix(in srgb, var(--jabil-white) 22%, var(--jabil-prussian));
+  --rule-soft: color-mix(in srgb, var(--jabil-white) 11%, var(--jabil-prussian));
+  --action-ink: var(--jabil-prussian);
+  --overlay: color-mix(in srgb, var(--jabil-prussian) 76%, transparent);
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--surface); color: var(--ink); font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
-.ident { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-:where(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #52a8e9; outline-offset: 3px; }
+html, body { margin: 0; background: var(--surface); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.ident { font-family: var(--font-ui); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+:where(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid var(--jabil-picton); outline-offset: 3px; }
 /* Visible-on-focus skip link (3.1) — first focusable element on every
    page; off-screen until Tab reaches it, then pinned above everything. */
 .skip-link {
   position: fixed; top: -100%; left: var(--space-4); z-index: var(--z-feedback);
   padding: var(--space-2) var(--space-4); border-radius: var(--radius-control);
   background: var(--panel); color: var(--ink); font-size: 13px; font-weight: 600;
-  box-shadow: 0 4px 16px #06152640; transition: top var(--motion-color);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--jabil-prussian) 25.1%, transparent); transition: top var(--motion-color);
 }
 .skip-link:focus-visible { top: var(--space-4); }
 button { cursor: pointer; transition: background-color var(--motion-color), border-color var(--motion-color); }
@@ -139,7 +142,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .toast-item {
   display: flex; align-items: flex-start; gap: 9px; pointer-events: auto;
   padding: 11px 12px; border: 1px solid var(--rule); border-radius: var(--radius-control);
-  background: var(--panel); color: var(--ink); box-shadow: 0 10px 28px #06152622;
+  background: var(--panel); color: var(--ink); box-shadow: 0 10px 28px color-mix(in srgb, var(--jabil-prussian) 13.33%, transparent);
   animation: ui-toast-in 0.18s var(--sidebar-ease, ease-out);
 }
 @keyframes ui-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
@@ -162,12 +165,6 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .grid-table tbody tr[data-archived='true'] td { color: var(--ink-3); }
 .equipment-status { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); color: var(--ink-2); font-size: 11px; font-weight: 600; line-height: 18px; white-space: nowrap; }
 .equipment-status-dot { display: none; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.equipment-status[data-status='active'] { color: #166534; background: #dcfce7; border-color: #86efac; }
-.equipment-status[data-status='inactive'] { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
-.equipment-status:is([data-status='wait_reg'], [data-status='under_registration']) { color: #854d0e; background: #fef9c3; border-color: #e4c64b; }
-:root[data-theme='dark'] .equipment-status[data-status='active'] { color: #86efac; background: #143523; border-color: #34734a; }
-:root[data-theme='dark'] .equipment-status[data-status='inactive'] { color: #fca5a5; background: #421f25; border-color: #914447; }
-:root[data-theme='dark'] .equipment-status:is([data-status='wait_reg'], [data-status='under_registration']) { color: #fde047; background: #3b3216; border-color: #88702b; }
 .preference-controls { display: flex; align-items: center; gap: 12px; color: var(--ink-2); flex-shrink: 0; }
 .language-switch { display: flex; align-items: center; gap: 3px; padding: 4px 5px 4px 10px; border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); }
 .language-switch > svg { margin-right: 5px; }
@@ -184,7 +181,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
   overflow: hidden;
   padding: 42px 48px 34px;
   color: white;
-  background: #0c2e4e;
+  background: var(--jabil-prussian);
 }
 /* `contain` (not `cover`) — top-anchored, on the same navy the panel already
    uses — so the full photo always shows regardless of how tall/narrow the
@@ -193,7 +190,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .login-hero-image {
   position: absolute;
   inset: 0;
-  background-image: url('/Image/TEguy.jpg');
+  background-image: url('/Image/TEguy.png');
   background-size: contain;
   background-position: center top;
   background-repeat: no-repeat;
@@ -201,18 +198,18 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .login-hero-image::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(12, 46, 78, 0) 42%, #0c2e4e 88%);
+  background: linear-gradient(180deg, transparent 42%, var(--jabil-prussian) 88%);
 }
 .brand-division-tag {
   position: absolute; top: 32px; left: 48px; z-index: 1;
-  font-size: 11px; font-weight: 600; letter-spacing: .14em; color: #eaf3fc;
-  background: #ffffff26; border: 1px solid #ffffff40; padding: 7px 14px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: .14em; color: color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white));
+  background: color-mix(in srgb, var(--jabil-white) 14.9%, transparent); border: 1px solid color-mix(in srgb, var(--jabil-white) 25.1%, transparent); padding: 7px 14px; border-radius: 999px;
   backdrop-filter: blur(3px);
 }
 .brand-content { width: 100%; max-width: 460px; margin-inline: auto; position: relative; z-index: 1; }
-.brand-kicker { color: #8ec7f1; font-size: 11px; font-weight: 600; letter-spacing: .16em; margin-bottom: 22px; }
+.brand-kicker { color: color-mix(in srgb, var(--jabil-prussian) 16%, var(--jabil-white)); font-size: 11px; font-weight: 600; letter-spacing: .16em; margin-bottom: 22px; }
 .brand-content h2 { font-size: clamp(24px, 2.4vw, 36px); line-height: 1.3; letter-spacing: -.025em; font-weight: 500; text-align: center; }
-.brand-footer { font-size: 11px; color: #9cb7cf; margin-top: 26px; position: relative; z-index: 1; }
+.brand-footer { font-size: 11px; color: color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)); margin-top: 26px; position: relative; z-index: 1; }
 .login-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--panel); padding: clamp(12px, 2.5dvh, 28px) clamp(20px, 3vw, 36px); }
 .login-toolbar { display: flex; justify-content: flex-end; flex-shrink: 0; }
 .login-form-area { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; padding: clamp(8px, 2dvh, 24px) 4px; overscroll-behavior: contain; }
@@ -227,7 +224,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .login-input input { min-width: 0; width: 100%; height: 100%; background: transparent; outline: none; border: 0; font-size: 13px; }
 .login-input > svg { flex-shrink: 0; }
 .password-toggle { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 34px; border-radius: 5px; }
-.sign-in-button { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 44px; background: var(--machine); color: white; border: 1px solid var(--machine-dark); border-radius: 9px; font-size: 13px; font-weight: 500; margin-top: 16px; box-shadow: 0 3px 6px #005c9c15; }
+.sign-in-button { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; height: 44px; background: var(--machine); color: white; border: 1px solid var(--machine-dark); border-radius: 9px; font-size: 13px; font-weight: 500; margin-top: 16px; box-shadow: 0 3px 6px color-mix(in srgb, color-mix(in srgb, var(--jabil-prussian) 70%, var(--jabil-white)) 8.24%, transparent); }
 .sign-in-button:disabled { opacity: .6; }
 .login-help { text-align: center; color: var(--ink-3); font-size: 12px; margin-top: 14px; line-height: 1.5; }
 .login-help span { color: var(--ink-2); }
@@ -258,13 +255,13 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 /* One continuous blue bar — the brand block used to sit on --navy while the
    rest of the bar sat on --panel, which read as two different headers
    whenever the sidebar collapsed and the seam between them moved. */
-.app-topbar { height: var(--header-height); display: flex; align-items: center; gap: 28px; background: var(--navy); color: white; border-bottom: 1px solid #ffffff1f; padding-right: 28px; }
+.app-topbar { height: var(--header-height); display: flex; align-items: center; gap: 28px; background: var(--navy); color: white; border-bottom: 1px solid color-mix(in srgb, var(--jabil-white) 12.16%, transparent); padding-right: 28px; }
 .app-brand { display: flex; flex-direction: column; justify-content: center; align-self: stretch; width: var(--sidebar-width); flex-shrink: 0; gap: 5px; padding: 16px 20px; color: white; }
 .app-brand-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.app-brand-title { font-size: 11px; color: #d3e4f5; white-space: nowrap; }
+.app-brand-title { font-size: 11px; color: color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)); white-space: nowrap; }
 .app-brand .jabil-logo { width: 112px; color: white; }
-.sidebar-toggle { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; color: white; background: #ffffff0c; border: 1px solid #ffffff38; border-radius: 8px; }
-.sidebar-toggle:hover { background: #ffffff20; }
+.sidebar-toggle { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; color: white; background: color-mix(in srgb, var(--jabil-white) 4.71%, transparent); border: 1px solid color-mix(in srgb, var(--jabil-white) 21.96%, transparent); border-radius: 8px; }
+.sidebar-toggle:hover { background: color-mix(in srgb, var(--jabil-white) 12.55%, transparent); }
 /* The collapse/expand control now lives on the sidebar itself (a persistent,
    always-clickable rail), not in the header — the header's own copy is only
    ever shown on mobile, where the sidebar is an off-canvas drawer with no
@@ -280,7 +277,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
    with one click instead of disappearing along with the rest of the menu. */
 .app-shell[data-sidebar-open='false'] .sidebar-region { width: var(--sidebar-rail-width); }
 .sidebar-backdrop {
-  position: fixed; inset: var(--header-height) 0 0; z-index: 40; background: #06152680; cursor: default; border: 0;
+  position: fixed; inset: var(--header-height) 0 0; z-index: 40; background: color-mix(in srgb, var(--jabil-prussian) 50.2%, transparent); cursor: default; border: 0;
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity 220ms var(--sidebar-ease), visibility 0s linear 220ms;
 }
@@ -295,7 +292,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .sidebar-collapse-toggle svg { transition: transform var(--sidebar-duration) var(--sidebar-ease); }
 .app-shell[data-sidebar-open='false'] .sidebar-collapse-toggle svg { transform: rotate(180deg); }
 .sidebar-caption {
-  color: #8ba9c2; font-size: 10px; font-weight: 500; letter-spacing: .1em; padding: 0 14px; margin-bottom: var(--space-3);
+  color: color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)); font-size: 10px; font-weight: 500; letter-spacing: .1em; padding: 0 14px; margin-bottom: var(--space-3);
   max-height: 20px; border-top: 1px solid transparent;
   opacity: 1; visibility: visible; overflow: hidden;
   transition: opacity var(--sidebar-label-in-duration) var(--sidebar-ease) var(--sidebar-label-in-delay), visibility 0s linear 0s,
@@ -320,24 +317,24 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
    left offset — padding never changes between expanded/collapsed, so the
    icon's x-position is pixel-identical in both states (item 3). Only the
    label column's own opacity/width animates away next to it. */
-.sidebar-link { display: flex; align-items: center; gap: var(--space-2); min-height: 48px; padding: var(--space-3); border-radius: var(--radius-control); font-size: 13px; color: #cfe1f2; border: 1px solid transparent; border-left: 3px solid transparent; }
+.sidebar-link { display: flex; align-items: center; gap: var(--space-2); min-height: 48px; padding: var(--space-3); border-radius: var(--radius-control); font-size: 13px; color: color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)); border: 1px solid transparent; border-left: 3px solid transparent; }
 .sidebar-link-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex-shrink: 0; }
 .sidebar-link-icon svg { flex-shrink: 0; }
-.sidebar-link:hover { background: #ffffff0c; }
-.sidebar-link[aria-current='page'] { color: white; background: #ffffff12; border-color: #ffffff20; border-left-color: #5bb8ff; font-weight: 500; }
+.sidebar-link:hover { background: color-mix(in srgb, var(--jabil-white) 4.71%, transparent); }
+.sidebar-link[aria-current='page'] { color: white; background: color-mix(in srgb, var(--jabil-white) 7.06%, transparent); border-color: color-mix(in srgb, var(--jabil-white) 12.55%, transparent); border-left-color: var(--jabil-picton); font-weight: 500; }
 /* Indent is extra left padding (not margin) so it animates in step with
    the sidebar width instead of snapping away separately. */
 .sidebar-link-nested {
-  padding-left: 26px; min-height: 40px; font-size: 12px; color: #b7cee0;
+  padding-left: 26px; min-height: 40px; font-size: 12px; color: color-mix(in srgb, var(--jabil-prussian) 16%, var(--jabil-white));
   transition: padding-left var(--sidebar-duration) var(--sidebar-ease);
 }
 .app-shell[data-sidebar-open='false'] .sidebar-link-nested { padding-left: 12px; }
 .sidebar-note {
-  margin-top: auto; display: flex; gap: 8px; align-items: center; font-size: 10px; color: #a3bdd2; padding: 28px 12px 0;
+  margin-top: auto; display: flex; gap: 8px; align-items: center; font-size: 10px; color: color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)); padding: 28px 12px 0;
   opacity: 1; visibility: visible;
   transition: opacity var(--sidebar-label-in-duration) var(--sidebar-ease) var(--sidebar-label-in-delay), visibility 0s linear 0s;
 }
-.sidebar-status { height: 5px; width: 5px; flex-shrink: 0; background: #65b5ed; border-radius: 50%; }
+.sidebar-status { height: 5px; width: 5px; flex-shrink: 0; background: var(--jabil-picton); border-radius: 50%; }
 /* Collapsed rail: icons only — the accessible name moves to aria-label
    (always set) and a hover title, so nothing is lost for anyone, just not
    shown at 72px wide. Caption/note/label fade out and only leave the
@@ -370,10 +367,10 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
    detail modal's Actions menu. */
 .user-menu { position: relative; }
 .user-menu-trigger { display: flex; align-items: center; gap: 9px; padding: 4px 10px 4px 4px; border: 1px solid transparent; border-radius: 20px; color: white; font-size: 12px; }
-.user-menu-trigger:hover { background: #ffffff12; border-color: #ffffff20; }
-.user-menu-trigger > svg { flex-shrink: 0; color: #b7cee0; }
+.user-menu-trigger:hover { background: color-mix(in srgb, var(--jabil-white) 7.06%, transparent); border-color: color-mix(in srgb, var(--jabil-white) 12.55%, transparent); }
+.user-menu-trigger > svg { flex-shrink: 0; color: color-mix(in srgb, var(--jabil-prussian) 16%, var(--jabil-white)); }
 .user-menu-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.user-menu-list { position: absolute; top: calc(100% + 6px); right: 0; z-index: 65; min-width: 190px; padding: 4px; border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); box-shadow: 0 10px 28px #06152622; }
+.user-menu-list { position: absolute; top: calc(100% + 6px); right: 0; z-index: 65; min-width: 190px; padding: 4px; border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); box-shadow: 0 10px 28px color-mix(in srgb, var(--jabil-prussian) 13.33%, transparent); }
 .user-menu-list button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 10px; border-radius: 6px; text-align: left; font-size: 12.5px; color: var(--ink); }
 .user-menu-list button:hover { background: var(--machine-tint); }
 .user-menu-list button[data-danger] { color: var(--alert); }
@@ -385,9 +382,9 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .notification-bell { position: relative; }
 .notification-trigger {
   position: relative; display: grid; place-items: center; width: 36px; height: 36px;
-  border-radius: 50%; border: 1px solid transparent; color: #b7cee0;
+  border-radius: 50%; border: 1px solid transparent; color: color-mix(in srgb, var(--jabil-prussian) 16%, var(--jabil-white));
 }
-.notification-trigger:hover { background: #ffffff12; border-color: #ffffff20; color: white; }
+.notification-trigger:hover { background: color-mix(in srgb, var(--jabil-white) 7.06%, transparent); border-color: color-mix(in srgb, var(--jabil-white) 12.55%, transparent); color: white; }
 .notification-badge {
   position: absolute; top: 2px; right: 2px; display: grid; place-items: center;
   min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
@@ -396,7 +393,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .notification-panel {
   position: absolute; top: calc(100% + 6px); right: 0; z-index: 65; width: 360px; max-width: calc(100vw - 32px);
   display: flex; flex-direction: column; max-height: 70vh;
-  border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); box-shadow: 0 10px 28px #06152622;
+  border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); box-shadow: 0 10px 28px color-mix(in srgb, var(--jabil-prussian) 13.33%, transparent);
   overflow: hidden;
 }
 .notification-panel-head {
@@ -425,8 +422,8 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 /* The theme/language pickers default to a light --panel pill, sized for a
    white topbar. Both app themes' --navy is dark, so give them a translucent
    white treatment here instead of relying on --panel/--rule contrast. */
-.app-topbar .language-switch, .app-topbar .theme-switch { background: #ffffff12; border-color: #ffffff30; color: white; }
-.app-topbar .language-switch button[aria-pressed='true'] { background: #ffffff26; color: white; }
+.app-topbar .language-switch, .app-topbar .theme-switch { background: color-mix(in srgb, var(--jabil-white) 7.06%, transparent); border-color: color-mix(in srgb, var(--jabil-white) 18.82%, transparent); color: white; }
+.app-topbar .language-switch button[aria-pressed='true'] { background: color-mix(in srgb, var(--jabil-white) 14.9%, transparent); color: white; }
 /* overflow-x: clip guards against a horizontal-scrollbar flash while the
    sidebar width is mid-transition (item 5/9) — the wide equipment table
    and dashboard cards already scroll internally, so nothing legitimate
@@ -531,7 +528,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
   z-index: 100; /* stays above modal panels (80) the same way SearchableSelect's popover does */
   display: flex; flex-direction: column; overflow: hidden;
   border: 1px solid var(--rule); border-radius: var(--radius-panel); background: var(--panel);
-  box-shadow: 0 10px 32px #06152628;
+  box-shadow: 0 10px 32px color-mix(in srgb, var(--jabil-prussian) 15.69%, transparent);
 }
 .equipment-filters-panel-head {
   display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
@@ -639,7 +636,6 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 
 /* Extra semantic tone for the Repair status (admin-configurable in general,
    but this is the one status code the seed data ships with a color for). */
-.equipment-status[data-status='repair'] { color: var(--alert); background: var(--alert-tint); border-color: var(--alert); }
 
 /* Direct /equipment/[id] deep-link page (QR target) — reuses the same
    bordered "dialog" look the masterlist's overlay uses, just inline. */
@@ -652,7 +648,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .ui-button--sm { min-height: 32px; }
 .ui-tag { display: inline-flex; align-items: center; white-space: nowrap; line-height: 1.6; }
 .modal-overlay { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px; }
-.modal-dialog { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100dvh - 48px); min-width: 0; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; outline: none; box-shadow: 0 24px 80px #06152630; }
+.modal-dialog { display: flex; flex-direction: column; width: 100%; max-width: 480px; max-height: calc(100dvh - 48px); min-width: 0; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; outline: none; box-shadow: 0 24px 80px color-mix(in srgb, var(--jabil-prussian) 18.82%, transparent); }
 .modal-dialog--wide { max-width: 760px; }
 .modal-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--rule-soft); }
 .modal-header h2 { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
@@ -705,7 +701,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
   .sidebar-region,
   .app-shell[data-sidebar-open='false'] .sidebar-region {
     position: fixed; top: var(--header-height); left: 0; bottom: 0; z-index: 50; overflow-y: auto;
-    box-shadow: 8px 0 24px #06152630; width: var(--sidebar-width);
+    box-shadow: 8px 0 24px color-mix(in srgb, var(--jabil-prussian) 18.82%, transparent); width: var(--sidebar-width);
     transform: translateX(-100%); visibility: hidden;
     transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 250ms;
   }
@@ -816,9 +812,9 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .hierarchy-children > .hierarchy-branch:last-child::before { height: 50%; }
 .hierarchy-children > .hierarchy-branch:only-child::before { display: none; }
 .hierarchy-children > .hierarchy-branch::after { content: ''; position: absolute; top: 50%; left: -16px; width: 16px; border-top: 2px solid var(--ink-3); }
-.hierarchy-card { display: flex; flex-direction: column; width: 200px; flex-shrink: 0; padding: 10px; border: 1px solid var(--rule); border-radius: 10px; text-align: left; color: var(--ink); background: var(--panel); box-shadow: 0 2px 5px #06152608; }
-button.hierarchy-card:hover { border-color: var(--machine); background: var(--machine-tint); box-shadow: 0 3px 10px #0067b115; }
-.hierarchy-card[data-selected='true'] { border: 2px solid var(--machine); padding: 9px; background: var(--machine-tint); box-shadow: 0 0 0 4px var(--panel), 0 4px 12px #0067b11a; }
+.hierarchy-card { display: flex; flex-direction: column; width: 200px; flex-shrink: 0; padding: 10px; border: 1px solid var(--rule); border-radius: 10px; text-align: left; color: var(--ink); background: var(--panel); box-shadow: 0 2px 5px color-mix(in srgb, var(--jabil-prussian) 3.14%, transparent); }
+button.hierarchy-card:hover { border-color: var(--machine); background: var(--machine-tint); box-shadow: 0 3px 10px color-mix(in srgb, var(--machine) 8.24%, transparent); }
+.hierarchy-card[data-selected='true'] { border: 2px solid var(--machine); padding: 9px; background: var(--machine-tint); box-shadow: 0 0 0 4px var(--panel), 0 4px 12px color-mix(in srgb, var(--machine) 10.2%, transparent); }
 .hierarchy-card-top { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 13px; font-weight: 600; }
 .hierarchy-type-name { min-width: 0; overflow-wrap: anywhere; }
 .hierarchy-viewing-label { flex-shrink: 0; margin-left: auto; padding: 2px 5px; border-radius: 4px; background: var(--panel); color: var(--ok); font-size: 9px; font-weight: 500; }
@@ -848,7 +844,7 @@ button.hierarchy-card:hover { border-color: var(--machine); background: var(--ma
 
 /* Dialog size follows the viewport; header and tabs stay outside the scroll area. */
 .equipment-detail-overlay { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.equipment-detail-dialog { display: flex; flex-direction: column; width: min(1200px, 100%); min-width: 0; min-height: 0; max-height: calc(100dvh - 32px); overflow: hidden; border: 1px solid var(--rule); border-radius: 12px; outline: none; box-shadow: 0 20px 60px #06152630; }
+.equipment-detail-dialog { display: flex; flex-direction: column; width: min(1200px, 100%); min-width: 0; min-height: 0; max-height: calc(100dvh - 32px); overflow: hidden; border: 1px solid var(--rule); border-radius: 12px; outline: none; box-shadow: 0 20px 60px color-mix(in srgb, var(--jabil-prussian) 18.82%, transparent); }
 .equipment-detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; max-height: inherit; }
 .equipment-detail-header { padding: 14px 20px; }
 .equipment-detail-tabs { padding: 0 20px; overflow-x: auto; }
@@ -875,7 +871,7 @@ button.hierarchy-card:hover { border-color: var(--machine); background: var(--ma
 
 /* Actions dropdown — non-portal, closes on outside click. */
 .detail-actions-menu { position: relative; }
-.detail-actions-menu-list { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 190px; padding: 4px; border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); box-shadow: 0 10px 28px #06152622; }
+.detail-actions-menu-list { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 190px; padding: 4px; border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); box-shadow: 0 10px 28px color-mix(in srgb, var(--jabil-prussian) 13.33%, transparent); }
 .detail-actions-menu-list button { display: block; width: 100%; padding: 7px 9px; border-radius: 6px; text-align: left; font-size: 12.5px; color: var(--ink); }
 .detail-actions-menu-list button:hover { background: var(--machine-tint); }
 .detail-actions-menu-list button[data-danger] { color: var(--alert); }
@@ -892,7 +888,7 @@ button.hierarchy-card:hover { border-color: var(--machine); background: var(--ma
 .detail-parent-link:hover { text-decoration: underline; }
 .detail-parent-serial { font-size: 11px; color: var(--ink-3); }
 .detail-overview-edit { padding-bottom: 64px; }
-.detail-edit-footer { position: sticky; bottom: -16px; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 22px -20px -16px; padding: 12px 20px; border-top: 1px solid var(--rule); background: var(--panel); box-shadow: 0 -6px 16px #06152614; }
+.detail-edit-footer { position: sticky; bottom: -16px; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 22px -20px -16px; padding: 12px 20px; border-top: 1px solid var(--rule); background: var(--panel); box-shadow: 0 -6px 16px color-mix(in srgb, var(--jabil-prussian) 7.84%, transparent); }
 .detail-edit-status { font-size: 12px; color: var(--ink-3); }
 
 /* History tab — icon-per-action timeline. */
@@ -998,7 +994,7 @@ button.hierarchy-card:hover { border-color: var(--machine); background: var(--ma
 /* the root layout, so this owns its whole page background/centering.     */
 /* ---------------------------------------------------------------------- */
 .label-page { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; background: var(--surface); }
-.label-toolbar button { min-height: 40px; padding: 0 18px; border: 1px solid var(--machine); border-radius: 8px; background: var(--machine); color: #fff; font-size: 13px; font-weight: 500; }
+.label-toolbar button { min-height: 40px; padding: 0 18px; border: 1px solid var(--machine); border-radius: 8px; background: var(--machine); color: var(--jabil-white); font-size: 13px; font-weight: 500; }
 .label-card { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 320px; padding: 24px; border: 1px solid var(--rule); border-radius: 14px; background: var(--panel); text-align: center; }
 .label-heading { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
 .label-qr { width: 180px; height: 180px; image-rendering: pixelated; }
@@ -1007,6 +1003,6 @@ button.hierarchy-card:hover { border-color: var(--machine); background: var(--ma
 .label-error { color: var(--alert); font-size: 14px; }
 @media print {
   .no-print { display: none !important; }
-  .label-page { min-height: 0; padding: 0; background: #fff; }
-  .label-card { border: 1px solid #000; box-shadow: none; width: auto; }
+  .label-page { min-height: 0; padding: 0; background: var(--jabil-white); }
+  .label-card { border: 1px solid var(--jabil-prussian); box-shadow: none; width: auto; }
 }
