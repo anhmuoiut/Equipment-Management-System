@@ -9,6 +9,10 @@ import { ToastViewport } from '@/components/ui';
 
 const STORAGE_KEY = 'equipment-sidebar-open';
 const MOBILE_QUERY = '(max-width: 800px)';
+// Pages built on the Masterlist's full-height table (toolbar and footer stay
+// put, only rows scroll) — the data-page='masterlist' rules in globals.css.
+// Archived equipment is the same list, so it gets the same layout.
+const FULL_HEIGHT_LIST_PAGES = new Set(['/equipment', '/equipment/archived', '/calibration']);
 
 export function AppShell({
   username, fullName, role, permissions = [], children,
@@ -83,12 +87,14 @@ export function AppShell({
         closeMobile();
       } else if (event.key === 'Tab') {
         // Keep keyboard navigation in the open menu and its header toggle.
+        // Links inside a closed sidebar group are inert (not focusable), so
+        // they can't be the first/last stop.
         const items = [
           toggleRef.current,
           ...Array.from(panelRef.current?.querySelectorAll<HTMLElement>(
             'a[href], button:not([disabled]), [tabindex="0"]',
           ) ?? []),
-        ].filter((item): item is HTMLElement => item !== null);
+        ].filter((item): item is HTMLElement => item !== null && !item.closest('[inert]'));
         const first = items[0];
         const last = items[items.length - 1];
         if (event.shiftKey && document.activeElement === first) {
@@ -110,7 +116,7 @@ export function AppShell({
   }, [isMobile, mobileOpen, closeMobile]);
 
   return (
-    <div ref={shellRef} className="app-shell" data-page={pathname === '/equipment' ? 'masterlist' : undefined} data-mobile-open={mobileOpen} data-sidebar-open={sidebarOpen}>
+    <div ref={shellRef} className="app-shell" data-page={FULL_HEIGHT_LIST_PAGES.has(pathname) ? 'masterlist' : undefined} data-mobile-open={mobileOpen} data-sidebar-open={sidebarOpen}>
       {/* Visible only on keyboard focus (ui-requirements.md 3.1) — the
           first focusable element on every page, so Tab from the address
           bar reaches main content without tabbing through the whole header

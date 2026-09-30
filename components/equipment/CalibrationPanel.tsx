@@ -26,7 +26,12 @@ const STATE_TONE: Record<string, 'neutral' | 'warn' | 'alert' | 'ok'> = {
 type FormState = { calibration_date: string; calibration_due_date: string; calibrated_by: string };
 const EMPTY_FORM: FormState = { calibration_date: '', calibration_due_date: '', calibrated_by: '' };
 
-export function CalibrationPanel({ equipmentId, me, disabled }: { equipmentId: string; me: Me; disabled: boolean }) {
+export function CalibrationPanel({ equipmentId, me, disabled, onChanged }: {
+  equipmentId: string; me: Me; disabled: boolean;
+  /** A record was added or edited — lets a list showing calibration state
+   *  (the Calibration page) refresh behind the dialog. */
+  onChanged?: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const language = i18n.language === 'vi' ? 'vi' : 'en';
   const [status, setStatus] = useState<CalibrationStatus | null>(null);
@@ -69,6 +74,7 @@ export function CalibrationPanel({ equipmentId, me, disabled }: { equipmentId: s
       }
       setDialog(null);
       load();
+      onChanged?.();
     } catch (e) {
       if (e instanceof ApiError) setDialogError(e);
     } finally {

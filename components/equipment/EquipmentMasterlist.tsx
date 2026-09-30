@@ -38,6 +38,7 @@ import {
 import { Button, EmptyState, ErrorState, Notice, Tag, TableSkeleton, toast } from '@/components/ui';
 import { translateError } from '@/lib/i18n/errors';
 import { EquipmentDetailModal, hasPermission, type Me } from '@/components/equipment/EquipmentDetailModal';
+import { EquipmentDetailOverlay } from '@/components/equipment/EquipmentDetailOverlay';
 import { CreateEquipmentModal } from '@/components/equipment/CreateEquipmentModal';
 import { ImportEquipmentModal } from '@/components/equipment/ImportEquipmentModal';
 import { EquipmentToolbar } from '@/components/equipment/EquipmentToolbar';
@@ -84,7 +85,6 @@ export function EquipmentMasterlist({ archivedOnly }: { archivedOnly: boolean })
 
   const fetchAbortRef = useRef<AbortController | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const detailRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLElement>(null);
   // Guards the very first fetchRows run (see the syncUrl effect below): on
   // mount, the URL-seeding effect's setXFilter calls haven't landed in state
@@ -117,41 +117,6 @@ export function EquipmentMasterlist({ archivedOnly }: { archivedOnly: boolean })
     if (!archivedOnly && sp.get('equipmentId')) setOpenTarget({ id: sp.get('equipmentId')!, mode: 'view' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (!openTarget || !me) return;
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    const content = contentRef.current;
-    document.body.style.overflow = 'hidden';
-    if (content) content.inert = true;
-    detailRef.current?.focus();
-
-    function keepFocusInside(event: KeyboardEvent) {
-      if (event.key !== 'Tab' || !detailRef.current) return;
-      if (event.target instanceof HTMLElement && event.target.closest('[data-action-dialog]')) return;
-      const focusable = Array.from(detailRef.current.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]',
-      )).filter(element => element.getClientRects().length > 0);
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (!first || !last) return;
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === detailRef.current)) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === detailRef.current)) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener('keydown', keepFocusInside);
-    return () => {
-      document.removeEventListener('keydown', keepFocusInside);
-      if (content) content.inert = false;
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-    };
-  }, [openTarget, me]);
 
   // Bootstrap: metadata tải một lần, không tải lại theo từng lần lọc.
   useEffect(() => {
@@ -472,38 +437,27 @@ export function EquipmentMasterlist({ archivedOnly }: { archivedOnly: boolean })
       </section>
 
       {openTarget && me && (
-        <div
-          className="equipment-detail-overlay"
-          style={{ background: 'var(--overlay)' }}
-          onClick={() => setOpenTarget(null)}
-          role="presentation"
+        <EquipmentDetailOverlay
+          label={t('dashboard.equipmentDetails') + ': ' + (rows.find(row => row.id === openTarget.id)?.serial_number ?? '')}
+          focusKey={`${openTarget.id}:${openTarget.mode}`}
+          backgroundRef={contentRef}
+          onClose={() => setOpenTarget(null)}
         >
-          <div
-            ref={detailRef}
-            tabIndex={-1}
-            className="equipment-detail-dialog"
-            style={{ background: 'var(--panel)', borderColor: 'var(--rule)' }}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('dashboard.equipmentDetails') + ': ' + (rows.find(row => row.id === openTarget.id)?.serial_number ?? '')}
-          >
-            <EquipmentDetailModal
-              key={`${openTarget.id}:${openTarget.mode}`}
-              id={openTarget.id}
-              me={me}
-              fields={fields}
-              locations={locations}
-              equipmentTypes={equipmentTypes}
-              equipmentLevels={equipmentLevels}
-              equipmentStatuses={equipmentStatuses}
-              initialMode={openTarget.mode}
-              onClose={() => setOpenTarget(null)}
-              onChanged={() => void fetchRows()}
-              onOpenOther={(id) => setOpenTarget({ id, mode: 'view' })}
-            />
-          </div>
-        </div>
+          <EquipmentDetailModal
+            key={`${openTarget.id}:${openTarget.mode}`}
+            id={openTarget.id}
+            me={me}
+            fields={fields}
+            locations={locations}
+            equipmentTypes={equipmentTypes}
+            equipmentLevels={equipmentLevels}
+            equipmentStatuses={equipmentStatuses}
+            initialMode={openTarget.mode}
+            onClose={() => setOpenTarget(null)}
+            onChanged={() => void fetchRows()}
+            onOpenOther={(id) => setOpenTarget({ id, mode: 'view' })}
+          />
+        </EquipmentDetailOverlay>
       )}
 
       {!archivedOnly && (

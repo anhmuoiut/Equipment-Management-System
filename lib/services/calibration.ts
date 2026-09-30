@@ -177,6 +177,142 @@ export async function listCalibrationAlerts(
   });
 }
 
+/** The states a calibration-required, active piece of equipment can be in
+ *  (NOT_REQUIRED equipment isn't on the Calibration page at all). */
+export const CALIBRATION_LIST_STATUSES = ['OVERDUE', 'NOT_CALIBRATED', 'DUE_SOON', 'VALID'] as const;
+export type CalibrationListStatus = typeof CALIBRATION_LIST_STATUSES[number];
+
+export type CalibrationOverviewRow = {
+  equipment_id: string; serial_number: string; part_number: string | null;
+  jabil_id: string | null; asset: string | null;
+  type_label: string | null; location_label: string | null;
+  calibration_status: CalibrationListStatus;
+  last_calibration_date: string | null; calibration_due_date: string | null; last_calibrated_by: string | null;
+  /** Whole days from today to the due date, negative once overdue; null
+   *  when never calibrated. "Today" is the UTC date — the calendar the
+   *  view's current_date decides OVERDUE/DUE_SOON by — so the two agree. */
+  days_until_due: number | null;
+};
+
+export type CalibrationOverviewCounts = Record<CalibrationListStatus | 'ALL', number>;
+
+export type CalibrationOverviewQuery = {
+  status?: CalibrationListStatus; search?: string; page: number; pageSize: number;
+};
+
+const URGENCY: Record<CalibrationListStatus, number> = { OVERDUE: 0, NOT_CALIBRATED: 1, DUE_SOON: 2, VALID: 3 };
+
+/** Most urgent state first (the same order as listCalibrationAlerts);
+ *  within a state the earliest due date — most overdue, or soonest due —
+ *  then serial number in natural order. */
+function byUrgency(a: CalibrationOverviewRow, b: CalibrationOverviewRow): number {
+  return URGENCY[a.calibration_status] - URGENCY[b.calibration_status]
+    || (a.calibration_due_date ?? '').localeCompare(b.calibration_due_date ?? '')
+    || a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true });
+}
+
+/**
+ * Search, count, filter, sort and page the whole calibration-required set.
+ * Pure, so the page's rules are testable without a database. Counts follow
+ * the search but not the status filter — each status button shows how many
+ * rows pressing it would list.
+ */
+export function buildCalibrationOverview(rows: readonly CalibrationOverviewRow[], query: CalibrationOverviewQuery) {
+  const term = query.search?.trim().toLowerCase() ?? '';
+  const matching = rows.filter((r) => !term || [
+    r.serial_number, r.part_number, r.jabil_id, r.asset, r.type_label, r.location_label, r.last_calibrated_by,
+  ].some((value) => value?.toLowerCase().includes(term)));
+
+  const counts: CalibrationOverviewCounts = { ALL: matching.length, OVERDUE: 0, NOT_CALIBRATED: 0, DUE_SOON: 0, VALID: 0 };
+  for (const r of matching) counts[r.calibration_status] += 1;
+
+  const listed = matching
+    .filter((r) => !query.status || r.calibration_status === query.status)
+    .sort(byUrgency);
+  const from = (query.page - 1) * query.pageSize;
+  return { rows: listed.slice(from, from + query.pageSize), total: listed.length, counts };
+}
+
+/** PostgREST caps the rows one request returns (Supabase: 1000 by default)
+ *  without saying so. The overview counts and sorts the whole set, so read
+ *  it request by request until the exact count is reached. */
+const ROWS_PER_REQUEST = 1000;
+
+async function selectAll<T>(
+  request: (from: number, to: number) => PromiseLike<{
+    data: unknown[] | null; error: Parameters<typeof mapRpcError>[0]; count: number | null;
+  }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (;;) {
+    const { data, error, count } = await request(rows.length, rows.length + ROWS_PER_REQUEST - 1);
+    if (error) throw mapRpcError(error);
+    const batch = (data ?? []) as T[];
+    rows.push(...batch);
+    if (batch.length === 0 || rows.length >= (count ?? 0)) return rows;
+  }
+}
+
+function daysBetween(fromDate: string, toDate: string): number {
+  return Math.round((Date.parse(`${toDate}T00:00:00Z`) - Date.parse(`${fromDate}T00:00:00Z`)) / 86_400_000);
+}
+
+type StatusViewRow = {
+  equipment_id: string; calibration_status: CalibrationListStatus | 'NOT_REQUIRED';
+  last_calibration_date: string | null; calibration_due_date: string | null; last_calibrated_by: string | null;
+};
+type EquipmentIdentityRow = {
+  id: string; serial_number: string; part_number: string | null; jabil_id: string | null; asset: string | null;
+  type: { display_name: string } | { display_name: string }[] | null;
+  current_location: { code: string } | { code: string }[] | null;
+};
+
+/**
+ * The Calibration page's list: every active, calibration-required piece of
+ * equipment with its derived state (the same equipment_calibration_status
+ * view the Dashboard and notification bell read) plus the identity columns
+ * the view doesn't carry. Two reads joined here rather than one embedded
+ * query — the view has no foreign key to embed equipment through — and no
+ * `in (…ids)` filter, which would grow the request URL with the list.
+ */
+export async function listCalibrationOverview(query: CalibrationOverviewQuery) {
+  const db = supabaseAdmin();
+  const [statuses, identities, dueSoonDays] = await Promise.all([
+    selectAll<StatusViewRow>((from, to) => db.from('equipment_calibration_status')
+      .select('equipment_id, calibration_status, last_calibration_date, calibration_due_date, last_calibrated_by', { count: 'exact' })
+      .is('archived_at', null).eq('calibration_required', true)
+      .order('equipment_id').range(from, to)),
+    selectAll<EquipmentIdentityRow>((from, to) => db.from('equipment')
+      .select('id, serial_number, part_number, jabil_id, asset, type:equipment_types!equipment_type_id_fkey(display_name), current_location:locations!equipment_current_location_id_fkey(code)', { count: 'exact' })
+      .is('archived_at', null).eq('calibration_required', true)
+      .order('id').range(from, to)),
+    getDueSoonDays(),
+  ]);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const identityById = new Map(identities.map((e) => [e.id, e]));
+  const rows: CalibrationOverviewRow[] = [];
+  for (const s of statuses) {
+    const eq = identityById.get(s.equipment_id);
+    // Absent when the record changed between the two reads (archived, or
+    // calibration no longer required) — it's simply not listed this time.
+    if (!eq || s.calibration_status === 'NOT_REQUIRED') continue;
+    const type = Array.isArray(eq.type) ? eq.type[0] : eq.type;
+    const location = Array.isArray(eq.current_location) ? eq.current_location[0] : eq.current_location;
+    rows.push({
+      equipment_id: eq.id, serial_number: eq.serial_number, part_number: eq.part_number,
+      jabil_id: eq.jabil_id, asset: eq.asset,
+      type_label: type?.display_name ?? null, location_label: location?.code ?? null,
+      calibration_status: s.calibration_status,
+      last_calibration_date: s.last_calibration_date,
+      calibration_due_date: s.calibration_due_date,
+      last_calibrated_by: s.last_calibrated_by,
+      days_until_due: s.calibration_due_date ? daysBetween(today, s.calibration_due_date) : null,
+    });
+  }
+  return { ...buildCalibrationOverview(rows, query), due_soon_days: dueSoonDays };
+}
+
 export async function getDueSoonDays(): Promise<number> {
   const { data } = await supabaseAdmin().from('app_settings').select('value').eq('key', 'calibration').maybeSingle();
   const value = (data as { value: { due_soon_days?: number } } | null)?.value;

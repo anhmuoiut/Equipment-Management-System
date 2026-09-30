@@ -1,240 +1,159 @@
-/* An edge-to-edge photograph and open form share one continuous surface.
-   All overrides stay scoped to authentication, including dark/mobile rules. */
+/* Login is an open photographic workspace, with no repeated hero text or
+   card behind the form. The landscape image keeps its natural 3:2 ratio. */
 .solar-login {
-  --solar-heading: var(--ink);
-  --solar-muted: var(--ink-2);
-  --solar-blue: var(--machine);
-  --solar-ground: var(--surface);
   --solar-mark-ground: var(--surface);
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(0, 57%) minmax(0, 43%);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 390px);
   grid-template-rows: auto;
+  align-items: center;
+  gap: clamp(40px, 5vw, 96px);
+  width: 100%;
   min-height: 100svh;
   height: auto;
+  padding: 48px max(40px, calc((100vw - 1560px) / 2));
   overflow: clip;
-  color: var(--solar-heading);
-  background: radial-gradient(ellipse at 94% 10%, var(--jabil-white) 0, transparent 50%),
-    radial-gradient(ellipse at 95% 95%, color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)) 0, transparent 56%), var(--solar-ground);
+  background: var(--surface);
+  color: var(--ink);
 }
-/* Fit the complete original photograph into 86% of the viewport height.
-   Its own softened edges merge into the navy backdrop; the outer mask still
-   finishes before the form column, keeping all fields unobstructed. */
-.solar-scene {
+.solar-grid {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 60%;
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
+  background-image: linear-gradient(var(--rule-soft) 1px, transparent 1px), linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(ellipse at 15% 50%, #000 0, transparent 68%);
+  mask-image: radial-gradient(ellipse at 15% 50%, #000 0, transparent 68%);
+  opacity: .65;
+}
+.solar-visual { position: relative; min-width: 0; padding: 14px 0; }
+.solar-photo-frame {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--jabil-prussian) 16%, transparent);
+  border-radius: 20px 20px 36px 20px;
   background: var(--jabil-prussian);
-  -webkit-mask-image: linear-gradient(90deg, #000 55%, #000f 65%, #0009 74%, #0003 85%, transparent 94%);
-  mask-image: linear-gradient(90deg, #000 55%, #000f 65%, #0009 74%, #0003 85%, transparent 94%);
+  box-shadow: 0 22px 60px -25px color-mix(in srgb, var(--jabil-prussian) 40%, transparent);
 }
-.solar-scene::before {
+.solar-photo { display: block; width: 100%; height: auto; border-radius: inherit; }
+.solar-photo-frame::before, .solar-photo-frame::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: min(100%, calc(86svh * 1129 / 1393));
-  aspect-ratio: 1129 / 1393;
-  background: url('/Image/TEguy.png') left top / contain no-repeat;
-  -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent 100%), linear-gradient(180deg, #000 84%, transparent 100%);
-  mask-image: linear-gradient(90deg, #000 90%, transparent 100%), linear-gradient(180deg, #000 84%, transparent 100%);
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
-}
-.solar-scene::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent 38%, color-mix(in srgb, var(--jabil-prussian) 10.2%, transparent) 58%, color-mix(in srgb, var(--jabil-prussian) 85.1%, transparent) 89%, color-mix(in srgb, var(--jabil-prussian) 92.94%, transparent) 100%);
-}
-.solar-atmosphere {
-  position: absolute;
-  inset: 0;
+  width: 36px;
+  height: 36px;
   pointer-events: none;
-  background: linear-gradient(112deg, transparent 55%, color-mix(in srgb, color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)) 9.41%, transparent) 55.2%, color-mix(in srgb, color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)) 14.12%, transparent) 58%, transparent 58.2%),
-    linear-gradient(112deg, transparent 60%, color-mix(in srgb, var(--jabil-white) 21.96%, transparent) 60.2%, color-mix(in srgb, var(--jabil-white) 3.14%, transparent) 61.5%, transparent 61.7%);
+  border-color: var(--jabil-picton);
 }
-.solar-login .login-brand {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  min-height: 100svh;
-  padding: clamp(30px, 4.3vw, 72px);
-  margin: 0;
-  background: transparent;
-  clip-path: none;
-  overflow: visible;
-}
-.solar-login .brand-content { display: block; width: 100%; max-width: min(470px, 34vw); margin: 0; color: white; }
-.solar-login .brand-content .jabil-logo { width: 132px; height: auto; margin-bottom: 26px; color: var(--jabil-white); }
-.solar-hero-kicker { margin: 0 0 9px; color: color-mix(in srgb, var(--jabil-prussian) 16%, var(--jabil-white)); font-size: 10px; font-weight: 500; letter-spacing: .24em; }
-.solar-login .brand-content h2 { max-width: 430px; font-size: clamp(28px, 3.4vw, 48px); line-height: 1.13; font-weight: 500; letter-spacing: -.035em; text-align: left; text-wrap: balance; }
-.solar-login .brand-footer { display: block; max-width: 335px; margin-top: 17px; color: color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)); font-size: 12px; line-height: 1.7; letter-spacing: .015em; }
-.solar-login .login-main {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-width: 0;
-  min-height: 100svh;
-  padding: 46px clamp(28px, 4.5vw, 80px) 26px 24px;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-}
-.solar-login .login-form-area { display: flex; flex: 0 0 auto; align-items: center; width: 100%; overflow: visible; padding: 0; }
-.solar-login .login-form { width: 100%; max-width: 366px; margin: 0 auto; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.solar-identity { margin-bottom: 30px; text-align: left; }
-.solar-mark { display: block; width: 120px; height: 94px; margin: 0 0 19px -7px; color: var(--solar-heading); }
+.solar-photo-frame::before { top: -10px; left: -10px; border-top: 2px solid; border-left: 2px solid; color: var(--jabil-picton); border-radius: 12px 0 0 0; }
+.solar-photo-frame::after { right: -10px; bottom: -10px; border-bottom: 2px solid; border-right: 2px solid; color: var(--jabil-picton); border-radius: 0 0 20px 0; }
+.solar-photo-edge { position: absolute; bottom: -1px; left: 34px; width: 80px; height: 3px; border-radius: 3px; background: var(--jabil-picton); }
+.solar-circuit { display: flex; align-items: center; gap: 7px; height: 1px; width: 105px; margin: 25px 0 0 34px; background: var(--rule); }
+.solar-circuit span { width: 5px; height: 5px; border: 1px solid var(--jabil-picton); background: var(--surface); border-radius: 50%; }
+.solar-circuit span:nth-child(2) { margin-left: auto; }
+.solar-login .login-main { position: relative; min-width: 0; min-height: 0; padding: 0; margin: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.solar-login .login-form-area { display: block; padding: 0; overflow: visible; }
+.solar-login .login-form { width: 100%; max-width: none; margin: 0; background: transparent; padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+.solar-identity { display: flex; align-items: center; gap: 13px; margin-bottom: 30px; }
+.solar-mark { width: 61px; height: 51px; flex-shrink: 0; color: var(--ink); }
 .solar-gear-center { fill: var(--solar-mark-ground); }
-.solar-overline { margin-bottom: 8px; color: var(--solar-muted); font-size: 10px; font-weight: 500; letter-spacing: .21em; }
-.solar-login .solar-identity h1 { font-size: clamp(32px, 3.15vw, 46px); line-height: 1.1; letter-spacing: -.055em; font-weight: 600; white-space: nowrap; }
-.solar-identity h1 span { color: var(--solar-heading); text-decoration: underline; text-decoration-color: var(--jabil-picton); text-decoration-thickness: 3px; text-underline-offset: 7px; }
-.solar-subtitle { margin-top: 8px; color: var(--solar-muted); font-size: 18px; line-height: 1.4; letter-spacing: -.01em; }
-.solar-spectrum { width: 46px; height: 3px; margin: 23px 0 14px; border-radius: 3px; background: linear-gradient(90deg, var(--machine) 0 74%, var(--jabil-picton) 74%); }
-.solar-motto { color: var(--solar-muted); font-size: 10px; line-height: 1.8; letter-spacing: .12em; }
-.solar-login .login-form > label, .solar-login .signup-field > label { display: block; color: var(--solar-heading); font-size: 13px; font-weight: 500; margin: 17px 0 7px; }
+.solar-product-name { font-size: 24px; font-weight: 600; line-height: 1.2; letter-spacing: -.04em; }
+.solar-subtitle { margin-top: 2px; font-size: 12px; color: var(--ink-2); }
+.login-intro { margin-bottom: 27px; }
+.solar-overline { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--ink-2); font-size: 10px; font-weight: 500; letter-spacing: .16em; }
+.solar-overline::before { content: ''; display: block; width: 17px; height: 2px; background: var(--jabil-picton); }
+.solar-login .login-intro h1 { font-size: clamp(28px, 2.4vw, 36px); font-weight: 500; line-height: 1.2; letter-spacing: -.045em; }
+.login-intro > p:last-child { max-width: 350px; margin-top: 10px; color: var(--ink-2); font-size: 13px; line-height: 1.65; }
+.solar-login .login-form > label, .solar-login .signup-field > label { display: block; margin: 16px 0 7px; color: var(--ink); font-size: 12px; font-weight: 500; }
 .solar-login .login-input {
-  height: 52px;
-  padding: 0 15px;
-  border: 1px solid color-mix(in srgb, color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)) 50.2%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--jabil-white) 39.61%, transparent);
-  color: var(--solar-muted);
-  box-shadow: 0 2px 7px color-mix(in srgb, var(--jabil-prussian) 1.18%, transparent);
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  display: flex;
+  align-items: center;
+  height: 50px;
+  padding: 0 13px;
+  gap: 11px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink-2);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-.solar-login .login-input input { font-size: 14px; color: var(--solar-heading); }
-.solar-login .login-input input::placeholder { color: color-mix(in srgb, var(--jabil-prussian) 70%, var(--jabil-white)); }
-.solar-login .login-input:focus-within { border-color: var(--machine); background: color-mix(in srgb, var(--jabil-white) 73.33%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--jabil-picton) 7.06%, transparent); }
-.solar-login .password-toggle { width: 38px; height: 44px; color: var(--solar-muted); }
-.solar-login .sign-in-button {
-  height: 51px;
-  margin-top: 23px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--machine);
-  color: var(--action-ink);
-  box-shadow: 0 8px 23px -9px color-mix(in srgb, var(--jabil-picton) 50.2%, transparent);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: .01em;
-}
-.solar-login .sign-in-button > svg { transition: transform 160ms ease; }
-.solar-login .sign-in-button:hover:not(:disabled) { background: var(--machine-dark); }
+.solar-login .login-input:focus-within { border-color: var(--jabil-picton); box-shadow: 0 0 0 3px color-mix(in srgb, var(--jabil-picton) 14%, transparent); }
+.solar-login .login-input input { width: 100%; min-width: 0; height: 100%; border: 0; border-radius: 0; outline: none; background: transparent; color: var(--ink); font-family: var(--font-ui); font-size: 14px; }
+.solar-login .login-input input::placeholder { color: var(--ink-3); }
+.solar-login .login-input input:autofill { background: var(--panel); color: var(--ink); }
+.solar-login .login-input input:-webkit-autofill,
+.solar-login .login-input input:-webkit-autofill:hover,
+.solar-login .login-input input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px var(--panel) inset; -webkit-text-fill-color: var(--ink); caret-color: var(--ink); }
+.solar-login .password-toggle { width: 36px; height: 44px; flex-shrink: 0; color: var(--ink-2); }
+.solar-login .sign-in-button { height: 50px; margin-top: 22px; border: 1px solid var(--machine); border-radius: 10px; background: var(--machine); color: var(--action-ink); box-shadow: 0 5px 14px -8px var(--jabil-prussian); font-size: 14px; font-weight: 500; }
+.solar-login .sign-in-button:hover:not(:disabled) { background: var(--machine-dark); border-color: var(--machine-dark); }
+.solar-login .sign-in-button > svg { transition: transform 150ms ease; }
 .solar-login .sign-in-button:hover:not(:disabled) > svg { transform: translateX(3px); }
-.solar-login .sign-in-button:active:not(:disabled) { transform: translateY(1px); }
-.solar-login .login-help { margin-top: 17px; color: var(--solar-heading); font-size: 11px; line-height: 1.8; }
-.solar-login .login-help span { color: var(--solar-muted); }
-.solar-login .request-account-link { min-height: 44px; width: auto; max-width: 100%; margin: 18px auto 0; padding: 8px 4px; border: 0; border-radius: 6px; color: var(--solar-blue); background: transparent; font-size: 12px; font-weight: 500; }
-.solar-login .request-account-link:hover { background: transparent; text-decoration: underline; text-underline-offset: 5px; }
-.solar-login .login-security { border: 0; padding: 0; margin-top: 17px; color: var(--solar-muted); font-size: 10px; gap: 6px; }
-.solar-login .login-security > svg { width: 13px; height: 13px; }
-.solar-preferences { display: flex; justify-content: center; width: 100%; max-width: 366px; margin-top: 24px; }
-.solar-login .preference-controls { gap: 14px; color: var(--solar-muted); }
-.solar-login .language-switch { background: transparent; border: 0; border-radius: 0; padding: 0; gap: 2px; }
-.solar-login .language-switch > svg { width: 14px; height: 14px; margin-right: 2px; }
-.solar-login .language-switch button { min-height: 36px; padding: 5px 7px; font-size: 10px; }
-.solar-login .language-switch button[aria-pressed='true'] { background: color-mix(in srgb, var(--jabil-picton) 4.31%, transparent); color: var(--solar-blue); }
-.solar-login .theme-switch { min-height: 36px; padding: 5px 9px; border: 0; border-radius: 8px; background: transparent; font-size: 10px; }
+.solar-login .login-help { margin-top: 17px; color: var(--ink); font-size: 12px; line-height: 1.7; }
+.solar-login .login-help span { color: var(--ink-2); }
+.solar-login .request-account-link { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; margin-top: 19px; padding: 8px 0; border: 0; border-top: 1px solid var(--rule-soft); border-radius: 0; background: transparent; color: var(--machine); font-size: 12px; }
+.solar-login .request-account-link:hover { background: transparent; text-decoration: underline; text-underline-offset: 4px; }
+.solar-login .login-security { margin-top: 13px; padding: 0; border: 0; color: var(--ink-3); font-size: 10px; }
+.solar-login .login-error { border-color: var(--alert); background: var(--alert-tint); color: var(--alert); }
+.solar-preferences { display: flex; justify-content: center; margin-top: 20px; }
+.solar-login .preference-controls { gap: 10px; color: var(--ink-2); }
+.solar-login .language-switch, .solar-login .theme-switch { border: 0; border-radius: 8px; background: transparent; padding: 4px; }
+.solar-login .language-switch > svg { width: 14px; height: 14px; }
+.solar-login .language-switch button { min-height: 32px; padding: 4px 7px; font-size: 10px; }
+.solar-login .language-switch button[aria-pressed='true'] { background: var(--machine-tint); color: var(--ink); }
+.solar-login .theme-switch { min-height: 36px; padding-inline: 9px; font-size: 10px; }
 .solar-login .theme-switch span { display: inline; }
-.solar-login .theme-switch:hover { background: color-mix(in srgb, var(--jabil-picton) 4.31%, transparent); }
-.solar-login .signup-form { max-width: 430px; }
-.solar-login .signup-form h1 { font-size: 30px; }
-.solar-login .login-description { margin: 10px 0 24px; color: var(--solar-muted); font-size: 13px; }
+.solar-login .theme-switch:hover { background: var(--machine-tint); }
+.solar-login .signup-form { max-width: none; }
+.solar-login .signup-form h1 { font-size: 28px; letter-spacing: -.035em; }
+.solar-login .login-description { font-size: 13px; margin: 10px 0 20px; color: var(--ink-2); }
+.solar-login .signup-fields { gap: 12px; }
 .solar-login .signup-field > label { margin-top: 0; }
-.solar-login .signup-fields { gap: 14px; }
-.solar-login .signup-actions { display: block; margin-top: 0; }
-.solar-login .signup-actions .sign-in-button { width: 100%; }
-.solar-login .signup-form .eyebrow { display: block; color: var(--solar-blue); }
+.solar-login .signup-actions { display: block; }
+.solar-login .signup-form .eyebrow { display: block; }
+:root[data-theme='dark'] .solar-photo-frame { border-color: var(--rule); }
 
-:root[data-theme='dark'] .solar-login {
-  --solar-heading: var(--ink);
-  --solar-muted: var(--ink-2);
-  --solar-blue: var(--machine);
-  --solar-ground: var(--surface);
-  --solar-mark-ground: var(--surface);
-  background: radial-gradient(ellipse at 95% 15%, var(--jabil-prussian) 0, transparent 52%),
-    radial-gradient(ellipse at 95% 95%, var(--jabil-prussian) 0, transparent 56%), var(--solar-ground);
+@media (min-width: 901px) and (max-height: 760px) {
+  .solar-login { padding-block: 28px; }
+  .solar-identity { margin-bottom: 20px; }
+  .login-intro { margin-bottom: 20px; }
+  .solar-login .login-intro h1 { font-size: 30px; }
+  .solar-preferences { margin-top: 12px; }
 }
-:root[data-theme='dark'] .solar-atmosphere { opacity: .25; }
-
-:root[data-theme='dark'] .solar-login .login-input { border-color: color-mix(in srgb, color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)) 27.84%, transparent); background: color-mix(in srgb, color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)) 3.14%, transparent); }
-:root[data-theme='dark'] .solar-login .login-input input::placeholder { color: color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)); }
-:root[data-theme='dark'] .solar-login .login-input:focus-within { border-color: var(--jabil-picton); background: color-mix(in srgb, color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)) 5.49%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--jabil-picton) 6.27%, transparent); }
-:root[data-theme='dark'] .solar-login .language-switch button[aria-pressed='true'],
-:root[data-theme='dark'] .solar-login .theme-switch:hover { background: color-mix(in srgb, color-mix(in srgb, var(--jabil-picton) 7%, var(--jabil-white)) 3.92%, transparent); }
-
-@media (min-width: 801px) and (max-height: 800px) {
-  .solar-login .login-main { padding-block: 26px 18px; }
-  .solar-mark { width: 94px; height: 73px; margin-bottom: 12px; }
-  .solar-identity { margin-bottom: 22px; }
-  .solar-spectrum { margin-block: 15px 10px; }
-  .solar-login .login-security { margin-top: 12px; }
-  .solar-preferences { margin-top: 14px; }
+@media (max-width: 1100px) and (min-width: 901px) {
+  .solar-login { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); gap: 32px; padding-inline: 28px; }
 }
-@media (min-width: 801px) and (max-width: 1100px) {
-  .solar-login { grid-template-columns: minmax(0, 53%) minmax(0, 47%); }
-  .solar-scene { width: 56%; }
-  .solar-login .login-main { padding-inline: 22px 34px; }
-  .solar-login .brand-content h2 { font-size: 34px; }
-}
-@media (max-width: 800px) {
-  .solar-login { display: flex; flex-direction: column; min-height: 100svh; overflow: clip; }
-  .solar-scene {
-    width: 100%;
-    height: 540px;
-    bottom: auto;
-    -webkit-mask-image: linear-gradient(180deg, #000 40%, #000e 52%, #0003 66%, transparent 83%);
-    mask-image: linear-gradient(180deg, #000 40%, #000e 52%, #0003 66%, transparent 83%);
-  }
-  .solar-scene::before { width: min(100%, 470px); }
-  .solar-scene::after { background: linear-gradient(180deg, transparent 35%, color-mix(in srgb, var(--jabil-prussian) 40%, transparent) 60%, color-mix(in srgb, var(--jabil-prussian) 80%, transparent) 100%); }
-  .solar-atmosphere { display: none; }
-  .solar-login .login-brand { min-height: 0; height: 350px; flex-shrink: 0; padding: 24px 28px 52px; }
-  .solar-login .brand-content { max-width: 470px; margin-inline: auto; }
-  .solar-login .brand-content .jabil-logo { width: 103px; margin-bottom: 12px; }
-  .solar-hero-kicker { margin: 0; font-size: 9px; letter-spacing: .18em; }
-  .solar-login .brand-content h2, .solar-login .brand-footer { display: none; }
-  .solar-login .login-main { min-height: 0; padding: 25px 28px 25px; margin: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-  .solar-login .login-form { max-width: 430px; }
-  .solar-login .login-form-area { align-items: flex-start; }
-  .solar-identity { display: grid; grid-template-columns: 75px minmax(0, 1fr); gap: 15px; align-items: center; margin-bottom: 24px; }
-  .solar-mark { width: 75px; height: 65px; margin: 0; }
-  .solar-overline { font-size: 8px; letter-spacing: .12em; margin-bottom: 6px; }
-  .solar-login .solar-identity h1 { font-size: clamp(24px, 5.9vw, 34px); }
-  .solar-subtitle { font-size: 13px; margin-top: 5px; }
-  .solar-spectrum, .solar-motto { display: none; }
-  .solar-login .login-input { height: 50px; background: color-mix(in srgb, var(--jabil-white) 52.94%, transparent); }
+@media (max-width: 900px) {
+  .solar-login { display: flex; flex-direction: column; align-items: stretch; gap: 28px; padding: 28px max(24px, calc((100vw - 560px) / 2)); }
+  .solar-grid { background-size: 32px 32px; -webkit-mask-image: linear-gradient(#000, transparent 60%); mask-image: linear-gradient(#000, transparent 60%); }
+  .solar-visual { padding: 0; }
+  .solar-photo-frame { border-radius: 14px 14px 24px 14px; }
+  .solar-photo-frame::before { top: -7px; left: -7px; width: 23px; height: 23px; }
+  .solar-photo-frame::after { right: -7px; bottom: -7px; width: 23px; height: 23px; }
+  .solar-circuit { display: none; }
+  .solar-login .login-main { width: 100%; max-width: 430px; margin: 0 auto; padding: 0; }
+  .solar-identity { margin-bottom: 24px; }
+  .solar-mark { width: 51px; height: 44px; }
+  .solar-product-name { font-size: 22px; }
+  .solar-login .login-intro h1 { font-size: 29px; }
+  .login-intro { margin-bottom: 20px; }
   .solar-login .login-input input { font-size: 16px; }
-  .solar-login .sign-in-button { height: 50px; margin-top: 20px; }
-  .solar-login .login-form > label { margin-top: 15px; }
-  .solar-login .login-help { font-size: 12px; }
-  .solar-login .login-security { margin-top: 14px; }
-  .solar-preferences { max-width: 430px; margin-top: 18px; }
   .solar-login .language-switch button, .solar-login .theme-switch { min-height: 44px; }
-  .solar-login .signup-fields { grid-template-columns: 1fr; gap: 13px; }
+  .solar-login .signup-fields { grid-template-columns: 1fr; }
   .solar-login .signup-field--wide { grid-column: auto; }
-  .solar-login .signup-form h1 { font-size: 28px; }
-}
-@media (min-width: 501px) and (max-width: 800px) {
-  .solar-scene { height: 620px; }
-  .solar-login .login-brand { height: 405px; }
 }
 @media (max-width: 380px) {
-  .solar-login .login-main { padding-inline: 22px; }
-  .solar-login .login-brand { height: 320px; padding-inline: 22px; }
-  .solar-scene { height: 500px; }
-  .solar-identity { grid-template-columns: 60px minmax(0, 1fr); gap: 12px; }
-  .solar-mark { width: 60px; height: 56px; }
+  .solar-login { padding: 20px; gap: 24px; }
+  .solar-identity { margin-bottom: 20px; }
+  .solar-login .login-intro h1 { font-size: 27px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .solar-login .login-input, .solar-login .sign-in-button > svg { transition: none; }
+}
+
+/* Single-column variant (no photo) — the forced change-password screen
+   (components/ForcedPasswordChange.tsx) shares the sign-in form styling. */
+.solar-login.solar-login--single { grid-template-columns: minmax(0, 390px); justify-content: center; }
+@media (max-width: 900px) {
+  .solar-login.solar-login--single { justify-content: flex-start; }
 }

@@ -1,5 +1,7 @@
 # Equipment Management
 
+> **UI requirements for developers and AI assistants:** Read [docs/JABIL_UI.md](docs/JABIL_UI.md) before adding or changing UI. It defines the accepted branding, compact layout, shared components, themes and responsive behavior.
+
 Web app nội bộ quản lý Tester / Base / Fixture / Equipment, thay cách ghi chép bằng Excel.
 
 Triển khai theo **Spec v0.9**. Mọi quyết định kiến trúc trong code đều có chú thích trỏ về số mục trong spec — khi sửa code, sửa spec trước.
@@ -280,3 +282,25 @@ integration suite under `database/test/` predates the V2 schema
 (`database/full_reset.sql`) — types/level/status are now `type_id`/
 `level_id`/`status_id` master-data references instead of free text, and it
 needs a rewrite before it passes again.
+
+## Admin hardening (database/migrations/003_admin_hardening.sql)
+
+Run `003_admin_hardening.sql` in the Supabase SQL Editor **before** deploying
+the app version that ships with it — `withAuth` reads the new
+`user_profiles.sessions_revoked_at` column on every request, so the new code
+against an old database fails every request. What it changes:
+
+- Creating a user, changing role/permissions, activating/deactivating and
+  deleting a custom field each run as one database transaction (RPC), with
+  old → new values in the audit log. Admin → **Audit log** shows them.
+- An admin can't deactivate or demote themselves or reset their own
+  password from the Users screen, and the last active admin can't be
+  removed (`LAST_ADMIN`).
+- Roles are Administrator / User / Viewer. Self-requested (Local) accounts
+  arrive as Viewer: **Reactivate** approves them, switching the role to User
+  lets them do more than view.
+- A password set by an admin (new account or reset) must be replaced at the
+  next sign-in (`/change-password`); a reset also signs the account out
+  everywhere. The first admin created by `seed-first-admin.ts` goes through
+  the same screen.
+- The unused `user.manage` permission is removed; `error_log` keeps 90 days.

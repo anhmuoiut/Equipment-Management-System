@@ -19,11 +19,14 @@
   --panel: var(--jabil-white);
   --rule: color-mix(in srgb, var(--jabil-prussian) 17%, var(--jabil-white));
   --rule-soft: color-mix(in srgb, var(--jabil-prussian) 8%, var(--jabil-white));
-  --warn: var(--ink);
-  --warn-tint: var(--machine-tint);
-  --alert: var(--ink);
-  --alert-tint: color-mix(in srgb, var(--jabil-prussian) 7%, var(--panel));
-  --ok: var(--ink);
+  /* Brand colors govern the shell; semantic colors communicate outcomes. */
+  --warn: #8A5100;
+  --warn-tint: #FFF4D6;
+  --alert: #B42318;
+  --alert-tint: #FFF0EE;
+  --success: #17683A;
+  --success-tint: #EAF7EF;
+  --ok: var(--machine);
   --action-ink: var(--jabil-white);
   --overlay: color-mix(in srgb, var(--jabil-prussian) 48%, transparent);
   --shadow-panel: 0 4px 22px color-mix(in srgb, var(--jabil-prussian) 4%, transparent);
@@ -68,6 +71,12 @@
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --warn: #FFD078;
+  --warn-tint: #3B301C;
+  --alert: #FFB4AB;
+  --alert-tint: #422827;
+  --success: #8DD7A8;
+  --success-tint: #183D2C;
   --machine: var(--jabil-picton);
   --machine-dark: color-mix(in srgb, var(--jabil-picton) 80%, var(--jabil-white));
   --machine-tint: color-mix(in srgb, var(--jabil-picton) 14%, var(--jabil-prussian));
@@ -147,7 +156,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 }
 @keyframes ui-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 .toast-item-icon { flex-shrink: 0; margin-top: 1px; }
-.toast-item[data-tone='success'] .toast-item-icon { color: var(--ok); }
+.toast-item[data-tone='success'] .toast-item-icon { color: var(--success); }
 .toast-item[data-tone='info'] .toast-item-icon { color: var(--machine); }
 .toast-item[data-tone='warning'] .toast-item-icon { color: var(--warn); }
 .toast-item[data-tone='error'] .toast-item-icon { color: var(--alert); }
@@ -299,20 +308,19 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
               max-height var(--sidebar-duration) var(--sidebar-ease), margin var(--sidebar-duration) var(--sidebar-ease), padding var(--sidebar-duration) var(--sidebar-ease);
 }
 /* Rail mode removes the caption from layout entirely rather than just
-   fading it (3.2) — the second ("Administration") caption's reserved space
-   becomes a subtle divider with 16px spacing instead, so the two nav
-   groups stay visually separated even with no caption text to do it. */
+   fading it (3.2). Workspace and Administration are separated by
+   .sidebar-divider (below) in both modes, so nothing depends on caption
+   text to keep the two groups apart. */
 .app-shell[data-sidebar-open='false'] .sidebar-caption {
   max-height: 0; margin-bottom: 0; padding-left: 0; padding-right: 0;
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity var(--sidebar-label-out-duration) var(--sidebar-ease) var(--sidebar-label-out-delay), visibility 0s linear var(--sidebar-duration),
               max-height var(--sidebar-duration) var(--sidebar-ease), margin var(--sidebar-duration) var(--sidebar-ease), padding var(--sidebar-duration) var(--sidebar-ease);
 }
-.app-shell[data-sidebar-open='false'] .sidebar-caption.mt-6 {
-  margin-top: var(--space-4) !important; padding-top: var(--space-4);
-  border-top-color: var(--on-brand-hover);
-}
-.app-sidebar nav { display: grid; gap: var(--space-1); }
+/* minmax(0, 1fr): an `auto` column grows to the widest link's unbreakable
+   label, pushing every link past the sidebar edge; bounded, a long label
+   (e.g. Vietnamese) truncates with an ellipsis and its title shows it all. */
+.app-sidebar nav { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
 /* Icon lives in a fixed-width column (.sidebar-link-icon) at a constant
    left offset — padding never changes between expanded/collapsed, so the
    icon's x-position is pixel-identical in both states (item 3). Only the
@@ -321,9 +329,13 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .sidebar-link-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex-shrink: 0; }
 .sidebar-link-icon svg { flex-shrink: 0; }
 .sidebar-link:hover { background: color-mix(in srgb, var(--jabil-white) 4.71%, transparent); }
-.sidebar-link[aria-current='page'] { color: white; background: color-mix(in srgb, var(--jabil-white) 7.06%, transparent); border-color: color-mix(in srgb, var(--jabil-white) 12.55%, transparent); border-left-color: var(--jabil-picton); font-weight: 500; }
-/* Indent is extra left padding (not margin) so it animates in step with
-   the sidebar width instead of snapping away separately. */
+/* aria-current="true" marks an Administration category while one of its
+   other pages is open (the link itself points at the category's first
+   page) — the same selection as the current page. */
+.sidebar-link:is([aria-current='page'], [aria-current='true']) { color: white; background: color-mix(in srgb, var(--jabil-white) 7.06%, transparent); border-color: color-mix(in srgb, var(--jabil-white) 12.55%, transparent); border-left-color: var(--jabil-picton); font-weight: 500; }
+/* Nested = an Administration category under its group toggle. Indent is
+   extra left padding (not margin) so it animates in step with the sidebar
+   width instead of snapping away separately. */
 .sidebar-link-nested {
   padding-left: 26px; min-height: 40px; font-size: 12px; color: color-mix(in srgb, var(--jabil-prussian) 16%, var(--jabil-white));
   transition: padding-left var(--sidebar-duration) var(--sidebar-ease);
@@ -359,6 +371,42 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
               transform var(--sidebar-label-out-duration) var(--sidebar-ease) var(--sidebar-label-out-delay),
               visibility 0s linear var(--sidebar-duration);
 }
+/* A label with something trailing it (the Administration chevron, a
+   "Soon" badge): both live inside the label, so they fade and collapse
+   with it in the rail instead of overflowing the narrow column. */
+.sidebar-link-label--split { display: flex; flex: 1; align-items: center; gap: var(--space-2); min-width: 0; }
+.sidebar-link-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-link-badge {
+  flex-shrink: 0; margin-left: auto; padding: 0 6px; border: 1px solid currentColor; border-radius: 999px;
+  font-size: 10px; font-weight: 500; line-height: 16px; letter-spacing: .02em; opacity: .85;
+}
+/* Workspace and Administration are separated by a rule — the
+   Administration toggle names its own group, so there's no second caption. */
+.sidebar-divider { flex-shrink: 0; height: 1px; margin: var(--space-3) var(--space-2); background: var(--on-brand-active-border); }
+/* Administration: one disclosure button and its category links. Height
+   animates through grid rows (0fr → 1fr); visibility flips only once a
+   collapse has finished, and AppSidebar marks the closed panel `inert`, so
+   hidden links never take focus. The clip wrapper reaches 6px past the nav
+   on each side (the list's padding gives it back) so a focused link's
+   outline isn't cut off. */
+.sidebar-group-toggle { width: 100%; text-align: left; }
+.sidebar-group-chevron { flex-shrink: 0; margin-left: auto; transition: transform var(--sidebar-duration) var(--sidebar-ease); }
+.sidebar-group[data-open='true'] .sidebar-group-chevron { transform: rotate(180deg); }
+.sidebar-group-panel {
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 0fr; visibility: hidden;
+  transition: grid-template-rows var(--sidebar-duration) var(--sidebar-ease), visibility 0s linear var(--sidebar-duration);
+}
+.sidebar-group[data-open='true'] > .sidebar-group-panel {
+  grid-template-rows: 1fr; visibility: visible;
+  transition: grid-template-rows var(--sidebar-duration) var(--sidebar-ease), visibility 0s linear 0s;
+}
+.sidebar-group-clip { min-height: 0; overflow: hidden; margin-inline: -6px; }
+.sidebar-group-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); padding: 6px; }
+/* The current page is inside a closed group: the toggle takes the
+   selection marker, so "where am I" never disappears from the sidebar. */
+.sidebar-group[data-open='false'] > .sidebar-group-toggle[data-current='true'] { color: white; border-left-color: var(--jabil-picton); font-weight: 600; }
+/* Icon-only rail: a faint band shows which icons belong to the open group. */
+.app-shell[data-sidebar-open='false'] .sidebar-group[data-open='true'] { border-radius: var(--radius-control); background: var(--on-brand-hover); }
 .topbar-actions { display: flex; align-items: center; gap: 16px; margin-left: auto; flex-shrink: 0; }
 .user-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: var(--machine-tint); color: var(--ok); font-size: 11px; font-weight: 600; }
 /* Header user chip + logout used to be two separate controls; this combines
@@ -455,11 +503,9 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .page-heading p { max-width: 720px; color: var(--ink-2); font-size: 13px; line-height: 1.6; margin-top: var(--space-2); }
 .page-heading-actions { flex-shrink: 0; display: flex; align-items: center; gap: var(--space-2); }
 .admin-page { min-width: 0; }
-/* Mobile-only fallback nav — on a phone, closing the sidebar hides it
-   entirely (no rail), so this compact strip stands in for it. On desktop
-   the collapsed sidebar is still a navigable icon rail, so it's redundant
-   there (see the ≤800px block below, which is the only place this shows). */
-.admin-tabs { display: none; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+/* Tabs between the pages of one Administration category (AdminNav) — the
+   sidebar lists categories only, so this is shown at every width. */
+.admin-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
 .admin-tab { padding: 9px 12px; font-size: 12px; font-weight: 500; border: 1px solid var(--rule); border-radius: 8px; color: var(--ink-2); background: var(--panel); }
 .admin-tab:hover { background: var(--surface); }
 .admin-tab[data-active='true'] { background: var(--machine-tint); color: var(--ok); border-color: var(--machine); }
@@ -591,7 +637,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .kpi-card-icon { color: var(--ink-3); }
 .kpi-card[data-tone='alert'] .kpi-card-icon { color: var(--alert); }
 .kpi-card[data-tone='warn'] .kpi-card-icon { color: var(--warn); }
-.kpi-card[data-tone='ok'] .kpi-card-icon { color: var(--ok); }
+.kpi-card[data-tone='ok'] .kpi-card-icon { color: var(--success); }
 .kpi-card-value { font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: -.02em; color: var(--ink); }
 .kpi-card[data-tone='alert'] .kpi-card-value { color: var(--alert); }
 .kpi-card[data-tone='warn'] .kpi-card-value { color: var(--warn); }
@@ -619,7 +665,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .calibration-health-value { font-size: 20px; font-weight: 700; color: var(--ink); }
 .calibration-health-cell[data-tone='alert'] .calibration-health-value { color: var(--alert); }
 .calibration-health-cell[data-tone='warn'] .calibration-health-value { color: var(--warn); }
-.calibration-health-cell[data-tone='ok'] .calibration-health-value { color: var(--ok); }
+.calibration-health-cell[data-tone='ok'] .calibration-health-value { color: var(--success); }
 
 .dashboard-activity-list { display: flex; flex-direction: column; gap: 12px; }
 .dashboard-activity-list > li { display: flex; gap: 10px; align-items: flex-start; }
@@ -629,10 +675,36 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .calibration-status-card { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
 .calibration-status-card[data-tone='alert'] { border-color: var(--alert); background: var(--alert-tint); color: var(--alert); }
 .calibration-status-card[data-tone='warn'] { border-color: var(--warn); background: var(--warn-tint); color: var(--warn); }
-.calibration-status-card[data-tone='ok'] { border-color: var(--ok); background: var(--machine-tint); color: var(--ok); }
+.calibration-status-card[data-tone='ok'] { border-color: var(--success); background: var(--success-tint); color: var(--success); }
 .calibration-status-label { font-size: 14px; font-weight: 600; }
 .calibration-status-meta { margin-top: 2px; font-size: 12px; opacity: .85; }
 .calibration-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+
+/* Calibration page (/calibration) — status segments with live counts are
+   the page's main filter (one press, no dropdown); the icon and count tone
+   supplement the text label, never replace it. */
+.calibration-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.calibration-filter > button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--rule); border-radius: var(--radius-control); background: var(--panel);
+  color: var(--ink-2); font-size: 12.5px; font-weight: 500; white-space: nowrap;
+}
+.calibration-filter > button:hover { background: var(--machine-tint); border-color: var(--machine); }
+.calibration-filter > button[aria-pressed='true'] { background: var(--machine-tint); border-color: var(--machine); color: var(--ink); font-weight: 600; }
+.calibration-filter > button[data-tone='alert'] > svg { color: var(--alert); }
+.calibration-filter > button[data-tone='warn'] > svg { color: var(--warn); }
+.calibration-filter > button[data-tone='ok'] > svg { color: var(--success); }
+.calibration-filter-count {
+  min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--surface); color: var(--ink);
+  font-size: 11.5px; font-weight: 600; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.calibration-filter > button[aria-pressed='true'] .calibration-filter-count { background: var(--panel); }
+/* Due date plus how far away (or how late) it is, stacked in one cell. */
+.calibration-due { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; }
+.calibration-due-relative { font-size: 11.5px; color: var(--ink-3); }
+.calibration-due-relative[data-tone='alert'] { color: var(--alert); font-weight: 600; }
+.calibration-due-relative[data-tone='warn'] { color: var(--warn); font-weight: 500; }
+.calibration-window-note a { color: var(--machine); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Extra semantic tone for the Repair status (admin-configurable in general,
    but this is the one status code the seed data ships with a color for). */
@@ -716,9 +788,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
   .page-heading p { font-size: 13px; }
   .preference-controls { gap: 6px; }
   .language-switch button { min-height: 32px; }
-  /* Only meaningful on mobile — closing the drawer here hides it completely
-     (no rail to fall back on), so the compact tab strip stands in for it. */
-  .app-shell[data-sidebar-open='false'] .admin-tabs { display: flex; }
+  .admin-tab { display: inline-flex; align-items: center; min-height: 44px; }
   .app-shell[data-page='masterlist'] .app-content { padding: 16px 12px; }
   .app-shell[data-page='masterlist'] .equipment-scroll, .equipment-scroll { min-height: 240px; max-height: 65dvh; }
   .equipment-toolbar { padding: 14px 14px 0; gap: 12px; }
@@ -757,6 +827,12 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
   .equipment-table .col-types, .equipment-table .col-level,
   .equipment-table .col-remark { display: none; }
   .equipment-table td, .equipment-table th { padding: 12px 10px; }
+  /* Calibration on a phone: Status, Serial and Due date — the rest is on
+     the row's detail (Calibration tab). */
+  .calibration-filter > button { min-height: 44px; }
+  .calibration-table .col-part, .calibration-table .col-types, .calibration-table .col-location,
+  .calibration-table .col-last, .calibration-table .col-by { display: none; }
+  .calibration-table td, .calibration-table th { padding: 12px 10px; }
   .equipment-table .equipment-status { gap: 0; padding: 0; border: 0; background: transparent; }
   .equipment-table .equipment-status-dot { display: inline-block; width: 9px; height: 9px; }
   .equipment-table .equipment-status-label {

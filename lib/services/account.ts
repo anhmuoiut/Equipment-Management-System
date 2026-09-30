@@ -42,6 +42,11 @@ export async function changeOwnPassword(
   if (!account) throw new AppError('UNAUTHORIZED');
 
   await verifyCurrentPassword(currentPassword, account as Account);
+  // Mostly matters for the forced change after an admin-set password: keeping
+  // the password the admin chose would defeat the point of forcing a change.
+  if (newPassword === currentPassword) {
+    throw new AppError('VALIDATION_ERROR', { fields: { new_password: 'must differ from the current password' } });
+  }
 
   if (account.auth_provider === 'local') {
     const password_hash = await hashPassword(newPassword);
@@ -57,7 +62,8 @@ export async function changeOwnPassword(
   } else {
     const { error: updErr } = await db.auth.admin.updateUserById(userId, { password: newPassword });
     if (updErr) throw new AppError('SERVER_ERROR', { stage: 'set_password' });
-    await db.from('user_profiles').update({ must_change_password: false }).eq('id', userId);
+    const { error: flagErr } = await db.from('user_profiles').update({ must_change_password: false }).eq('id', userId);
+    if (flagErr) throw mapRpcError(flagErr);
   }
 
   await db.from('audit_log').insert({

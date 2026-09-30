@@ -5,11 +5,13 @@ import { AppError } from '@/lib/errors';
 /** Call only with the ID returned by verified server-side authentication. */
 export async function getProfileIdentity(userId: string) {
   const { data, error } = await supabaseAdmin().from('user_profiles')
-    .select('username,full_name,is_active,role,token_version').eq('id', userId).maybeSingle();
+    .select('username,full_name,is_active,role,token_version,sessions_revoked_at,must_change_password')
+    .eq('id', userId).maybeSingle();
   if (error) throw new AppError('SERVER_ERROR');
   return data as {
     username: string; full_name: string; is_active: boolean;
     role: 'admin' | 'user' | 'viewer'; token_version: number;
+    sessions_revoked_at: string | null; must_change_password: boolean;
   } | null;
 }
 

@@ -5,25 +5,21 @@
  * all admin-managed reference tables with the identical shape (code/display
  * name/description/order/active, statuses additionally carrying
  * requires_remark) — one page, one table pattern (MasterDataTable), four
- * instances instead of four bespoke screens.
+ * instances instead of four bespoke screens. App-wide settings (the
+ * calibration Due Soon window) are the Configuration category's other tab,
+ * /admin/calibration-settings.
  */
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '@/lib/client/api';
 import { AdminNav } from '@/components/admin/AdminNav';
+import { useAdminAccess } from '@/components/admin/AdminAccessContext';
+import { canAccessAdminSection } from '@/lib/permissions';
 import { MasterDataTable } from '@/components/admin/MasterDataTable';
-import { CalibrationSettingsCard } from '@/components/admin/CalibrationSettingsCard';
 import { PageHeading } from '@/components/layout/PageHeading';
-
-type Me = { role: 'admin' | 'user' | 'viewer'; permissions: string[] };
 
 export default function AdminMasterDataPage() {
   const { t } = useTranslation();
-  const [me, setMe] = useState<Me | null>(null);
-
-  useEffect(() => { void api.get<Me>('/api/me').then((r) => setMe(r.data)); }, []);
-
-  const canManage = !!me && (me.role === 'admin' || me.permissions.includes('master_data.manage'));
+  const { role, permissions } = useAdminAccess();
+  const canManage = canAccessAdminSection(role, permissions, 'masterData');
 
   return (
     <div className="admin-page">
@@ -32,9 +28,6 @@ export default function AdminMasterDataPage() {
       <AdminNav />
 
       <div className="equipment-panel" style={{ padding: 20, display: 'grid', gap: 24 }}>
-        <div style={{ paddingBottom: 20, borderBottom: '1px solid var(--rule-soft)' }}>
-          <CalibrationSettingsCard canManage={canManage} />
-        </div>
         <MasterDataTable
           title={t('dashboard.type')} hint={t('adminMasterData.typesHint')}
           endpoint="/api/admin/master-data/types" showRequiresRemark={false} canManage={canManage}

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserPlus, UserRound } from 'lucide-react';
 import { PreferenceControls } from '@/components/Preferences';
-import { JabilLogo } from '@/components/JabilLogo';
+import Image from 'next/image';
 import './login.css';
 import { safeLoginDestination } from '@/lib/auth/username';
 
@@ -44,12 +44,14 @@ function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
       <div className="solar-identity">
         <SolarMark />
         <div className="solar-identity-copy">
-          <p className="solar-overline">{t('loginBrand.division')}</p>
-          <h1>TE-Solar<span>Edge</span></h1>
+          <p className="solar-product-name">SolarEdge</p>
           <p className="solar-subtitle">{t('loginBrand.headlineLine2')}</p>
         </div>
-        <div className="solar-spectrum" aria-hidden="true" />
-        <p className="solar-motto">{t('loginBrand.motto')}</p>
+      </div>
+      <div className="login-intro">
+        <p className="solar-overline">{t('loginBrand.division')}</p>
+        <h1>{t('login.welcomeBack')}</h1>
+        <p>{t('login.description')}</p>
       </div>
 
       <label htmlFor="username">{t('login.username')}</label>
@@ -287,14 +289,22 @@ export default function LoginPage() {
   const { t } = useTranslation();
   return (
     <main className="login-page solar-login">
-      <div className="solar-scene" aria-hidden="true" />
-      <div className="solar-atmosphere" aria-hidden="true" />
-      <section className="login-brand" aria-label={t('loginBrand.division')}>
-        <div className="brand-content">
-          <JabilLogo />
-          <p className="solar-hero-kicker">{t('loginBrand.workcell')}</p>
-          <h2>{t('loginBrand.headlineLine2')}</h2>
-          <p className="brand-footer">{t('loginBrand.footer')}</p>
+      <div className="solar-grid" aria-hidden="true" />
+      <section className="solar-visual" aria-label={t('loginBrand.division')}>
+        <div className="solar-photo-frame">
+          <Image
+            src="/Image/TEguy.png"
+            alt={t('loginBrand.photoAlt')}
+            width={1536}
+            height={1024}
+            sizes="(max-width: 900px) 100vw, (max-width: 1600px) 60vw, 1040px"
+            priority
+            className="solar-photo"
+          />
+          <span className="solar-photo-edge" aria-hidden="true" />
+        </div>
+        <div className="solar-circuit" aria-hidden="true">
+          <span /><span /><span />
         </div>
       </section>
       <section className="login-main" aria-label={t('login.yourWorkspace')}>

@@ -1,8 +1,8 @@
 # UI layout review
 
-> Historical layout review. The current palette, typography and component styling are documented in [Jabil interface system](JABIL_UI.md). Screenshots below predate the September 23 brand redesign.
+> Historical layout review only. For all new UI work, follow [UI requirements: SolarEdge Equipment Management](JABIL_UI.md). Its rules supersede the visual/layout decisions below, including the old top-bar and laptop header-row behavior. Screenshots below predate the accepted design.
 
-Updated: 20 September 2026. Implemented in the current application.
+Historical snapshot: 20 September 2026. This is not the current UI specification.
 
 This redesign follows the reference's clear sidebar, pale table headers, neatly aligned rows and restrained spacing. All existing light/dark color variables, the Jabil logo and equipment status colors are preserved.
 

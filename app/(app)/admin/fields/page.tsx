@@ -25,10 +25,22 @@ import { api, ApiError, type FieldDefinition } from '@/lib/client/api';
 import { Button, ConfirmDialog, Modal, Notice, RequiredMark, Spinner, Tag, toast } from '@/components/ui';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { AdminNav } from '@/components/admin/AdminNav';
+import { useAdminAccess } from '@/components/admin/AdminAccessContext';
 import { PageHeading } from '@/components/layout/PageHeading';
 import { translateError } from '@/lib/i18n/errors';
 
 type OptionRow = { id: string; value: string; label: string; display_order: number; is_active: boolean };
+type OptionDraft = { label: string; is_active: boolean };
+
+type BlockedCreator = { id: string; full_name: string; username: string };
+/** What the server says a change to this field would affect (GET /api/admin/fields/[key]). */
+type FieldImpact = { missing_count: number; filled_count: number | null; blocked_creators: BlockedCreator[] };
+
+/** "An, Bình, Chi and 4 more" — the warning names people, but stays short. */
+function namesList(users: BlockedCreator[], t: (key: string, opts?: Record<string, unknown>) => string): string {
+  const shown = users.slice(0, 5).map((u) => u.full_name).join(', ');
+  return users.length > 5 ? t('adminFields.blockedCreatorsMore', { names: shown, count: users.length - 5 }) : shown;
+}
 
 type EditForm = {
   display_label: string;
@@ -56,6 +68,9 @@ const EMPTY_CREATE = {
 export default function AdminFieldsPage() {
   const { t, i18n } = useTranslation();
   const language = i18n.language === 'vi' ? 'vi' : 'en';
+  // Granting edit permission changes other users' access — admin-only; a
+  // delegated field manager only sees the warning.
+  const isAdmin = useAdminAccess().role === 'admin';
   const [fields, setFields] = useState<FieldDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
@@ -63,23 +78,26 @@ export default function AdminFieldsPage() {
 
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm | null>(null);
-  const [missingCount, setMissingCount] = useState<number | null>(null);
-  const [missingLoading, setMissingLoading] = useState(false);
+  const [impact, setImpact] = useState<FieldImpact | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [grantOnSave, setGrantOnSave] = useState(false);
   const [editError, setEditError] = useState<ApiError | null>(null);
 
   const [options, setOptions] = useState<OptionRow[] | null>(null);
   const [optionDraft, setOptionDraft] = useState({ value: '', label: '' });
   // Staged, not autosaved — same "edit then Save" model MasterDataTable uses
-  // for the identical concept (an Active checkbox on an admin-managed
-  // reference row), instead of writing on every click with no confirmation.
-  const [optionActiveDrafts, setOptionActiveDrafts] = useState<Record<string, boolean>>({});
+  // for the identical concept (a label + Active checkbox on an admin-managed
+  // reference row), instead of writing on every keystroke/click.
+  const [optionDrafts, setOptionDrafts] = useState<Record<string, OptionDraft>>({});
   const [optionSavingId, setOptionSavingId] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState(EMPTY_CREATE);
   const [createError, setCreateError] = useState<ApiError | null>(null);
+  const [createGrant, setCreateGrant] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<FieldDefinition | null>(null);
+  const [deleteFilledCount, setDeleteFilledCount] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -100,7 +118,7 @@ export default function AdminFieldsPage() {
     try {
       const res = await api.get<OptionRow[]>(`/api/admin/fields/${fieldKey}/options`);
       setOptions(res.data);
-      setOptionActiveDrafts(Object.fromEntries(res.data.map((o) => [o.id, o.is_active])));
+      setOptionDrafts(Object.fromEntries(res.data.map((o) => [o.id, { label: o.label, is_active: o.is_active }])));
     } catch {
       setOptions([]);
     }
@@ -118,20 +136,34 @@ export default function AdminFieldsPage() {
       placeholder: def.placeholder ?? '',
     });
     setEditError(null);
-    setMissingCount(null);
-    setMissingLoading(true);
+    setImpact(null);
+    setImpactLoading(true);
+    setGrantOnSave(false);
     setOptions(null);
     if (def.input_type === 'dropdown' && !def.is_system) void refreshOptions(def.field_key);
     void (async () => {
       try {
-        const res = await api.get<{ missing_count: number }>(`/api/admin/fields/${def.field_key}`);
-        setMissingCount(res.data.missing_count);
+        const res = await api.get<FieldImpact>(`/api/admin/fields/${def.field_key}`);
+        setImpact(res.data);
       } catch {
         // Informational only — a failed lookup doesn't block editing.
       } finally {
-        setMissingLoading(false);
+        setImpactLoading(false);
       }
     })();
+  }
+
+  /** Admin-only: give every user who can create equipment but can't edit
+   *  this field permission to edit it (the Required × permission trap).
+   *  Runs after the field itself is saved, so a failure here is reported on
+   *  the page rather than keeping the (already saved) form open. */
+  async function grantEditToBlocked(fieldKey: string) {
+    try {
+      const res = await api.post<{ granted_users: number }>(`/api/admin/fields/${fieldKey}/grant-edit`);
+      if (res.data.granted_users > 0) toast.success(t('adminFields.editGranted', { count: res.data.granted_users }));
+    } catch (e) {
+      if (e instanceof ApiError) setError(e);
+    }
   }
 
   async function saveEdit() {
@@ -149,6 +181,9 @@ export default function AdminFieldsPage() {
         placeholder: form.placeholder.trim() || null,
       });
       toast.success(t('adminFields.settingsSaved', { label: form.display_label }));
+      if (isAdmin && grantOnSave && form.is_required && (impact?.blocked_creators.length ?? 0) > 0) {
+        await grantEditToBlocked(editingKey);
+      }
       setEditingKey(null);
       setForm(null);
       void refresh();
@@ -173,12 +208,13 @@ export default function AdminFieldsPage() {
     }
   }
 
-  async function saveOptionActive(option: OptionRow) {
+  async function saveOption(option: OptionRow) {
     if (!editingKey) return;
-    const nextActive = optionActiveDrafts[option.id] ?? option.is_active;
+    const draft = optionDrafts[option.id] ?? { label: option.label, is_active: option.is_active };
+    if (!draft.label.trim()) return;
     setOptionSavingId(option.id);
     try {
-      await api.put(`/api/admin/fields/${editingKey}/options/${option.id}`, { is_active: nextActive });
+      await api.put(`/api/admin/fields/${editingKey}/options/${option.id}`, { label: draft.label.trim(), is_active: draft.is_active });
       void refreshOptions(editingKey);
     } catch (e) {
       if (e instanceof ApiError) setEditError(e);
@@ -201,9 +237,11 @@ export default function AdminFieldsPage() {
         help_text: createForm.help_text.trim() || null,
         placeholder: createForm.placeholder.trim() || null,
       });
+      toast.success(t('adminFields.customFieldCreated'));
+      if (isAdmin && createGrant) await grantEditToBlocked(createForm.field_key.trim());
       setShowCreate(false);
       setCreateForm(EMPTY_CREATE);
-      toast.success(t('adminFields.customFieldCreated'));
+      setCreateGrant(false);
       void refresh();
     } catch (e) {
       if (e instanceof ApiError) setCreateError(e);
@@ -217,8 +255,10 @@ export default function AdminFieldsPage() {
     setBusy(true);
     setError(null);
     try {
-      await api.delete(`/api/admin/fields/${deleteTarget.field_key}`);
-      toast.success(t('adminFields.customFieldDeleted'));
+      const res = await api.delete<{ cleared_records: number }>(`/api/admin/fields/${deleteTarget.field_key}`);
+      toast.success(res.data.cleared_records > 0
+        ? t('adminFields.customFieldDeletedCount', { count: res.data.cleared_records })
+        : t('adminFields.customFieldDeleted'));
       setDeleteTarget(null);
       void refresh();
     } catch (e) {
@@ -231,6 +271,15 @@ export default function AdminFieldsPage() {
   const systemFields = [...fields].filter((f) => f.is_system).sort((a, b) => a.display_order - b.display_order);
   const customFields = [...fields].filter((f) => !f.is_system).sort((a, b) => a.display_order - b.display_order);
   const editingDef = fields.find((f) => f.field_key === editingKey);
+  const blockedCreators = impact?.blocked_creators ?? [];
+
+  function openDelete(def: FieldDefinition) {
+    setDeleteTarget(def);
+    setDeleteFilledCount(null);
+    void api.get<FieldImpact>(`/api/admin/fields/${def.field_key}`)
+      .then((res) => setDeleteFilledCount(res.data.filled_count))
+      .catch(() => { /* Informational only — the dialog still works without the count. */ });
+  }
 
   function fieldTable(rows: FieldDefinition[], allowDelete: boolean) {
     return (
@@ -259,7 +308,7 @@ export default function AdminFieldsPage() {
                 <div className="table-actions">
                   <Button size="sm" onClick={() => openEdit(def)}>{t('adminFields.edit')}</Button>
                   {allowDelete && (
-                    <Button size="sm" variant="danger" disabled={busy} onClick={() => setDeleteTarget(def)}
+                    <Button size="sm" variant="danger" disabled={busy} onClick={() => openDelete(def)}
                       aria-label={`${t('adminFields.deleteField')}: ${def.display_label}`} title={t('adminFields.deleteField')}>
                       <Trash2 size={14} aria-hidden="true" />
                     </Button>
@@ -335,7 +384,12 @@ export default function AdminFieldsPage() {
             <div className="grid grid-cols-2 gap-3">
               <label className="flex items-center gap-2 text-[12px]">
                 <input type="checkbox" checked={form.is_required}
-                  onChange={(e) => setForm((f) => f && { ...f, is_required: e.target.checked })} />
+                  onChange={(e) => {
+                    const required = e.target.checked;
+                    setForm((f) => f && { ...f, is_required: required });
+                    // Turning Required on is when the trap springs — offer the fix pre-ticked.
+                    setGrantOnSave(required);
+                  }} />
                 {t('adminFields.required')}
               </label>
               <label className="flex items-center gap-2 text-[12px]">
@@ -345,11 +399,25 @@ export default function AdminFieldsPage() {
               </label>
             </div>
 
-            {missingLoading ? (
+            {impactLoading ? (
               <p className="text-[11px]" style={{ color: 'var(--ink-3)' }}>{t('adminFields.checkingRecords')}</p>
-            ) : missingCount !== null && missingCount > 0 ? (
-              <Notice tone="warn">{t('adminFields.missingValueCount', { count: missingCount })}</Notice>
+            ) : impact && impact.missing_count > 0 ? (
+              <Notice tone="warn">{t('adminFields.missingValueCount', { count: impact.missing_count })}</Notice>
             ) : null}
+
+            {form.is_required && blockedCreators.length > 0 && (
+              <Notice tone="warn">
+                {t('adminFields.blockedCreatorsWarning', { count: blockedCreators.length, names: namesList(blockedCreators, t) })}
+                {isAdmin ? (
+                  <label className="mt-1.5 flex items-center gap-2 text-[12px]" style={{ color: 'var(--ink)' }}>
+                    <input type="checkbox" checked={grantOnSave} onChange={(e) => setGrantOnSave(e.target.checked)} />
+                    {t('adminFields.grantEditToBlocked')}
+                  </label>
+                ) : (
+                  <span className="mt-1 block">{t('adminFields.askAdminToGrant')}</span>
+                )}
+              </Notice>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
@@ -395,19 +463,25 @@ export default function AdminFieldsPage() {
                     </thead>
                     <tbody>
                       {options.map((opt) => {
-                        const draftActive = optionActiveDrafts[opt.id] ?? opt.is_active;
-                        const dirty = draftActive !== opt.is_active;
+                        const draft = optionDrafts[opt.id] ?? { label: opt.label, is_active: opt.is_active };
+                        const dirty = draft.label.trim() !== opt.label || draft.is_active !== opt.is_active;
                         return (
                           <tr key={opt.id}>
                             <td className="ident">{opt.value}</td>
-                            <td>{opt.label}</td>
+                            <td>
+                              <input value={draft.label} maxLength={200} disabled={optionSavingId === opt.id}
+                                aria-label={`${t('adminFields.displayLabel')}: ${opt.value}`}
+                                onChange={(e) => setOptionDrafts((d) => ({ ...d, [opt.id]: { ...draft, label: e.target.value } }))}
+                                className="w-full border px-2 py-1 text-[12px]" style={{ borderColor: 'var(--rule)' }} />
+                            </td>
                             <td className="text-center">
-                              <input type="checkbox" checked={draftActive} disabled={optionSavingId === opt.id}
-                                onChange={(e) => setOptionActiveDrafts((d) => ({ ...d, [opt.id]: e.target.checked }))} />
+                              <input type="checkbox" checked={draft.is_active} disabled={optionSavingId === opt.id}
+                                aria-label={`${t('adminFields.optionActive')}: ${opt.value}`}
+                                onChange={(e) => setOptionDrafts((d) => ({ ...d, [opt.id]: { ...draft, is_active: e.target.checked } }))} />
                             </td>
                             <td className="text-center">
                               {dirty && (
-                                <Button size="sm" disabled={optionSavingId === opt.id} onClick={() => void saveOptionActive(opt)}>
+                                <Button size="sm" loading={optionSavingId === opt.id} disabled={!draft.label.trim()} onClick={() => void saveOption(opt)}>
                                   {t('common.save')}
                                 </Button>
                               )}
@@ -473,7 +547,11 @@ export default function AdminFieldsPage() {
           <div className="grid grid-cols-2 gap-3">
             <label className="flex items-center gap-2 text-[12px]">
               <input type="checkbox" checked={createForm.is_required}
-                onChange={(e) => setCreateForm((f) => ({ ...f, is_required: e.target.checked }))} />
+                onChange={(e) => {
+                  const required = e.target.checked;
+                  setCreateForm((f) => ({ ...f, is_required: required }));
+                  setCreateGrant(required);
+                }} />
               {t('adminFields.required')}
             </label>
             <label className="flex items-center gap-2 text-[12px]">
@@ -494,6 +572,18 @@ export default function AdminFieldsPage() {
               onChange={(e) => setCreateForm((f) => ({ ...f, help_text: e.target.value }))}
               className="mt-1 w-full resize-y border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
           </label>
+          {createForm.is_required && (
+            <Notice tone="warn">
+              {t('adminFields.newRequiredFieldWarning')}
+              {!isAdmin && <span className="mt-1 block">{t('adminFields.askAdminToGrant')}</span>}
+            </Notice>
+          )}
+          {isAdmin && (
+            <label className="flex items-center gap-2 text-[12px]">
+              <input type="checkbox" checked={createGrant} onChange={(e) => setCreateGrant(e.target.checked)} />
+              {t('adminFields.grantEditToCreators')}
+            </label>
+          )}
           <p className="text-[11px]" style={{ color: 'var(--ink-3)' }}>{t('adminFields.dropdownOptionsAfterCreateHint')}</p>
         </form>
       </Modal>
@@ -501,11 +591,16 @@ export default function AdminFieldsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title={t('adminFields.deleteField')}
-        description={t('adminFields.confirmDeleteCustomField')}
+        description={<>
+          {t('adminFields.confirmDeleteCustomField')}
+          {deleteFilledCount !== null && deleteFilledCount > 0 && (
+            <span className="mt-2 block font-medium">{t('adminFields.deleteValueCount', { count: deleteFilledCount })}</span>
+          )}
+        </>}
         confirmLabel={t('adminFields.deleteField')}
         busy={busy}
         onConfirm={() => void deleteCustomField()}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => { setDeleteTarget(null); setDeleteFilledCount(null); }}
       />
     </div>
   );

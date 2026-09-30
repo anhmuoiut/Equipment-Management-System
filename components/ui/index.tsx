@@ -48,7 +48,7 @@ export function Tag({ text, tone = 'neutral' }: { text: string; tone?: 'neutral'
     tone === 'warn'
       ? { background: 'var(--warn-tint)', color: 'var(--warn)', borderColor: 'var(--warn)' }
       : tone === 'ok'
-        ? { background: 'var(--machine-tint)', color: 'var(--ok)', borderColor: 'var(--ok)' }
+        ? { background: 'var(--success-tint)', color: 'var(--success)', borderColor: 'var(--success)' }
         : { background: 'transparent', color: 'var(--ink-2)', borderColor: 'var(--rule)' };
   return (
     <span className="ui-tag border px-1.5 py-[1px] text-[11px] font-medium" data-tone={tone} style={c}>

@@ -20,7 +20,7 @@ export const GET = withAuth(async (_req, { requestId, profile }) => {
     getOwnAccountDetails(profile.id),
   ]);
   return ok({ ...profile, ...details, editable_fields: editable }, requestId);
-});
+}, { allowPendingPasswordChange: true });
 
 /**
  * Self-service profile edit — only the personal/administrative fields

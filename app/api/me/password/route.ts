@@ -11,4 +11,4 @@ export const PUT = withAuth(async (req, { requestId, profile }) => {
   );
   await changeOwnPassword(profile.id, current_password, new_password, requestId);
   return ok({ changed: true }, requestId);
-});
+}, { allowPendingPasswordChange: true });

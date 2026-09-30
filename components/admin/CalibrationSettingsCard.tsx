@@ -4,9 +4,9 @@
  * The Calibration Due Soon window (`app_settings.calibration.due_soon_days`)
  * — the only app-wide setting the backend currently exposes
  * (`/api/admin/calibration-settings`). It drives when a calibration's status
- * flips from VALID to DUE_SOON across the Dashboard and Equipment Masterlist,
- * so it lives here on Master Data next to the other admin-managed reference
- * values rather than as its own single-setting page.
+ * flips from VALID to DUE_SOON across the Dashboard, the Calibration page and
+ * the Equipment Masterlist. Shown on Administration → Configuration →
+ * Calibration settings, which is where further app-wide settings belong too.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -49,7 +49,7 @@ export function CalibrationSettingsCard({ canManage }: { canManage: boolean }) {
 
   return (
     <div>
-      <h2 className="text-[15px] font-semibold">{t('adminMasterData.calibrationSettingsTitle')}</h2>
+      <h2 className="text-[15px] font-semibold">{t('adminCalibrationSettings.dueSoonTitle')}</h2>
       <p className="mt-1 text-[12px]" style={{ color: 'var(--ink-3)' }}>{t('adminMasterData.calibrationSettingsHint')}</p>
       {error && <div className="mt-2"><Notice tone="alert">{translateError(error.code, language, error.message)}</Notice></div>}
       {loading ? (

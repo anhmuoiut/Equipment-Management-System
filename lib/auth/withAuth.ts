@@ -17,7 +17,7 @@ import 'server-only';
  */
 import { NextResponse, type NextRequest } from 'next/server';
 import { AppError, type ErrorCode } from '@/lib/errors';
-import { getCurrentSession } from '@/lib/auth/session';
+import { getCurrentSession, isSessionRevoked } from '@/lib/auth/session';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { assertPermission, type PermissionCode, type Role, type UserProfile } from '@/lib/permissions';
 
@@ -34,6 +34,9 @@ type Options = {
   action?: PermissionCode | string;
   /** Chỉ dùng cho /api/health. Mọi route nghiệp vụ đều phải xác thực. */
   allowAnonymous?: true;
+  /** Still reachable while must_change_password is set — only the routes
+   *  the forced change-password screen itself needs (/api/me, /api/me/password). */
+  allowPendingPasswordChange?: true;
 };
 
 type Handler = (
@@ -119,30 +122,35 @@ export function withAuth(handler: Handler, options: Options = {}) {
       const db = supabaseAdmin();
       const [{ data: profile, error: profErr }, { data: grants, error: grantsErr }] = await Promise.all([
         db.from('user_profiles')
-          .select('id, full_name, email, username, role, is_active, must_change_password, token_version')
+          .select('id, full_name, email, username, role, is_active, must_change_password, token_version, sessions_revoked_at')
           .eq('id', userId)
-          .maybeSingle<Omit<UserProfile, 'permissions'> & { token_version: number }>(),
+          .maybeSingle<Omit<UserProfile, 'permissions'> & { token_version: number; sessions_revoked_at: string | null }>(),
         db.from('user_permissions').select('permission_code').eq('user_id', userId),
       ]);
 
       if (profErr || grantsErr) throw new AppError('SERVER_ERROR', { stage: 'load_profile' });
       if (!profile) throw new AppError('UNAUTHORIZED');
 
-      // 2a. A local-account cookie signed before the last password change
-      //     (reset or self-service) must not still work.
-      if (session.tokenVersion !== null && session.tokenVersion !== profile.token_version) {
-        throw new AppError('UNAUTHORIZED');
-      }
+      // 2a. A session issued before the last password reset/change must not
+      //     still work (local: token_version; Supabase: sessions_revoked_at).
+      if (isSessionRevoked(session, profile)) throw new AppError('UNAUTHORIZED');
 
       // 3. Tài khoản bị deactivate không thao tác được dù session cũ còn hạn.
       if (!profile.is_active) throw new AppError('USER_INACTIVE');
+
+      // 3a. Admin-set password (new account or reset): nothing else works
+      //     until the user picks their own — the admin knows the current one.
+      if (profile.must_change_password && !options.allowPendingPasswordChange) {
+        throw new AppError('PASSWORD_CHANGE_REQUIRED');
+      }
 
       // 4. Role
       if (options.role && !options.role.includes(profile.role)) {
         throw new AppError('FORBIDDEN', { required_role: options.role });
       }
 
-      const fullProfile: UserProfile = { ...profile, permissions: (grants ?? []).map((g) => g.permission_code) };
+      const { token_version: _tv, sessions_revoked_at: _revoked, ...identity } = profile;
+      const fullProfile: UserProfile = { ...identity, permissions: (grants ?? []).map((g) => g.permission_code) };
 
       // 5. Action permission
       if (options.action) assertPermission(fullProfile, options.action);

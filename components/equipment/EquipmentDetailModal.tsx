@@ -38,6 +38,8 @@ export type Me = {
   editable_fields: string[] | null;
 };
 
+export type DetailTab = 'info' | 'chain' | 'calibration' | 'repair' | 'history';
+
 type Props = {
   id: string;
   me: Me;
@@ -48,6 +50,9 @@ type Props = {
   equipmentStatuses: StatusRef[];
   /** Opening from a row click or the View button always starts read-only. */
   initialMode?: 'view' | 'edit';
+  /** Overrides the mode's default tab — e.g. the Calibration page opens
+   *  straight on Calibration. */
+  initialTab?: DetailTab;
   onClose: () => void;
   onChanged: () => void;
   onOpenOther: (id: string) => void;
@@ -69,7 +74,7 @@ export function hasPermission(me: Me, code: string): boolean {
 
 export function EquipmentDetailModal({
   id, me, fields, locations, equipmentTypes, equipmentLevels, equipmentStatuses,
-  initialMode = 'view', onClose, onChanged, onOpenOther,
+  initialMode = 'view', initialTab, onClose, onChanged, onOpenOther,
 }: Props) {
   const { t, i18n } = useTranslation();
   const language = i18n.language === 'vi' ? 'vi' : 'en';
@@ -79,7 +84,7 @@ export function EquipmentDetailModal({
   // Viewing read-only opens straight on the parent/child hierarchy — that's
   // what a click from the masterlist is usually trying to find out. Editing
   // opens on the Overview tab, since that's where the work actually happens.
-  const [tab, setTab] = useState<'info' | 'chain' | 'calibration' | 'repair' | 'history'>(initialMode === 'edit' ? 'info' : 'chain');
+  const [tab, setTab] = useState<DetailTab>(initialTab ?? (initialMode === 'edit' ? 'info' : 'chain'));
   const [mode, setMode] = useState<'view' | 'edit'>(initialMode);
 
   const [values, setValues] = useState<FormValues>({});
@@ -370,7 +375,7 @@ export function EquipmentDetailModal({
           />
         )}
 
-        {tab === 'calibration' && <CalibrationPanel equipmentId={eq.id} me={me} disabled={isViewer || isArchived} />}
+        {tab === 'calibration' && <CalibrationPanel equipmentId={eq.id} me={me} disabled={isViewer || isArchived} onChanged={onChanged} />}
         {tab === 'repair' && <RepairPanel equipmentId={eq.id} me={me} disabled={isViewer || isArchived} />}
 
         {tab === 'history' && (

@@ -266,7 +266,11 @@ export function Dashboard() {
           {recentActivity.length === 0 ? (
             <p className="py-6 text-[13px]" style={{ color: 'var(--ink-3)' }}>{t('dashboardPage.noRecentActivity')}</p>
           ) : (
-            <ul className="dashboard-activity-list">
+            <ul
+              className="dashboard-activity-list dashboard-activity-list--scrollable"
+              tabIndex={0}
+              aria-label={t('dashboardPage.recentActivity')}
+            >
               {recentActivity.map((a) => {
                 const Icon = ACTION_ICONS[a.action] ?? ClipboardList;
                 return (

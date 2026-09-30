@@ -22,6 +22,7 @@
     "noOptionsFound": "Không tìm thấy tùy chọn nào."
   },
   "theme": {
+    "preferences": "Tùy chọn giao diện",
     "language": "Ngôn ngữ",
     "english": "English",
     "vietnamese": "Tiếng Việt",
@@ -34,7 +35,14 @@
     "workspace": "KHÔNG GIAN LÀM VIỆC",
     "equipmentMasterlist": "Danh sách thiết bị",
     "archivedEquipment": "Thiết bị đã lưu trữ",
-    "administration": "QUẢN TRỊ",
+    "calibration": "Hiệu chuẩn",
+    "goldenMasterList": "Golden master",
+    "soon": "Sắp có",
+    "adminMenu": "Quản trị",
+    "userManagement": "Quản lý người dùng",
+    "configuration": "Cấu hình",
+    "fieldManagement": "Quản lý trường",
+    "systemLogs": "Nhật ký hệ thống",
     "administrationBreadcrumb": "Quản trị",
     "usersPermissions": "Người dùng & phân quyền",
     "fieldConfiguration": "Cấu hình trường",
@@ -42,7 +50,6 @@
     "sidebarMenu": "Menu bên trái",
     "mainNavigation": "Điều hướng chính",
     "administrationNavigation": "Điều hướng quản trị",
-    "administrationSections": "Các mục quản trị",
     "equipmentControlSystem": "Hệ thống quản lý thiết bị",
     "closeMenu": "Đóng menu",
     "hideMenu": "Ẩn menu",
@@ -51,7 +58,9 @@
     "signOut": "Đăng xuất",
     "equipmentManagement": "Quản lý thiết bị SolarEdge",
     "dashboard": "Tổng quan",
-    "masterData": "Dữ liệu gốc"
+    "masterData": "Dữ liệu gốc",
+    "calibrationSettings": "Cài đặt hiệu chuẩn",
+    "auditLog": "Nhật ký thay đổi"
   },
   "login": {
     "yourWorkspace": "KHÔNG GIAN LÀM VIỆC THIẾT BỊ CỦA BẠN",
@@ -104,6 +113,7 @@
     "alreadyHaveAccount": "Đã có tài khoản? Đăng nhập"
   },
   "loginBrand": {
+    "photoAlt": "Kỹ thuật viên cùng laptop tại workcell SolarEdge, xung quanh là thiết bị kiểm tra.",
     "workcell": "WORKCELL SOLAREDGE",
     "motto": "THEO DÕI · QUẢN LÝ · ĐẢM BẢO · TỐI ƯU",
     "division": "KỸ THUẬT KIỂM TRA",
@@ -333,7 +343,7 @@
     "inactive": "Ngừng hoạt động",
     "allAdmin": "Tất cả (quản trị viên)",
     "noPermissions": "Không có",
-    "actionsCount": "Thao tác: {{count}}/4",
+    "actionsCount": "Thao tác: {{count}}",
     "fieldsCount": "Trường: {{count}}",
     "administrator": "Quản trị viên",
     "administratorHint": "Toàn quyền với mọi thứ trong dự án này — bỏ qua mọi quyền thao tác và quyền sửa trường bên dưới.",
@@ -370,7 +380,29 @@
     "done": "Xong",
     "searchUsers": "Tìm tên, tên đăng nhập hoặc email…",
     "noMatchingUsers": "Không có người dùng phù hợp.",
-    "userCount_other": "{{count}} người dùng"
+    "userCount_other": "{{count}} người dùng",
+    "role": "Vai trò",
+    "roleAdmin": "Quản trị viên",
+    "roleUser": "Người dùng",
+    "roleViewer": "Chỉ xem",
+    "roleUserHint": "Được làm những gì các quyền bên dưới cho phép.",
+    "roleViewerHint": "Xem được mọi thứ đang hiển thị, kể cả lịch sử sửa chữa và hiệu chuẩn, nhưng không sửa được gì. Tài khoản tự đăng ký bắt đầu ở đây — chuyển sang Người dùng để cho phép thao tác.",
+    "viewOnly": "Chỉ xem",
+    "requiredFieldsWarning": "Có quyền tạo thiết bị nhưng không được sửa {{count}} trường bắt buộc: {{fields}}. Tạo thiết bị sẽ thất bại cho đến khi cho phép các trường này.",
+    "addRequiredFields": "Cho phép các trường bắt buộc",
+    "you": "Bạn",
+    "cannotChangeOwnRole": "Bạn không thể tự đổi vai trò của mình.",
+    "cannotDeactivateSelf": "Bạn không thể tự vô hiệu hoá tài khoản của mình.",
+    "cannotResetOwnPassword": "Hãy đổi mật khẩu của chính bạn trong Cài đặt tài khoản.",
+    "confirmDeactivateTitle": "Vô hiệu hoá tài khoản?",
+    "confirmDeactivate": "{{name}} sẽ bị đăng xuất ngay và không đăng nhập lại được cho đến khi được kích hoạt lại.",
+    "editUser": "Sửa thông tin",
+    "editUserTitle": "Sửa thông tin người dùng",
+    "userUpdated": "Đã lưu thông tin người dùng.",
+    "usernameFixed": "Tên đăng nhập dùng để đăng nhập nên không đổi được.",
+    "emailLoginHint": "Với tài khoản Supabase, đây cũng là email đăng nhập.",
+    "mustChangePassword": "Chờ đổi mật khẩu",
+    "passwordResetHint": "Người dùng sẽ bị đăng xuất khỏi mọi nơi và phải tự đặt mật khẩu mới ở lần đăng nhập tới."
   },
   "userMenu": {
     "accountSettings": "Cài đặt tài khoản",
@@ -461,7 +493,16 @@
     "customFieldCreated": "Đã tạo trường tuỳ chỉnh.",
     "customFieldDeleted": "Đã xoá trường tuỳ chỉnh.",
     "dropdownOptionsAfterCreateHint": "Với trường Dropdown, thêm lựa chọn sau khi tạo bằng cách mở Sửa.",
-    "inputTypeBoolean": "Có / Không"
+    "inputTypeBoolean": "Có / Không",
+    "blockedCreatorsWarning": "{{count}} người dùng có quyền tạo thiết bị nhưng không được sửa trường này: {{names}}. Khi trường này là bắt buộc, họ sẽ không tạo được thiết bị nào.",
+    "blockedCreatorsMore": "{{names}} và {{count}} người khác",
+    "grantEditToBlocked": "Cấp luôn quyền sửa trường này cho những người dùng đó",
+    "askAdminToGrant": "Hãy nhờ quản trị viên cấp quyền sửa trường này cho họ.",
+    "newRequiredFieldWarning": "Trường mới chưa ai có quyền sửa. Khi trường là bắt buộc, người dùng tạo thiết bị sẽ bị chặn cho đến khi được phép sửa trường này.",
+    "grantEditToCreators": "Cho mọi người dùng có quyền tạo thiết bị được sửa trường này",
+    "editGranted_other": "Đã cấp quyền sửa cho {{count}} người dùng.",
+    "deleteValueCount": "{{count}} thiết bị đang có giá trị cho trường này. Giá trị sẽ bị xoá khỏi các thiết bị đó (giá trị bị xoá vẫn được lưu trong nhật ký thay đổi).",
+    "customFieldDeletedCount": "Đã xoá trường. Đã xoá giá trị ở {{count}} thiết bị."
   },
   "adminErrors": {
     "title": "Nhật ký lỗi",
@@ -480,7 +521,8 @@
     "requestId": "Request ID",
     "route": "Route",
     "code": "Mã",
-    "message": "Thông báo"
+    "message": "Thông báo",
+    "searchHint": "Tìm trong mọi lỗi được ghi trong 90 ngày gần nhất, không chỉ các lỗi mới nhất."
   },
   "fields": {
     "labels": {
@@ -554,7 +596,11 @@
     "SWAP_INVALID": "Không thể hoán đổi hai thiết bị này.",
     "SWAP_INVALID_ANCESTOR_RELATION": "Không thể hoán đổi hai thiết bị đang có quan hệ cha - con với nhau.",
     "DUPLICATE_WARNING": "Cảnh báo: đã có thiết bị khác trùng Part Number và Serial Number.",
-    "SERVER_ERROR": "Lỗi hệ thống. Vui lòng thử lại, hoặc liên hệ quản trị viên kèm request ID."
+    "SERVER_ERROR": "Lỗi hệ thống. Vui lòng thử lại, hoặc liên hệ quản trị viên kèm request ID.",
+    "USER_NOT_FOUND": "Không tìm thấy người dùng.",
+    "CANNOT_MODIFY_SELF": "Bạn không thể tự vô hiệu hoá, tự đổi vai trò hoặc tự đặt lại mật khẩu của chính mình tại đây.",
+    "LAST_ADMIN": "Phải luôn còn ít nhất một quản trị viên đang hoạt động.",
+    "PASSWORD_CHANGE_REQUIRED": "Bạn cần đổi mật khẩu trước khi tiếp tục."
   },
   "adminMasterData": {
     "title": "Dữ liệu gốc",
@@ -564,8 +610,7 @@
     "levelsHint": "Level của thiết bị trong dây chuyền.",
     "locationsHint": "Vị trí vật lý hoặc logic — toà nhà, tầng, hoặc địa điểm nhà cung cấp khi đang sửa chữa.",
     "departmentsHint": "Phòng ban — danh sách cố định để người dùng chọn ở Cài đặt tài khoản, thay vì tự gõ (để tránh \"Test Eng\" và \"Test Engineering\" trở thành hai phòng ban khác nhau).",
-    "calibrationSettingsTitle": "Cài đặt hiệu chuẩn",
-    "calibrationSettingsHint": "Số ngày trước hạn để một lần hiệu chuẩn tính là \"Sắp đến hạn\" thay vì \"Còn hạn\", áp dụng cho cả Dashboard và Danh sách thiết bị.",
+    "calibrationSettingsHint": "Số ngày trước hạn để một lần hiệu chuẩn tính là \"Sắp đến hạn\" thay vì \"Còn hiệu lực\".",
     "dueSoonDays": "Số ngày Sắp đến hạn",
     "calibrationSettingsSaved": "Đã lưu.",
     "requiresRemark": "Bắt buộc Remark",
@@ -573,6 +618,11 @@
     "saved": "Đã lưu.",
     "added": "Đã thêm.",
     "codePlaceholder": "mã"
+  },
+  "adminCalibrationSettings": {
+    "title": "Cài đặt hiệu chuẩn",
+    "subtitle": "Cài đặt dùng chung quyết định cách tính trạng thái hiệu chuẩn trên Tổng quan, trang Hiệu chuẩn và Danh sách thiết bị.",
+    "dueSoonTitle": "Ngưỡng Sắp đến hạn"
   },
   "calibration": {
     "title": "Hiệu chuẩn",
@@ -595,6 +645,30 @@
       "DUE_SOON": "Sắp đến hạn",
       "VALID": "Còn hiệu lực"
     }
+  },
+  "calibrationPage": {
+    "title": "Hiệu chuẩn",
+    "subtitle": "Tất cả thiết bị đang hoạt động cần hiệu chuẩn, mục khẩn cấp nhất lên đầu. Mở một dòng để xem lịch sử hoặc ghi nhận lần hiệu chuẩn mới.",
+    "statusFilter": "Lọc theo trạng thái hiệu chuẩn",
+    "all": "Tất cả",
+    "searchLabel": "Tìm trong danh sách hiệu chuẩn",
+    "searchPlaceholder": "Tìm serial, part number, vị trí, người hiệu chuẩn…",
+    "noneRequired": "Chưa có thiết bị nào yêu cầu hiệu chuẩn.",
+    "noneRequiredHint": "Thiết bị sẽ hiện ở đây khi bật “Calibration Required” trong hồ sơ thiết bị.",
+    "noMatches": "Không có thiết bị nào khớp bộ lọc.",
+    "dueToday": "Đến hạn hôm nay",
+    "dueIn_other": "còn {{count}} ngày",
+    "overdueBy_other": "quá hạn {{count}} ngày",
+    "dueSoonWindow": "Sắp đến hạn = đến hạn trong vòng {{days}} ngày",
+    "changeWindow": "Thay đổi",
+    "openCalibrationFor": "Mở hiệu chuẩn của"
+  },
+  "goldenMaster": {
+    "title": "Danh sách Golden master",
+    "subtitle": "Các mẫu chuẩn (golden unit) dùng trên line để xác nhận tester và thiết bị.",
+    "inDevelopment": "Đang phát triển",
+    "comingSoonTitle": "Mô-đun này đang được phát triển.",
+    "comingSoonBody": "Chức năng quản lý Golden master sẽ có ở phiên bản sau."
   },
   "repair": {
     "title": "Sửa chữa",
@@ -633,12 +707,44 @@
     "needsAttention": "Cần chú ý",
     "underRepair": "Đang sửa chữa",
     "calibrationHealth": "Tình trạng hiệu chuẩn",
-    "dueSoonWindowNote": "Ngưỡng Sắp đến hạn: {{days}} ngày (Admin → Dữ liệu gốc).",
+    "dueSoonWindowNote": "Ngưỡng Sắp đến hạn: {{days}} ngày (Quản trị → Cấu hình → Cài đặt hiệu chuẩn).",
     "calibrationAttention": "Hiệu chuẩn cần chú ý",
     "noCalibrationAttention": "Hiện không có mục hiệu chuẩn nào cần chú ý.",
     "currentRepair": "Đang sửa chữa",
     "recentActivity": "Hoạt động gần đây",
     "noRecentActivity": "Chưa có hoạt động gần đây.",
     "viewAll": "Xem tất cả"
+  },
+  "adminAudit": {
+    "title": "Nhật ký thay đổi",
+    "subtitle": "Ai đã thay đổi người dùng, phân quyền, trường và dữ liệu danh mục — từ giá trị nào sang giá trị nào.",
+    "entityFilter": "Hiển thị",
+    "allEntities": "Tất cả thay đổi",
+    "entity_user": "Người dùng",
+    "entity_field": "Trường",
+    "entity_location": "Vị trí",
+    "entity_equipment_type": "Loại",
+    "entity_equipment_status": "Trạng thái",
+    "entity_equipment_level": "Cấp",
+    "entity_department": "Phòng ban",
+    "entity_permission": "Cài đặt",
+    "time": "Thời gian",
+    "actor": "Người thực hiện",
+    "action": "Thao tác",
+    "target": "Đối tượng",
+    "changes": "Thay đổi",
+    "loading": "Đang tải nhật ký…",
+    "empty": "Chưa có thay đổi nào.",
+    "emptyHint": "Các thay đổi về người dùng, phân quyền, trường và dữ liệu danh mục sẽ hiện ở đây.",
+    "loadMore": "Tải thêm",
+    "system": "Hệ thống"
+  },
+  "forcedPassword": {
+    "overline": "BẢO MẬT TÀI KHOẢN",
+    "title": "Đặt mật khẩu của riêng bạn",
+    "description": "Mật khẩu hiện tại do quản trị viên đặt. Hãy chọn mật khẩu mới trước khi tiếp tục.",
+    "submit": "Lưu và tiếp tục",
+    "saving": "Đang lưu…",
+    "errorSameAsCurrent": "Mật khẩu mới phải khác mật khẩu hiện tại."
   }
 }

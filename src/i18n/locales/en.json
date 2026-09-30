@@ -22,6 +22,7 @@
     "noOptionsFound": "No options found."
   },
   "theme": {
+    "preferences": "Appearance preferences",
     "language": "Language",
     "english": "English",
     "vietnamese": "Tiếng Việt",
@@ -34,7 +35,14 @@
     "workspace": "WORKSPACE",
     "equipmentMasterlist": "Equipment masterlist",
     "archivedEquipment": "Archived equipment",
-    "administration": "ADMINISTRATION",
+    "calibration": "Calibration",
+    "goldenMasterList": "Golden master list",
+    "soon": "Soon",
+    "adminMenu": "Administration",
+    "userManagement": "User management",
+    "configuration": "Configuration",
+    "fieldManagement": "Field management",
+    "systemLogs": "System logs",
     "administrationBreadcrumb": "Administration",
     "usersPermissions": "Users & permissions",
     "fieldConfiguration": "Field configuration",
@@ -42,7 +50,6 @@
     "sidebarMenu": "Sidebar menu",
     "mainNavigation": "Main navigation",
     "administrationNavigation": "Administration navigation",
-    "administrationSections": "Administration sections",
     "equipmentControlSystem": "Equipment Control System",
     "closeMenu": "Close menu",
     "hideMenu": "Hide menu",
@@ -51,7 +58,9 @@
     "signOut": "Sign out",
     "equipmentManagement": "SolarEdge Equipment Management",
     "dashboard": "Dashboard",
-    "masterData": "Master data"
+    "masterData": "Master data",
+    "calibrationSettings": "Calibration settings",
+    "auditLog": "Audit log"
   },
   "login": {
     "yourWorkspace": "YOUR EQUIPMENT WORKSPACE",
@@ -104,6 +113,7 @@
     "alreadyHaveAccount": "Already have an account? Sign in"
   },
   "loginBrand": {
+    "photoAlt": "Test engineer with a laptop in the SolarEdge workcell, surrounded by testing equipment.",
     "workcell": "SOLAREDGE WORKCELL",
     "motto": "TRACK · MANAGE · ENSURE · MAXIMIZE",
     "division": "TEST ENGINEERING",
@@ -332,7 +342,7 @@
     "inactive": "Inactive",
     "allAdmin": "All (admin)",
     "noPermissions": "None",
-    "actionsCount": "Actions: {{count}}/4",
+    "actionsCount": "Actions: {{count}}",
     "fieldsCount": "Fields: {{count}}",
     "administrator": "Administrator",
     "administratorHint": "Full access to everything in this project — bypasses every action and field permission below.",
@@ -370,7 +380,29 @@
     "searchUsers": "Search name, username or email…",
     "noMatchingUsers": "No users match your search.",
     "userCount_one": "{{count}} user",
-    "userCount_other": "{{count}} users"
+    "userCount_other": "{{count}} users",
+    "role": "Role",
+    "roleAdmin": "Administrator",
+    "roleUser": "User",
+    "roleViewer": "Viewer (read only)",
+    "roleUserHint": "Can do what the permissions below allow.",
+    "roleViewerHint": "Can see everything visible, including repair and calibration history, but can't change anything. Self-requested accounts start here — switch to User to let them work.",
+    "viewOnly": "View only",
+    "requiredFieldsWarning": "Can create equipment but can't edit {{count}} Required field(s): {{fields}}. Creating equipment will fail until those fields are allowed.",
+    "addRequiredFields": "Allow the Required fields",
+    "you": "You",
+    "cannotChangeOwnRole": "You can't change your own role.",
+    "cannotDeactivateSelf": "You can't deactivate your own account.",
+    "cannotResetOwnPassword": "Change your own password from Account settings.",
+    "confirmDeactivateTitle": "Deactivate account?",
+    "confirmDeactivate": "{{name}} will be signed out immediately and can't sign in again until reactivated.",
+    "editUser": "Edit details",
+    "editUserTitle": "Edit user details",
+    "userUpdated": "User details saved.",
+    "usernameFixed": "The username is the sign-in name and can't be changed.",
+    "emailLoginHint": "For a Supabase account this is also the sign-in email.",
+    "mustChangePassword": "Must change password",
+    "passwordResetHint": "The user is signed out everywhere and must choose a new password at their next sign-in."
   },
   "userMenu": {
     "accountSettings": "Account settings",
@@ -461,7 +493,17 @@
     "customFieldCreated": "Custom field created.",
     "customFieldDeleted": "Custom field deleted.",
     "dropdownOptionsAfterCreateHint": "For a Dropdown field, add its options after creating it by opening Edit.",
-    "inputTypeBoolean": "Yes / No"
+    "inputTypeBoolean": "Yes / No",
+    "blockedCreatorsWarning": "{{count}} user(s) can create equipment but can't edit this field: {{names}}. While it is Required, they can't create any equipment.",
+    "blockedCreatorsMore": "{{names}} and {{count}} more",
+    "grantEditToBlocked": "Also let these users edit this field",
+    "askAdminToGrant": "Ask an administrator to give them edit permission on this field.",
+    "newRequiredFieldWarning": "Nobody can edit a new field yet. While it is Required, users who create equipment are blocked until they may edit it.",
+    "grantEditToCreators": "Let every user who can create equipment edit this field",
+    "editGranted_one": "Edit permission granted to {{count}} user.",
+    "editGranted_other": "Edit permission granted to {{count}} users.",
+    "deleteValueCount": "{{count}} equipment record(s) have a value for this field. It will be removed from them (the removed values are kept in the audit log).",
+    "customFieldDeletedCount": "Field deleted. Value removed from {{count}} equipment record(s)."
   },
   "adminErrors": {
     "title": "Error log",
@@ -480,7 +522,8 @@
     "requestId": "Request ID",
     "route": "Route",
     "code": "Code",
-    "message": "Message"
+    "message": "Message",
+    "searchHint": "Searches every logged error from the last 90 days, not only the latest ones."
   },
   "fields": {
     "labels": {
@@ -554,7 +597,11 @@
     "SWAP_INVALID": "These two pieces of equipment cannot be swapped.",
     "SWAP_INVALID_ANCESTOR_RELATION": "Cannot swap two pieces of equipment that are parent and child of each other.",
     "DUPLICATE_WARNING": "Warning: another piece of equipment already has the same Part Number and Serial Number.",
-    "SERVER_ERROR": "System error. Please try again, or contact an admin with the request ID."
+    "SERVER_ERROR": "System error. Please try again, or contact an admin with the request ID.",
+    "USER_NOT_FOUND": "User not found.",
+    "CANNOT_MODIFY_SELF": "You can't deactivate your own account, change your own role or reset your own password here.",
+    "LAST_ADMIN": "There must always be at least one active administrator.",
+    "PASSWORD_CHANGE_REQUIRED": "You need to change your password before continuing."
   },
   "adminMasterData": {
     "title": "Master data",
@@ -564,8 +611,7 @@
     "levelsHint": "Equipment Level in the production line.",
     "locationsHint": "Physical or logical locations — buildings, floors, or a vendor site during a repair.",
     "departmentsHint": "Department — a fixed list users pick from in Account settings, instead of free-typing their own (so \"Test Eng\" and \"Test Engineering\" can't end up as two different values for the same department).",
-    "calibrationSettingsTitle": "Calibration settings",
-    "calibrationSettingsHint": "How many days before its due date a calibration counts as \"Due Soon\" instead of \"Valid\", across the Dashboard and Equipment Masterlist.",
+    "calibrationSettingsHint": "How many days before its due date a calibration counts as \"Due Soon\" instead of \"Valid\".",
     "dueSoonDays": "Due Soon window (days)",
     "calibrationSettingsSaved": "Saved.",
     "requiresRemark": "Requires Remark",
@@ -573,6 +619,11 @@
     "saved": "Saved.",
     "added": "Added.",
     "codePlaceholder": "code"
+  },
+  "adminCalibrationSettings": {
+    "title": "Calibration settings",
+    "subtitle": "App-wide settings that decide how calibration status is calculated on the Dashboard, the Calibration page and the Equipment masterlist.",
+    "dueSoonTitle": "Due Soon window"
   },
   "calibration": {
     "title": "Calibration",
@@ -595,6 +646,32 @@
       "DUE_SOON": "Due soon",
       "VALID": "Valid"
     }
+  },
+  "calibrationPage": {
+    "title": "Calibration",
+    "subtitle": "All active equipment that requires calibration, most urgent first. Open a row to view its history or record a calibration.",
+    "statusFilter": "Filter by calibration status",
+    "all": "All",
+    "searchLabel": "Search calibration list",
+    "searchPlaceholder": "Search serial, part number, location, calibrated by…",
+    "noneRequired": "No equipment requires calibration yet.",
+    "noneRequiredHint": "Equipment is listed here once “Calibration Required” is turned on in its record.",
+    "noMatches": "No equipment matches this filter.",
+    "dueToday": "Due today",
+    "dueIn_one": "in {{count}} day",
+    "dueIn_other": "in {{count}} days",
+    "overdueBy_one": "{{count}} day overdue",
+    "overdueBy_other": "{{count}} days overdue",
+    "dueSoonWindow": "Due soon = due within {{days}} days",
+    "changeWindow": "Change",
+    "openCalibrationFor": "Open calibration for"
+  },
+  "goldenMaster": {
+    "title": "Golden master list",
+    "subtitle": "Golden units used on the production line to verify testers and equipment.",
+    "inDevelopment": "In development",
+    "comingSoonTitle": "This module is under development.",
+    "comingSoonBody": "Golden master management will be available here in a later release."
   },
   "repair": {
     "title": "Repair",
@@ -633,12 +710,44 @@
     "needsAttention": "Needs attention",
     "underRepair": "Under repair",
     "calibrationHealth": "Calibration health",
-    "dueSoonWindowNote": "Due Soon window: {{days}} days (Admin → Master data).",
+    "dueSoonWindowNote": "Due Soon window: {{days}} days (Administration → Configuration → Calibration settings).",
     "calibrationAttention": "Calibration attention",
     "noCalibrationAttention": "Nothing needs calibration attention right now.",
     "currentRepair": "Current repair",
     "recentActivity": "Recent activity",
     "noRecentActivity": "No recent activity yet.",
     "viewAll": "View all"
+  },
+  "adminAudit": {
+    "title": "Audit log",
+    "subtitle": "Who changed users, permissions, fields and master data — and from what to what.",
+    "entityFilter": "Show",
+    "allEntities": "All changes",
+    "entity_user": "Users",
+    "entity_field": "Fields",
+    "entity_location": "Locations",
+    "entity_equipment_type": "Types",
+    "entity_equipment_status": "Statuses",
+    "entity_equipment_level": "Levels",
+    "entity_department": "Departments",
+    "entity_permission": "Settings",
+    "time": "Time",
+    "actor": "By",
+    "action": "Action",
+    "target": "Target",
+    "changes": "Changes",
+    "loading": "Loading audit log…",
+    "empty": "No changes recorded yet.",
+    "emptyHint": "Changes to users, permissions, fields and master data will appear here.",
+    "loadMore": "Load more",
+    "system": "System"
+  },
+  "forcedPassword": {
+    "overline": "ACCOUNT SECURITY",
+    "title": "Choose your own password",
+    "description": "Your password was set by an administrator. Choose a new one before continuing.",
+    "submit": "Save and continue",
+    "saving": "Saving…",
+    "errorSameAsCurrent": "The new password must be different from the current one."
   }
 }

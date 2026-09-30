@@ -1,17 +1,18 @@
 import { withAuth, ok } from '@/lib/auth/withAuth';
-import { updateFieldDefinition, countMissingValues, deleteCustomField } from '@/lib/services/admin';
+import { updateFieldDefinition, getFieldImpact, deleteCustomField } from '@/lib/services/admin';
 
 /**
  * is_required sửa được BẤT KỲ LÚC NÀO — không có is_finalized. Validation áp
  * dụng theo payload, không theo record, nên bật Required không làm chết các
  * record cũ đang thiếu giá trị.
  *
- * GET trả kèm missing_count để UI cảnh báo trước khi Admin bật Required.
+ * GET trả kèm để UI cảnh báo trước khi lưu: missing_count (record đang thiếu
+ * giá trị), filled_count (custom field: record sẽ mất giá trị nếu xoá field)
+ * và blocked_creators (user có quyền tạo thiết bị nhưng không sửa được field
+ * này — nếu field Required thì họ không tạo được thiết bị nào).
  */
 export const GET = withAuth(
-  async (_req, { requestId, params }) =>
-    ok({ field_key: params.fieldKey, missing_count: await countMissingValues(params.fieldKey!) },
-      requestId),
+  async (_req, { requestId, params }) => ok(await getFieldImpact(params.fieldKey!), requestId),
   { role: ['admin', 'user'], action: 'field.manage' },
 );
 
@@ -24,9 +25,7 @@ export const PUT = withAuth(
 
 /** Custom fields only — system fields can never be removed. */
 export const DELETE = withAuth(
-  async (_req, { requestId, profile, params }) => {
-    await deleteCustomField(params.fieldKey!, profile.id, requestId);
-    return ok({ field_key: params.fieldKey, deleted: true }, requestId);
-  },
+  async (_req, { requestId, profile, params }) =>
+    ok(await deleteCustomField(params.fieldKey!, profile.id, requestId), requestId),
   { role: ['admin', 'user'], action: 'field.manage' },
 );

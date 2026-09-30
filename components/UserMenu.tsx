@@ -148,6 +148,7 @@ function AccountSettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setPwError(null); setPwApiError(null);
     if (pwForm.next !== pwForm.confirm) { setPwError(t('adminUsers.errorPasswordMismatch')); return; }
     if (pwForm.next.length < 10) { setPwError(t('adminUsers.errorPasswordTooShort')); return; }
+    if (pwForm.next === pwForm.current) { setPwError(t('forcedPassword.errorSameAsCurrent')); return; }
     setPwBusy(true);
     try {
       await api.put('/api/me/password', { current_password: pwForm.current, new_password: pwForm.next });

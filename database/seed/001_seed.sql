@@ -69,8 +69,9 @@ insert into public.permissions (code, display_label, category, description, disp
   ('calibration.create','Log a calibration',       'calibration', 'Create calibration records.', 90),
   ('calibration.update','Edit calibration records','calibration', 'Correct existing calibration records.', 100),
   ('master_data.manage','Manage master data',      'admin',       'Manage Equipment Types, Statuses, Levels and Locations.', 110),
-  ('field.manage',      'Manage field configuration','admin',     'Manage field presentation and custom fields.', 120),
-  ('user.manage',       'Manage users',            'admin',       'Create/deactivate users and assign permissions.', 130)
+  ('field.manage',      'Manage field configuration','admin',     'Manage field presentation and custom fields.', 120)
+  -- No 'user.manage': user management is deliberately role=admin only
+  -- (see app/(app)/admin/layout.tsx), so a grantable code would do nothing.
 on conflict (code) do nothing;
 
 -- -----------------------------------------------------------------------------

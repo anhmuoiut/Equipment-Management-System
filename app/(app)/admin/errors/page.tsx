@@ -38,25 +38,33 @@ export default function AdminErrorsPage() {
   const [error, setError] = useState<ApiError | null>(null);
   const [limit, setLimit] = useState<number>(50);
   const [search, setSearch] = useState('');
+  // Debounced copy of the search box — the search runs server-side over the
+  // whole log (not just the rows loaded), so not one request per keystroke.
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<ErrorRow[]>(`/api/admin/errors?limit=${limit}`);
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (query) params.set('request_id', query);
+      const res = await api.get<ErrorRow[]>(`/api/admin/errors?${params}`);
       setRows(res.data);
     } catch (e) {
       if (e instanceof ApiError) setError(e);
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [limit, query]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const filtered = search.trim()
-    ? rows.filter((r) => r.request_id.toLowerCase().includes(search.trim().toLowerCase()))
-    : rows;
+  const filtered = rows;
 
   return (
     <div className="admin-page">
@@ -80,6 +88,7 @@ export default function AdminErrorsPage() {
             className="w-32 border px-2 py-1 text-[12px]"
           />
           <Button size="sm" onClick={() => void refresh()}>{t('adminErrors.refresh')}</Button>
+          <span className="text-[11px]" style={{ color: 'var(--ink-3)' }}>{t('adminErrors.searchHint')}</span>
           <span className="ml-auto text-[12px]" style={{ color: 'var(--ink-3)' }}>
             {loading ? t('common.loadingEllipsis') : filtered.length + ' ' + t('adminErrors.entries')}
           </span>
@@ -89,9 +98,9 @@ export default function AdminErrorsPage() {
             <Spinner label={t('adminErrors.loadingLog')} />
           ) : filtered.length === 0 ? (
             <div className="px-4 py-16 text-center">
-              <p className="text-[14px]">{t(search.trim() ? 'adminErrors.noMatchingErrors' : 'adminErrors.noErrorsLogged')}</p>
+              <p className="text-[14px]">{t(query ? 'adminErrors.noMatchingErrors' : 'adminErrors.noErrorsLogged')}</p>
               <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-3)' }}>
-                {t(search.trim() ? 'adminErrors.tryDifferentRequestId' : 'adminErrors.noErrorsLoggedHint')}
+                {t(query ? 'adminErrors.tryDifferentRequestId' : 'adminErrors.noErrorsLoggedHint')}
               </p>
             </div>
           ) : (
