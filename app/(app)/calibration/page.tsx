@@ -1,12 +1,8 @@
 'use client';
 
 import { Suspense } from 'react';
-import { CalibrationList } from '@/components/calibration/CalibrationList';
+import { CalibrationWorkspace } from '@/components/calibration/CalibrationWorkspace';
 
 export default function CalibrationPage() {
-  return (
-    <Suspense fallback={null}>
-      <CalibrationList />
-    </Suspense>
-  );
+  return <Suspense><CalibrationWorkspace /></Suspense>;
 }

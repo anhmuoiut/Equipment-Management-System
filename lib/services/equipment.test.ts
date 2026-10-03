@@ -1,86 +1,86 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-const mocks = vi.hoisted(() => ({ getEquipment: vi.fn(), rpc: vi.fn() }));
-vi.mock('@/lib/supabase/admin', () => ({
-  supabaseAdmin: () => ({
-    rpc: mocks.rpc,
-    from: (table: string) => {
-      if (table === 'equipment') return { select: () => ({ eq: () => ({ maybeSingle: mocks.getEquipment }) }) };
-      throw new Error('Unexpected table ' + table);
-    },
+vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => { throw new Error('no database in unit tests'); } }));
+
+/**
+ * Sửa thiết bị cha trong form (docs/DATABASE_MODIFIED.md mục 2): đổi cha = Move,
+ * bỏ trống = Detach; kiểm tra vòng lặp trước khi ghi. Database giả trong bộ nhớ.
+ *
+ *   ROOT (B3F1) ─ MID ─ LEAF        OTHER (B3F2)
+ */
+const rows = [
+  { id: 'root', parent_id: null, serial_number: 'ROOT', location_id: 'l1' },
+  { id: 'mid', parent_id: 'root', serial_number: 'MID', location_id: 'l1' },
+  { id: 'leaf', parent_id: 'mid', serial_number: 'LEAF', location_id: 'l1' },
+  { id: 'other', parent_id: null, serial_number: 'OTHER', location_id: 'l2' },
+].map((r) => ({
+  ...r, jabil_id: null, part_number_id: null, asset: null, type_id: null, status_id: null, level_id: null, remark: null,
+  created_at: '2026-10-01T00:00:00Z', created_by: null, updated_at: '2026-10-01T00:00:00Z', updated_by: null,
+}));
+
+const db = vi.hoisted(() => ({ appWrite: vi.fn(), rpc: vi.fn(), selectAll: vi.fn(), selectOne: vi.fn() }));
+vi.mock('./core/db', () => db);
+
+const named = (id: string, name: string) => [id, { id, display_name: name, sort_order: 0, is_active: true }] as const;
+vi.mock('./core/lookups', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./core/lookups')>()),
+  loadLookups: async () => ({
+    part_numbers: new Map(), types: new Map(), levels: new Map(), departments: new Map(), calibration_vendors: new Map(),
+    statuses: new Map(), users: new Map(), locations: new Map([named('l1', 'B3F1'), named('l2', 'B3F2')]),
   }),
 }));
-import { updateEquipmentFromFields, createEquipmentFromFields } from './equipment';
-import type { FieldDefinition } from '@/lib/validators/equipment';
 
-function def(field_key: string, overrides: Partial<FieldDefinition> = {}): FieldDefinition {
-  return {
-    id: `def-${field_key}`, field_key, display_label: field_key, data_type: 'text', input_type: 'text',
-    is_required: false, is_visible: true, display_order: 1, max_length: null, dropdown_options: null,
-    help_text: null, placeholder: null, is_system: true,
-    ...overrides,
-  };
-}
-
-const defs: FieldDefinition[] = [
-  def('serial_number'),
-  def('types', { input_type: 'type_ref' }),
-  def('status', { input_type: 'status_ref' }),
-  def('calibration_required', { data_type: 'boolean', input_type: 'boolean' }),
-  def('warranty_months', { is_system: false, input_type: 'number', data_type: 'number' }),
-  def('vendor_name', { is_system: false, input_type: 'text' }),
-];
+import { updateEquipment } from './equipment';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.rpc.mockResolvedValue({ data: { id: 'eq-1' }, error: null });
+  db.selectOne.mockImplementation(async (_table: string, id: string) => rows.find((r) => r.id === id) ?? null);
+  db.selectAll.mockImplementation(async () => rows);
 });
 
-describe('createEquipmentFromFields — system/custom split', () => {
-  it('translates ref field_keys to their real column names and nests custom fields', async () => {
-    await createEquipmentFromFields(
-      { serial_number: 'SN-1', types: '11111111-1111-1111-1111-111111111111', warranty_months: '12' },
-      defs, null, 'actor', 'req-1',
-    );
-    expect(mocks.rpc).toHaveBeenCalledWith('create_equipment_with_audit', expect.objectContaining({
-      p_data: expect.objectContaining({
-        serial_number: 'SN-1',
-        type_id: '11111111-1111-1111-1111-111111111111',
-        parent_id: null,
-        custom_fields: { warranty_months: '12' },
-      }),
-    }));
-    // A custom field_key never leaks through as a bare top-level column.
-    const sent = mocks.rpc.mock.calls[0]![1].p_data;
-    expect(sent).not.toHaveProperty('warranty_months');
-  });
-});
+/** Các lệnh ghi theo thứ tự: tên RPC (hoặc app_write) + tham số chính. */
+const writes = () => [
+  ...db.appWrite.mock.calls.map((c, i) => ({ order: db.appWrite.mock.invocationCallOrder[i]!, call: ['app_write', c[3]] })),
+  ...db.rpc.mock.calls.map((c, i) => ({ order: db.rpc.mock.invocationCallOrder[i]!, call: [c[0], c[1]] })),
+].sort((a, b) => a.order - b.order).map((w) => w.call);
 
-describe('updateEquipmentFromFields — custom_fields merge', () => {
-  it('sends only real columns straight through when no custom field changed', async () => {
-    await updateEquipmentFromFields('eq-1', 3, { status: '33333333-3333-3333-3333-333333333333' }, defs, 'actor', 'req-1');
-    expect(mocks.getEquipment).not.toHaveBeenCalled(); // no need to read current row
-    expect(mocks.rpc).toHaveBeenCalledWith('update_equipment_with_audit', expect.objectContaining({
-      p_changes: { status_id: '33333333-3333-3333-3333-333333333333' },
-    }));
+describe('updateEquipment — thiết bị cha sửa được trong form', () => {
+  it('a new parent moves the equipment (location follows the parent; a sent location is ignored)', async () => {
+    await updateEquipment('mid', { parent_id: 'other', location_id: 'l1' }, 'u1');
+    expect(writes()).toEqual([['equipment_move', { p_id: 'mid', p_parent_id: 'other', p_actor: 'u1', p_children: 'follow' }]]);
   });
 
-  it('merges a changed custom field onto the record\'s existing custom_fields rather than replacing the whole blob', async () => {
-    mocks.getEquipment.mockResolvedValue({
-      data: { id: 'eq-1', custom_fields: { warranty_months: '12', vendor_name: 'Acme' } },
-      error: null,
-    });
-    await updateEquipmentFromFields('eq-1', 3, { vendor_name: 'NewCo' }, defs, 'actor', 'req-1');
-    expect(mocks.rpc).toHaveBeenCalledWith('update_equipment_with_audit', expect.objectContaining({
-      p_changes: { custom_fields: { warranty_months: '12', vendor_name: 'NewCo' } },
-    }));
+  it('clearing the parent detaches, then applies the new location', async () => {
+    await updateEquipment('mid', { parent_id: null, location_id: 'l2', jabil_id: 'J9' }, 'u1');
+    expect(writes()).toEqual([
+      ['app_write', { jabil_id: 'J9' }],
+      ['equipment_detach', { p_id: 'mid', p_actor: 'u1', p_children: 'follow' }],
+      ['equipment_change_location', { p_id: 'mid', p_location_id: 'l2', p_actor: 'u1', p_children: 'follow' }],
+    ]);
   });
 
-  it('merges both a system field and a custom field change in the same call', async () => {
-    mocks.getEquipment.mockResolvedValue({ data: { id: 'eq-1', custom_fields: { warranty_months: '12' } }, error: null });
-    await updateEquipmentFromFields('eq-1', 3, { calibration_required: 'true', warranty_months: '24' }, defs, 'actor', 'req-1');
-    expect(mocks.rpc).toHaveBeenCalledWith('update_equipment_with_audit', expect.objectContaining({
-      p_changes: { calibration_required: 'true', custom_fields: { warranty_months: '24' } },
-    }));
+  it('passes "children stay" from the form to the database, never as a column', async () => {
+    await updateEquipment('mid', { parent_id: 'other', children_mode: 'stay', jabil_id: 'J9' }, 'u1');
+    expect(writes()).toEqual([
+      ['app_write', { jabil_id: 'J9' }],
+      ['equipment_move', { p_id: 'mid', p_parent_id: 'other', p_actor: 'u1', p_children: 'stay' }],
+    ]);
+  });
+
+  it('an unchanged parent writes only the other fields', async () => {
+    await updateEquipment('mid', { parent_id: 'root', jabil_id: 'J9' }, 'u1');
+    expect(writes()).toEqual([['app_write', { jabil_id: 'J9' }]]);
+  });
+
+  it('refuses its own descendant (or itself) as parent, before writing anything', async () => {
+    await expect(updateEquipment('root', { parent_id: 'leaf', jabil_id: 'J9' }, 'u1')).rejects.toMatchObject({ code: 'PARENT_CYCLE_DETECTED' });
+    await expect(updateEquipment('root', { parent_id: 'root' }, 'u1')).rejects.toMatchObject({ code: 'PARENT_CYCLE_DETECTED' });
+    await expect(updateEquipment('root', { parent_id: 'gone' }, 'u1')).rejects.toMatchObject({ code: 'PARENT_NOT_FOUND' });
+    expect(writes()).toEqual([]);
+  });
+
+  it('a child keeping its parent cannot change location on its own', async () => {
+    await expect(updateEquipment('leaf', { location_id: 'l2' }, 'u1')).rejects.toMatchObject({ code: 'LOCATION_INHERITED_READ_ONLY' });
+    expect(writes()).toEqual([]);
   });
 });

@@ -1,27 +1,18 @@
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { AppError } from '@/lib/errors';
+import type { AccountStatus, Role } from '@/lib/permissions';
 
-/** Call only with the ID returned by verified server-side authentication. */
-export async function getProfileIdentity(userId: string) {
+export type ProfileIdentity = {
+  username: string; full_name: string; role: Role; account_status: AccountStatus;
+  token_version: number; sessions_revoked_at: string | null; must_change_password: boolean;
+};
+
+/** Gọi chỉ với id lấy từ phiên đăng nhập đã xác thực ở server. */
+export async function getProfileIdentity(userId: string): Promise<ProfileIdentity | null> {
   const { data, error } = await supabaseAdmin().from('user_profiles')
-    .select('username,full_name,is_active,role,token_version,sessions_revoked_at,must_change_password')
+    .select('username, full_name, role, account_status, token_version, sessions_revoked_at, must_change_password')
     .eq('id', userId).maybeSingle();
   if (error) throw new AppError('SERVER_ERROR');
-  return data as {
-    username: string; full_name: string; is_active: boolean;
-    role: 'admin' | 'user' | 'viewer'; token_version: number;
-    sessions_revoked_at: string | null; must_change_password: boolean;
-  } | null;
-}
-
-/** Just the granted permission codes — used by server layouts deciding
- *  whether a non-admin (e.g. a master_data.manage or field.manage holder)
- *  may land on an /admin/* page at all. The actual enforcement always
- *  happens again at the API layer (withAuth); this is UX-only. */
-export async function getProfilePermissions(userId: string): Promise<string[]> {
-  const { data, error } = await supabaseAdmin().from('user_permissions')
-    .select('permission_code').eq('user_id', userId);
-  if (error) throw new AppError('SERVER_ERROR');
-  return (data ?? []).map((r) => (r as { permission_code: string }).permission_code);
+  return data as ProfileIdentity | null;
 }

@@ -1,6 +1,6 @@
 # UI requirements: SolarEdge Equipment Management
 
-Updated: 30 September 2026. Status: accepted design baseline.
+Updated: 2 October 2026. Status: accepted design baseline.
 
 ## Read this before changing UI
 
@@ -10,7 +10,7 @@ The guiding principle is **compact, clear, consistent**. Preserve working space 
 
 Explicit new user instructions take precedence. Otherwise, follow this document for visual decisions and the feature specifications for business behavior. If a deliberate design change is requested, update this document in the same change. Do not silently redesign unrelated screens.
 
-[UI_LAYOUT.md](UI_LAYOUT.md) and screenshots in `docs/ui` are historical references, not the current visual acceptance target. [EQUIPMENT_DETAIL_MODAL.md](EQUIPMENT_DETAIL_MODAL.md) still describes detail-modal behavior; its visual treatment must follow this document.
+[APP_SHELL.md](APP_SHELL.md) defines the menu and routes. [DETAIL_MODEL.md](DETAIL_MODEL.md) defines the one list and detail layout that every module uses (Masterlist + Detail Panel). Its visual treatment must follow this document.
 
 ## 1. Brand and typography
 
@@ -37,6 +37,9 @@ Use Prussian text on Picton backgrounds and white text on Prussian backgrounds. 
 | Error / destructive | `--alert`, `--alert-tint` |
 | Warning | `--warn`, `--warn-tint` |
 | Success | `--success`, `--success-tint` |
+| Information / waiting | `--info`, `--info-tint` |
+| Neutral / inactive | `--neutral`, `--neutral-tint` |
+| Status marks (dots, chart fills) | `--status-green`, `--status-yellow`, `--status-red`, `--status-blue`, `--status-gray` |
 | Overlay | `--overlay` |
 
 `--ok` is a legacy brand-action alias, not the success color. Use `--success` for new success states. Do not add local hardcoded hex colors or override global tokens inside a feature to obtain a different palette.
@@ -53,14 +56,14 @@ Use Prussian text on Picton backgrounds and white text on Prussian backgrounds. 
 
 ### Sidebar navigation structure
 
-- **Workspace** is one flat level: Dashboard, Equipment masterlist, Archived equipment, Calibration, Golden master list. Archived equipment is a peer of the masterlist (same size and icon) and uses the same full-height list layout (`FULL_HEIGHT_LIST_PAGES` in `AppShell`). Calibration is shown only with `calibration.view`.
-- A page that is reachable but not built yet shows a short badge beside its label (for example "Soon"); the link's accessible name includes it.
-- **Administration** is one collapsible item — the WAI-ARIA disclosure pattern: a `button` with `aria-expanded`/`aria-controls`, never `role="menu"`. Its categories are the only second level: User management, Configuration (Master data, Calibration settings), Field management and System logs (Audit log, Error log). Grouping and order live in `ADMIN_CATEGORIES` (`lib/permissions`); names and icons in `components/admin/adminNavigation.ts`.
-- Never add a third sidebar tier. A category with several pages links to its first page, and its pages switch with the page's own tab strip (`AdminNav`), shown at every width.
-- The group opens when navigation arrives in the admin area and otherwise keeps the user's choice. If the current page is inside the closed group, the toggle carries the selection marker. On a category's other pages its link uses `aria-current="true"`, styled like the current page.
-- List only what the account can open (`accessibleAdminCategories`); the server layouts enforce the same rules.
-- In the icon rail, an open group gets a faint background band. Links in a closed group are `inert`, so they never take focus.
-- Sidebar grids use `minmax(0, 1fr)` columns: a long (often Vietnamese) label truncates with an ellipsis and its `title` shows the full name, instead of widening every link past the sidebar edge.
+The menu is defined in [APP_SHELL.md](APP_SHELL.md).
+
+- The sidebar has **one flat level** with six items in this order: Dashboard (`/`), Equipment (`/equipment`), Calibration (`/calibration`), Golden (`/golden`), then a divider, then Configuration (`/configuration/…`) and User Management (`/users`). There is no second sidebar tier and no Administration group.
+- Configuration and User Management are shown only to Admin. User and Readonly see the first four items and no divider. The server layouts enforce the same rules, and an unauthorized route redirects to the Dashboard.
+- Menu items carry no count badges.
+- A detail route (for example `/equipment/{id}`) marks its parent item as current.
+- Configuration picks its lists from an in-page grouped sub-list: DỮ LIỆU GỐC, HIỆU CHUẨN and HỆ THỐNG (Error log). Each group header is a disclosure button with `aria-expanded`. The group holding the current page is always open. On phones the sub-list becomes a grouped select at the top of the page.
+- Sidebar grids use `minmax(0, 1fr)` columns, so a long label (often Vietnamese) truncates with an ellipsis instead of widening every link past the sidebar edge. Its `title` shows the full name.
 
 ### Current compact dimensions
 
@@ -98,15 +101,24 @@ Login is intentionally different from the authenticated shell; do not add the wo
 
 Reuse shared controls from [`components/ui/index.tsx`](../components/ui/index.tsx): `Button`, `Tag`, `Notice`, `Modal`, `ConfirmDialog`, loading/skeleton controls, `EmptyState`, `ErrorState` and the existing toast system. Check the actual exported props before use. Extend a shared component for a reusable requirement rather than copy it into a feature with different styling.
 
+Every module page uses the same list and detail components ([DETAIL_MODEL.md](DETAIL_MODEL.md)). A module only declares its columns, field groups, tabs and actions:
+
+- `ModuleWorkspace` lays out the page. It renders the `Masterlist` (search, filters, sorting, column settings, Excel export, + Add) and the Detail Panel beside it. It also handles the `?id=` and `?new=1` URLs, ‹ › navigation in the current list order, and the ↑ ↓ / J K keys.
+- `RecordDetail` shows a record and handles view, edit, create, action screens and delete in one panel. Delete and "unsaved changes" are confirmed in the panel footer, never in a second dialog.
+- `RecordPage` shows the same detail as a full page, for the ⤢ button and QR links.
+
+Do not build a per-feature modal or table for a record type. `Modal` stays only for global dialogs such as account settings.
+
 Use the existing `lucide-react` icon style and established sizing. Decorative icons must not be announced as content; icon-only actions need an accessible name. Keep primary, quiet and destructive button variants consistent. Red destructive actions retain the existing confirmation behavior and warning treatment.
 
 ### Lists, tables and dashboards
 
-- Reuse `.page-heading`, `.equipment-panel`, `.list-toolbar` / `.equipment-toolbar` and `.grid-table` patterns where applicable.
+- Module lists use `Masterlist` (`.ml-*` in [`app/workspace.css`](../app/workspace.css)). Other tables reuse `.page-heading` and `.grid-table`.
 - Keep search, filters, counts and actions compact and clearly grouped. Preserve sorting, filtering, pagination and permission-based actions.
 - Tables use subtle dividers, restrained alternating row tint, and readable hover/focus states. Wide tables scroll inside their panel; they must not widen the whole page or silently lose columns.
 - Let the equipment table use the available workspace height. Do not add arbitrary minimum heights that push content beyond the viewport.
 - Dashboard cards use compact spacing, small corner icons, tabular values, restrained Picton charts and semantic highlights. Do not invent metrics or status data to decorate a screen.
+- The Dashboard **Status overview** shows Equipment, Calibration and Golden side by side (one column each, stacked on phones). Each has a stacked bar in status colors (2px gaps, ordered by the status sort order, not by count) and a legend with dot, name, count and percent, which works as the table view. Overdue and Due soon KPIs tint their icon red / amber only when the count is above zero.
 - Recent activity must not grow the page with every log. Cap its list at `min(360px, 50svh)` and scroll within it, keeping the card heading outside the scroll area. Keep every returned log accessible, allow long notes to wrap, and support keyboard scrolling with a named focusable list. Short/empty lists should stay compact.
 - Include appropriate loading, empty, error and success states for new data flows using shared patterns.
 
@@ -115,15 +127,38 @@ Use the existing `lucide-react` icon style and established sizing. Decorative ic
 | Existing status meaning | Visual treatment |
 | --- | --- |
 | Active / valid / successful | Green success tokens |
-| Inactive / overdue / not calibrated / error | Red alert tokens |
-| Waiting / registration / due soon / repair | Amber warning tokens |
-| Neutral information / selection | Brand tokens |
+| Overdue / not calibrated / failed / error | Red alert tokens |
+| Due soon / repair / needs attention | Amber warning tokens |
+| Waiting / registration / informational | Blue info tokens |
+| Inactive / disabled / neutral | Neutral tokens |
+| Selection / navigation | Brand tokens |
+
+Calibration due dates (`DueDate`) and account statuses (`AccountStatusTag`) use the semantic tokens above.
+
+### Status colors
+
+Admins create statuses in Configuration › Status and must pick one of **five system colors** for each (`statuses.color`, see [DATABASE_MODIFIED.md](DATABASE_MODIFIED.md)). Red, green and yellow are required by the business; blue and gray complete the set. The meanings follow ISA-101 (green = running, yellow = caution, red = alarm, blue = manual/waiting, gray = stopped) and common design systems (Carbon, Atlassian, Primer).
+
+| `color` | Meaning | Example | Text / tint (light) | Mark light | Mark dark |
+| --- | --- | --- | --- | --- | --- |
+| `green` | Normal, passed, running | Active, Pass | `--success` / `--success-tint` | `#3DA535` | `#65C281` |
+| `yellow` | Needs attention, in progress | Repair | `--warn` / `--warn-tint` | `#EFC23A` | `#F6CE22` |
+| `red` | Failed, act now | Fail | `--alert` / `--alert-tint` | `#C8202D` | `#E93F2D` |
+| `blue` | Waiting, informational | Wait Registration | `--info` / `--info-tint` | `#2A72D8` | `#447BE4` |
+| `gray` | Inactive, neutral | Inactive | `--neutral` / `--neutral-tint` | `#98A3AD` | `#7A858F` |
+
+- The database stores only the color name. The hex values live in `globals.css` (`--status-*` for marks), so retuning a shade changes every status that uses it. Never let admins enter free hex codes.
+- The five marks were validated with the dataviz palette checker against the real surfaces (white, and the dark panel `#0D3652`): every pair stays apart under red-green color blindness (OKLab ΔE ≥ 8.8 light / 11.9 dark) and for normal vision (ΔE ≥ 15). Yellow and gray marks are below 3:1 on white by design, so a status mark is always accompanied by its text label.
+- Text always uses the text tokens of the table (contrast ≥ 4.5:1 on its tint), never the mark color.
+- `StatusTag name color` renders the colored tag. Put `data-status-color` on an element to get `--sc-mark`, `--sc-ink` and `--sc-tint` for custom marks (for example `.status-dot`, Dashboard segments).
+- A missing status (`null`) uses the plain rule color, not gray, so "not set" never looks like Inactive.
+- Status colors are reserved for statuses. Nominal breakdowns such as location or type use the single Picton bar color.
 
 Keep visible status text on desktop and mobile. Supplement color with text, icons or existing border patterns; never show only a colored dot. Preserve existing status meanings and translations. Error copy should state the problem and a useful next step without exposing internal secrets.
 
 ### Forms, dialogs and menus
 
-- Reuse existing input, validation and modal patterns. Use persistent labels, visible required markers and clear field-level feedback.
+- Record forms are the Detail Panel itself: fields switch to inputs in place. Labels stay above values, required fields carry a red `*`, and errors appear under the field. Other forms reuse the existing input, validation and modal patterns.
 - Dialog headers/close controls remain accessible while long bodies scroll. Stack fields on narrow screens and keep actions reachable, including the mobile safe area.
 - Preserve keyboard navigation, focus trapping/restoration and Escape handling. Dropdowns/popovers stay inside the viewport and use the established layering tokens.
 - Keep disabled and loading states meaningful; prevent duplicate submissions through the existing behavior.
@@ -146,8 +181,14 @@ Keep visible keyboard focus, semantic labels and readable contrast. Respect redu
 | [`app/layout.tsx`](../app/layout.tsx) | Font loading and global CSS import order: globals before brand |
 | [`components/AppShell.tsx`](../components/AppShell.tsx) | Shared authenticated workspace |
 | [`components/TopBar.tsx`](../components/TopBar.tsx) | Left-aligned brand row and right-side controls |
-| [`components/layout/AppSidebar.tsx`](../components/layout/AppSidebar.tsx) | Navigation and collapsed/mobile sidebar |
-| [`components/admin/AdminNav.tsx`](../components/admin/AdminNav.tsx), [`lib/permissions/index.ts`](../lib/permissions/index.ts) | Tabs inside an Administration category; section/category grouping and access |
+| [`components/layout/AppSidebar.tsx`](../components/layout/AppSidebar.tsx) | Six-item menu, collapsed/mobile sidebar |
+| [`lib/permissions/index.ts`](../lib/permissions/index.ts), [`components/ViewerContext.tsx`](../components/ViewerContext.tsx) | Role groups (Admin / User / Readonly) and which buttons a viewer sees |
+| [`app/workspace.css`](../app/workspace.css) | Masterlist, Detail Panel, history, equipment tree, Configuration sub-list, Dashboard |
+| [`components/ui/masterlist/`](../components/ui/masterlist) | `Masterlist`, `ColumnSettings`, Excel export |
+| [`components/ui/detail/`](../components/ui/detail) | `DetailPanel`, `RecordDetail`, `ActionScreen`, `DetailHistory` |
+| [`components/ui/workspace/`](../components/ui/workspace) | `ModuleWorkspace` (list + panel page), `RecordPage` (full-page detail) |
+| [`components/ui/tags.tsx`](../components/ui/tags.tsx) | `StatusTag`, `DueDate`, `AccountStatusTag` |
+| [`components/configuration/ConfigNav.tsx`](../components/configuration/ConfigNav.tsx) | Grouped Configuration sub-list; becomes a select on phones |
 | [`components/JabilLogo.tsx`](../components/JabilLogo.tsx) | Reusable Jabil brand asset |
 | [`components/ui/index.tsx`](../components/ui/index.tsx) | Shared controls and feedback |
 | [`components/Preferences.tsx`](../components/Preferences.tsx) | Theme/language controls |

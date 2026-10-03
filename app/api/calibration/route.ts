@@ -1,30 +1,13 @@
 import { withAuth, ok } from '@/lib/auth/withAuth';
-import {
-  CALIBRATION_LIST_STATUSES, listCalibrationOverview, type CalibrationListStatus,
-} from '@/lib/services/calibration';
+import { EDITORS } from '@/lib/permissions';
+import { addCalibration, listCalibration } from '@/lib/services/calibration';
+import { parseBody, readJson, reqId, z } from '@/lib/services/core/validate';
 
-const MAX_PAGE_SIZE = 200;
+/** Dashboard hiệu chuẩn — mọi nhóm. */
+export const GET = withAuth(async (_req, { requestId }) => ok(await listCalibration(), requestId));
 
-/**
- * The Calibration page's list — calibration-required, active equipment,
- * most urgent first, with per-status counts for its filter. Same gate as
- * the per-equipment calibration route (calibration.view: viewers hold every
- * .view code, a user needs the grant).
- */
-export const GET = withAuth(
-  async (req, { requestId }) => {
-    const sp = new URL(req.url).searchParams;
-    const pageSize = Math.min(Number(sp.get('pageSize') ?? 50) || 50, MAX_PAGE_SIZE);
-    const page = Math.max(Number(sp.get('page') ?? 1) || 1, 1);
-    const rawStatus = sp.get('status');
-    const status = (CALIBRATION_LIST_STATUSES as readonly string[]).includes(rawStatus ?? '')
-      ? rawStatus as CalibrationListStatus
-      : undefined;
-
-    const { rows, total, counts, due_soon_days } = await listCalibrationOverview({
-      status, search: sp.get('search') ?? undefined, page, pageSize,
-    });
-    return ok(rows, requestId, { page, pageSize, total, counts, due_soon_days });
-  },
-  { role: ['admin', 'user', 'viewer'], action: 'calibration.view' },
-);
+/** Đưa thiết bị vào Dashboard hiệu chuẩn — Admin, User. */
+export const POST = withAuth(async (req, { requestId, profile }) => {
+  const { equipment_id } = parseBody(z.object({ equipment_id: reqId }), await readJson(req));
+  return ok(await addCalibration(equipment_id, profile.id), requestId);
+}, { role: EDITORS });

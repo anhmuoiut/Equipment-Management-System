@@ -1,32 +1,23 @@
 import 'server-only';
 
 /**
- * The page-side counterpart of `withAuth`: the same session checks, but a
- * failure redirects instead of answering 401/403. Used by every server
- * layout/page that needs "who is looking at this page", and memoized per
- * request (React `cache`) so a nested layout doesn't repeat the lookups.
+ * Bản cho trang của withAuth: cùng các bước kiểm tra phiên, nhưng không đạt
+ * thì chuyển trang thay vì trả 401/403. Nhớ theo từng request (React cache).
  *
- * An invalid session (deactivated account, or a session issued before a
- * password reset) goes to /api/auth/session-ended rather than straight to
- * /login: middleware only checks that the cookie is well-formed, so it
- * would bounce /login straight back to / and loop until the cookie is
- * actually cleared.
+ * Phiên không còn hợp lệ (tài khoản bị khóa, đăng nhập trước khi đặt lại mật
+ * khẩu) đi qua /api/auth/session-ended để xóa cookie rồi mới về /login.
  */
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { getCurrentSession, isSessionRevoked } from '@/lib/auth/session';
-import { getProfileIdentity, getProfilePermissions } from '@/lib/services/profile';
-import {
-  canAccessAdminSection, roleHasPermission, type AdminSection, type PermissionCode, type Role,
-} from '@/lib/permissions';
+import { getProfileIdentity } from '@/lib/services/profile';
+import type { Role } from '@/lib/permissions';
 
 export type PageViewer = {
   userId: string;
   username: string;
   fullName: string;
   role: Role;
-  /** Empty for admins — they bypass every permission check anyway. */
-  permissions: string[];
   mustChangePassword: boolean;
 };
 
@@ -36,32 +27,19 @@ export const requirePageViewer = cache(async (): Promise<PageViewer> => {
   const session = await getCurrentSession();
   if (!session) redirect('/login');
   const profile = await getProfileIdentity(session.userId);
-  if (!profile || !profile.is_active || isSessionRevoked(session, profile)) redirect(SESSION_ENDED_PATH);
-
-  const permissions = profile.role === 'admin' ? [] : await getProfilePermissions(session.userId);
+  if (!profile || profile.account_status !== 'active' || isSessionRevoked(session, profile)) redirect(SESSION_ENDED_PATH);
   return {
     userId: session.userId,
     username: profile.username,
     fullName: profile.full_name,
     role: profile.role,
-    permissions,
     mustChangePassword: profile.must_change_password,
   };
 });
 
-/** For an /admin/<section> layout: anyone without access goes back to /admin,
- *  which forwards them to the first section they do have (or home). */
-export async function requireAdminSection(section: AdminSection): Promise<PageViewer> {
+/** Trang chỉ Admin (Configuration, User Management): nhóm khác về Dashboard. */
+export async function requireAdminPage(): Promise<PageViewer> {
   const viewer = await requirePageViewer();
-  if (!canAccessAdminSection(viewer.role, viewer.permissions, section)) redirect('/admin');
-  return viewer;
-}
-
-/** For a workspace page whose API is gated by a permission code: without
- *  the grant it would only get 403s (and the sidebar hides its link), so
- *  the page sends the viewer home instead. */
-export async function requirePagePermission(code: PermissionCode): Promise<PageViewer> {
-  const viewer = await requirePageViewer();
-  if (!roleHasPermission(viewer.role, viewer.permissions, code)) redirect('/');
+  if (viewer.role !== 'admin') redirect('/?denied=1');
   return viewer;
 }

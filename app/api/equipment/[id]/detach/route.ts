@@ -1,12 +1,10 @@
 import { withAuth, ok } from '@/lib/auth/withAuth';
+import { EDITORS } from '@/lib/permissions';
 import { detachEquipment } from '@/lib/services/equipment';
-import { versionOnlySchema, parseBody } from '@/lib/validators/equipment';
+import { assertUuid, childrenMode, parseBody, readJson, z } from '@/lib/services/core/validate';
 
-/** Giữ location cũ, KHÔNG cascade (mục 22). */
-export const POST = withAuth(
-  async (req, { requestId, profile, params }) => {
-    const body = parseBody(versionOnlySchema, await req.json());
-    return ok(await detachEquipment(params.id!, body.version, profile.id, requestId), requestId);
-  },
-  { role: ['admin', 'user'], action: 'equipment.detach' },
-);
+/** Tách khỏi cha — giữ vị trí hiện tại; `children`: con đi theo hay ở lại với cha cũ. */
+export const POST = withAuth(async (req, { requestId, profile, params }) => {
+  const { children } = parseBody(z.object({ children: childrenMode }), await readJson(req));
+  return ok(await detachEquipment(assertUuid(params.id), profile.id, children), requestId);
+}, { role: EDITORS });

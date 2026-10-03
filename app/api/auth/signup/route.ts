@@ -12,10 +12,8 @@ export const POST = withAuth(async (req, { requestId }) => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new AppError('VALIDATION_ERROR');
 
   const ip = (req.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0]!.trim();
-  const result = await requestAccount(input, ip, requestId);
-  const response = ok(result, requestId, {
-    notice: 'Account request submitted. An administrator needs to approve it before you can sign in.',
-  });
+  const result = await requestAccount(input, ip);
+  const response = ok(result, requestId);
   response.headers.set('Cache-Control', 'no-store');
   return response;
 }, { allowAnonymous: true });

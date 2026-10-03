@@ -16,19 +16,20 @@
 import { useEffect, useState, use as usePromise } from 'react';
 import QRCode from 'qrcode';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError, type Equipment } from '@/lib/client/api';
+import { api, ApiError } from '@/lib/client/api';
+import type { EquipmentRow } from '@/lib/types';
 import { translateError } from '@/lib/i18n/errors';
 
 export default function EquipmentLabelPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
   const { t, i18n } = useTranslation();
   const language = i18n.language === 'vi' ? 'vi' : 'en';
-  const [eq, setEq] = useState<Equipment | null>(null);
+  const [eq, setEq] = useState<EquipmentRow | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
   useEffect(() => {
-    void api.get<Equipment>(`/api/equipment/${id}`)
+    void api.get<EquipmentRow>(`/api/equipment/${id}`)
       .then((r) => setEq(r.data))
       .catch((e) => { if (e instanceof ApiError) setError(e); });
   }, [id]);

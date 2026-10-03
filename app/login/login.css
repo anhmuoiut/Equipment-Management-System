@@ -157,3 +157,112 @@
 @media (max-width: 900px) {
   .solar-login.solar-login--single { justify-content: flex-start; }
 }
+
+/* Factory-photo authentication, matching the supplied desktop/mobile reference. */
+.jabil-login {
+  --ink: #003456;
+  --ink-2: #526b8e;
+  --ink-3: #526b8e;
+  --auth-link: #006bc8;
+  --panel: #fff;
+  --surface: #fff;
+  --rule: #d6e1ee;
+  --rule-soft: #e3ebf4;
+  --machine: #003456;
+  --machine-tint: #eef7fc;
+  --ok: #003456;
+  font-family: var(--font-ui);
+  color-scheme: light;
+  display: flex;
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  height: auto;
+  overflow: clip;
+  padding: 130px max(40px, calc((100vw - 1400px) / 2)) 48px;
+  color: #003456;
+  background: #eaf4fc;
+}
+.jabil-login .auth-background { z-index: -1; object-fit: cover; object-position: left top; pointer-events: none; }
+.auth-layout { display: flex; justify-content: flex-end; align-items: center; gap: clamp(24px, 3.4vw, 64px); width: 100%; }
+.auth-title { position: relative; isolation: isolate; flex: 1; min-width: 0; max-width: 600px; align-self: flex-start; margin: clamp(64px, 10vh, 100px) 0 0 auto; color: #003456; text-align: left; }
+.auth-title::before { content: ''; position: absolute; inset: -28px -36px; z-index: -1; background: radial-gradient(ellipse at 40% 45%, #fffffff2 15%, #ffffffb3 55%, #ffffff00 78%); filter: blur(12px); pointer-events: none; }
+.jabil-login .auth-title h2, .jabil-login .auth-title p, .jabil-login .login-intro h1, .jabil-login .signup-success h1 { font-family: var(--font-ui); font-weight: 600; line-height: 1.25; letter-spacing: -.04em; color: #003456; }
+.jabil-login .auth-title h2 { font-size: clamp(42px, 3.5vw, 64px); line-height: 1.02; }
+.auth-title h2 > span { display: block; }
+.auth-title h2 > span:last-child { color: #006bc8; }
+.jabil-login .auth-title p { margin-top: 12px; font-size: clamp(24px, 1.8vw, 30px); font-weight: 500; line-height: 1.35; letter-spacing: -.02em; }
+.auth-title-accent { width: 44px; height: 5px; border-radius: 4px; margin-top: 18px; background: #00bce8; }
+.auth-capabilities { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 400px; margin: 28px 0 0; padding: 0; list-style: none; }
+.auth-capabilities li { display: flex; flex-direction: column; align-items: center; gap: 9px; min-width: 0; text-align: center; }
+.auth-capability-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: #eaf4ff; color: #0088ef; }
+.auth-capability-label { color: #003456; font-size: 12px; font-weight: 500; line-height: 1.3; }
+.jabil-login .login-main { display: block; flex-shrink: 0; width: 440px; max-width: 100%; min-width: 0; padding: 0; background: transparent; }
+.jabil-login .login-form-area { display: block; overflow: visible; padding: 0; background: #fffffffa; color: var(--ink); border: 1px solid #fff; border-radius: 18px; box-shadow: 0 12px 36px #39749b1a; }
+.jabil-login .login-form { width: 100%; max-width: none; margin: 0; padding: 40px 36px 28px; }
+.jabil-login .login-intro { margin-bottom: 28px; }
+.jabil-login .login-intro h1, .jabil-login .signup-success h1 { font-size: 24px; }
+.jabil-login .login-intro > p { margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.jabil-login .login-form > label, .jabil-login .signup-field > label { display: block; margin: 18px 0 6px; font-size: 14px; color: #061e36; font-weight: 500; }
+.jabil-login .login-input { height: 49px; background: #fff; border: 1px solid #d6e1ee; border-radius: 8px; color: #003456; }
+.jabil-login .login-input input { font-size: 14px; color: #061e36; font-family: inherit; }
+.jabil-login .login-input input::placeholder { color: var(--ink-2); opacity: 1; }
+.jabil-login .login-input:focus-within { border-color: #00a9e0; box-shadow: 0 0 0 3px #00a9e01a; }
+.jabil-login .password-toggle { display: grid; place-items: center; width: 36px; min-height: 44px; margin-right: -7px; color: #315985; flex-shrink: 0; }
+.jabil-login .login-recovery { margin-top: 8px; text-align: right; font-size: 13px; }
+.jabil-login .login-recovery summary { display: inline-block; padding-block: 6px; color: var(--auth-link); cursor: pointer; list-style: none; }
+.jabil-login .login-recovery summary::-webkit-details-marker { display: none; }
+.jabil-login .login-recovery p { margin-top: 5px; color: var(--ink-2); }
+.jabil-login .sign-in-button { height: 49px; margin-top: 18px; background: #003456; color: #fff; border: 1px solid #003456; border-radius: 8px; font-size: 15px; box-shadow: 0 3px 8px #002b490d; }
+.jabil-login .sign-in-button:hover:not(:disabled) { background: #075078; }
+.jabil-login .sign-in-button:disabled { cursor: wait; }
+.auth-divider { display: flex; align-items: center; gap: 14px; margin: 22px 0 18px; font-size: 14px; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: #e3ebf4; }
+.jabil-login .sso-button { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 49px; border: 1px solid #d6e1ee; border-radius: 8px; background: #fff; color: #061e36; font-size: 15px; font-weight: 500; cursor: not-allowed; opacity: 1; }
+.sso-availability { text-align: center; color: var(--ink-2); font-size: 12px; line-height: 1.5; margin-top: 8px; }
+.auth-switch { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; margin-top: 10px; font-size: 14px; color: var(--ink-2); }
+.auth-switch button { color: var(--auth-link); min-height: 36px; }
+.auth-switch button:hover, .login-recovery summary:hover { text-decoration: underline; }
+.auth-preferences { display: flex; justify-content: center; margin-top: 14px; }
+.jabil-login .preference-controls { color: #003456; }
+.jabil-login .language-switch, .jabil-login .theme-switch { background: #ffffffde; border-color: #c5d8e8; }
+.jabil-login .language-switch button[aria-pressed='true'] { background: #003456; color: #fff; }
+.jabil-login .theme-switch:hover { background: #eaf4fc; }
+.jabil-login .signup-fields { gap: 17px 14px; }
+.jabil-login .signup-field > label { margin: 0 0 6px; font-size: 13px; }
+.jabil-login .signup-form .login-intro > p { font-size: 14px; }
+.jabil-login .signup-actions { display: block; margin-top: 6px; }
+.jabil-login .request-account-link { border: 0; border-top: 1px solid #e3ebf4; border-radius: 0; color: var(--auth-link); font-size: 14px; margin-top: 20px; padding-top: 16px; }
+.jabil-login .signup-success .login-icon { width: 52px; height: 52px; margin-bottom: 20px; }
+.jabil-login .signup-success .eyebrow { color: var(--ink-2); }
+.jabil-login .login-error { background: #fff0ee; border-color: #f3b2ab; color: #a52318; }
+@media (min-width: 1600px) {
+  .jabil-login .login-main { width: 460px; }
+  .jabil-login .login-form { padding: 44px 40px 30px; }
+}
+@media (max-width: 1100px) {
+  .jabil-login { padding: 230px 14px 24px; }
+  .jabil-login .auth-background { height: 440px !important; object-position: left top; }
+  .auth-layout { flex-direction: column; justify-content: flex-start; align-items: center; gap: 26px; }
+  .auth-title { flex: none; align-self: center; width: 100%; max-width: 440px; margin: 0; }
+  .jabil-login .auth-title h2 { font-size: clamp(38px, 8vw, 48px); }
+  .jabil-login .auth-title p { margin-top: 12px; font-size: 24px; }
+  .auth-capabilities { gap: 8px; margin-top: 24px; }
+  .jabil-login .login-main { width: 440px; }
+  .jabil-login .login-form { padding: 32px 26px 28px; }
+  .jabil-login .login-intro h1 { font-size: 24px; }
+  .jabil-login .login-intro > p { font-size: 14px; }
+  .jabil-login .login-input input { font-size: 16px; }
+  .auth-switch { font-size: 13px; }
+  .jabil-login .language-switch button, .jabil-login .theme-switch { min-height: 44px; }
+}
+@media (max-width: 600px) {
+  .jabil-login { padding-top: 140px; }
+  .jabil-login .signup-fields { grid-template-columns: 1fr; gap: 17px; }
+}
+@media (max-width: 360px) {
+  .jabil-login { padding-inline: 10px; }
+  .jabil-login .login-form { padding: 28px 20px; }
+  .auth-capabilities { gap: 6px; }
+  .auth-capability-label { font-size: 11px; }
+}

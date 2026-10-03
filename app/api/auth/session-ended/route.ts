@@ -6,7 +6,7 @@ import { supabaseAuthClient } from '@/lib/supabase/server';
 
 /**
  * Where server layouts send a session that is well-formed but no longer
- * valid (account deactivated, or signed in before a password reset). It
+ * valid (account disabled, or signed in before a password reset). It
  * clears the cookies and continues to /login — without this, middleware
  * (which only checks the cookie) would send /login straight back to /.
  *
@@ -21,7 +21,7 @@ export const GET = withAuth(async (req) => {
   if (!session) return NextResponse.redirect(login);
 
   const profile = await getProfileIdentity(session.userId);
-  if (profile && profile.is_active && !isSessionRevoked(session, profile)) {
+  if (profile && profile.account_status === 'active' && !isSessionRevoked(session, profile)) {
     return NextResponse.redirect(home);
   }
 

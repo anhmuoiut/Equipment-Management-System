@@ -1,14 +1,10 @@
 import { withAuth, ok } from '@/lib/auth/withAuth';
+import { EDITORS } from '@/lib/permissions';
 import { moveEquipment } from '@/lib/services/equipment';
-import { moveSchema, parseBody } from '@/lib/validators/equipment';
+import { assertUuid, childrenMode, parseBody, readJson, reqId, z } from '@/lib/services/core/validate';
 
-export const POST = withAuth(
-  async (req, { requestId, profile, params }) => {
-    const body = parseBody(moveSchema, await req.json());
-    const result = await moveEquipment(
-      params.id!, body.new_parent_id, body.version, profile.id, requestId,
-    );
-    return ok(result, requestId);
-  },
-  { role: ['admin', 'user'], action: 'equipment.move' },
-);
+/** Đổi cha / gắn vào cha — vị trí theo cha mới; `children`: con đi theo hay ở lại với cha cũ. */
+export const POST = withAuth(async (req, { requestId, profile, params }) => {
+  const { parent_id, children } = parseBody(z.object({ parent_id: reqId, children: childrenMode }), await readJson(req));
+  return ok(await moveEquipment(assertUuid(params.id), parent_id, profile.id, children), requestId);
+}, { role: EDITORS });

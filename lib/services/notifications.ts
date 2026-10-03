@@ -1,62 +1,67 @@
 import 'server-only';
 
 /**
- * Notification Center — hybrid design (see database/migrations/002_notification_reads.sql
- * for the full rationale):
- *   - The alert itself (equipment X is OVERDUE / DUE_SOON / NOT_CALIBRATED) is
- *     never stored here. It's derived every time from `listCalibrationAlerts`
- *     (lib/services/calibration.ts) — the exact same query the Dashboard's
- *     "Needs attention" list reads, off `equipment_calibration_status` and
- *     `app_settings.calibration.due_soon_days`. There is no second copy of
- *     the calibration business rules in this file.
- *   - Only per-user READ STATE is persisted (`notification_reads`), keyed by
- *     a content-addressed id (equipment + status + due date) so a genuinely
- *     new fact (recalibration, status change) always reappears unread while
- *     an unchanged one never re-notifies — no separate dedup/expiry pass
- *     needed, and nothing to go stale.
+ * Thông báo tài khoản (bảng notifications) — docs/DATABASE_MODIFIED.md mục 7.
+ * Chỉ dùng cho việc liên quan đến tài khoản. Quá hạn hiệu chuẩn và thay đổi
+ * dữ liệu xem trên Dashboard, không gửi thông báo.
  */
-import { supabaseAdmin } from '@/lib/supabase/admin';
+import { db } from './core/db';
+import { withActorNames } from './core/history';
 import { AppError, mapRpcError } from '@/lib/errors';
-import { listCalibrationAlerts, type CalibrationAlertRow } from './calibration';
+import type { NotificationRow, NotificationType } from '@/lib/types';
 
-export type Notification = CalibrationAlertRow & {
-  key: string;
-  is_read: boolean;
+type NewNotification = {
+  type: NotificationType; title: string; message?: string | null; link?: string | null;
+  entity_id?: string | null; created_by?: string | null;
 };
 
-export function notificationKey(row: Pick<CalibrationAlertRow, 'equipment_id' | 'calibration_status' | 'calibration_due_date'>): string {
-  return `${row.equipment_id}:${row.calibration_status}:${row.calibration_due_date ?? 'none'}`;
+export async function notify(recipientIds: string[], n: NewNotification): Promise<void> {
+  if (recipientIds.length === 0) return;
+  const { error } = await db().from('notifications').insert(recipientIds.map((recipient_id) => ({
+    recipient_id, type: n.type, title: n.title, message: n.message ?? null, link: n.link ?? null,
+    entity_id: n.entity_id ?? null, created_by: n.created_by ?? null,
+  })));
+  // Thông báo hỏng không được làm hỏng thao tác chính.
+  if (error) console.error('notify failed', error.message);
 }
 
-export async function listNotifications(userId: string): Promise<Notification[]> {
-  const alerts = await listCalibrationAlerts();
-  if (alerts.length === 0) return [];
+export async function notifyAdmins(n: NewNotification): Promise<void> {
+  const { data, error } = await db().from('user_profiles').select('id').eq('role', 'admin').eq('account_status', 'active');
+  if (error) { console.error('notifyAdmins lookup failed', error.message); return; }
+  await notify((data ?? []).map((r) => (r as { id: string }).id), n);
+}
 
-  const keys = alerts.map(notificationKey);
-  const { data: reads, error } = await supabaseAdmin()
-    .from('notification_reads')
-    .select('notification_key')
-    .eq('user_id', userId)
-    .in('notification_key', keys);
+export async function listNotifications(userId: string): Promise<{ items: NotificationRow[]; unread: number }> {
+  const { data, error } = await db().from('notifications')
+    .select('id, type, title, message, link, entity_id, read_at, created_at, created_by')
+    .eq('recipient_id', userId).order('created_at', { ascending: false }).limit(50);
   if (error) throw mapRpcError(error);
-  const readSet = new Set((reads ?? []).map((r) => (r as { notification_key: string }).notification_key));
+  const rows = await withActorNames((data ?? []) as (Omit<NotificationRow, 'created_by_name' | 'handled'> & { created_by: string | null })[]);
 
-  return alerts.map((row) => {
-    const key = notificationKey(row);
-    return { ...row, key, is_read: readSet.has(key) };
-  });
+  // Yêu cầu duyệt đã được một admin khác xử lý → "đã xử lý".
+  const pendingIds = rows.filter((r) => r.type === 'USER_APPROVAL_REQUEST' && r.entity_id).map((r) => r.entity_id!);
+  const stillPending = new Set<string>();
+  if (pendingIds.length) {
+    const { data: users } = await db().from('user_profiles').select('id').in('id', pendingIds).eq('account_status', 'pending');
+    (users ?? []).forEach((u) => stillPending.add((u as { id: string }).id));
+  }
+  const items = rows.map(({ created_by: _c, ...r }) => ({
+    ...r,
+    handled: r.type === 'USER_APPROVAL_REQUEST' && !!r.entity_id && !stillPending.has(r.entity_id),
+  }));
+
+  const { count, error: countError } = await db().from('notifications')
+    .select('id', { count: 'exact', head: true }).eq('recipient_id', userId).is('read_at', null);
+  if (countError) throw mapRpcError(countError);
+  return { items, unread: count ?? 0 };
 }
 
-export async function markNotificationsRead(userId: string, keys: string[]): Promise<void> {
-  const unique = [...new Set(keys)].filter(Boolean);
-  if (unique.length === 0) return;
-  if (unique.length > 200) throw new AppError('VALIDATION_ERROR', { keys: 'Too many keys in one request.' });
-
-  const { error } = await supabaseAdmin()
-    .from('notification_reads')
-    .upsert(
-      unique.map((key) => ({ user_id: userId, notification_key: key })),
-      { onConflict: 'user_id,notification_key', ignoreDuplicates: true },
-    );
+/** Đánh dấu đã đọc: danh sách id, hoặc tất cả khi ids rỗng. Chỉ thông báo của chính mình. */
+export async function markNotificationsRead(userId: string, ids: string[]): Promise<void> {
+  if (ids.length > 200) throw new AppError('VALIDATION_ERROR');
+  let query = db().from('notifications').update({ read_at: new Date().toISOString() })
+    .eq('recipient_id', userId).is('read_at', null);
+  if (ids.length) query = query.in('id', ids);
+  const { error } = await query;
   if (error) throw mapRpcError(error);
 }

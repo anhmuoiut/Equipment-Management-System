@@ -3,11 +3,11 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserPlus, UserRound } from 'lucide-react';
+import { ArrowRight, BarChart3, Cpu, Eye, EyeOff, LockKeyhole, Mail, Package, UserPlus, UserRound, Wrench } from 'lucide-react';
 import { PreferenceControls } from '@/components/Preferences';
 import Image from 'next/image';
 import './login.css';
-import { safeLoginDestination } from '@/lib/auth/username';
+import { normalizeUsername, safeLoginDestination } from '@/lib/auth/username';
 
 function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
   const router = useRouter();
@@ -41,15 +41,7 @@ function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
 
   return (
     <form onSubmit={submit} className="login-form" aria-label={t('login.signIn')} aria-busy={busy}>
-      <div className="solar-identity">
-        <SolarMark />
-        <div className="solar-identity-copy">
-          <p className="solar-product-name">SolarEdge</p>
-          <p className="solar-subtitle">{t('loginBrand.headlineLine2')}</p>
-        </div>
-      </div>
       <div className="login-intro">
-        <p className="solar-overline">{t('loginBrand.division')}</p>
         <h1>{t('login.welcomeBack')}</h1>
         <p>{t('login.description')}</p>
       </div>
@@ -77,18 +69,27 @@ function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
           error === 'limit' ? t('login.errorLimit') :
             t('login.errorNetwork')
       }</p>}
+      <details className="login-recovery">
+        <summary>{t('login.forgotPassword')}</summary>
+        <p>{t('login.contactAdmin')}</p>
+      </details>
       <button className="sign-in-button" type="submit" disabled={busy}>
         {busy ? t('login.signingIn') : t('login.signIn')}
         <ArrowRight size={18} aria-hidden="true" />
       </button>
-      <p className="login-help">{t('login.forgotPassword')}<br />
-        <span>{t('login.contactAdmin')}</span>
-      </p>
-      <button type="button" className="request-account-link" onClick={onRequestAccount}>
-        <UserPlus size={15} aria-hidden="true" />
-        {t('login.requestAccountLink')}
+      <div className="auth-divider"><span>{t('login.or')}</span></div>
+      <button type="button" className="sso-button" disabled aria-describedby="sso-availability">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+          <path fill="#0078d4" d="M2 4.5 11 3.3v8.2H2zm10-1.3L22 2v9.5H12zM2 12.5h9v8.2l-9-1.2zm10 0h10V22l-10-1.3z" />
+        </svg>
+        <span>{t('login.signInWithSso')}</span>
+        <ArrowRight size={18} aria-hidden="true" />
       </button>
-      <div className="login-security"><ShieldCheck size={15} aria-hidden="true" />{t('login.authorizedOnly')}</div>
+      <p id="sso-availability" className="sso-availability">{t('login.ssoComingSoon')}</p>
+      <div className="auth-switch">
+        <span>{t('login.noAccount')}</span>
+        <button type="button" onClick={onRequestAccount}>{t('login.signUp')}</button>
+      </div>
     </form>
   );
 }
@@ -120,6 +121,12 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
       setError(t('signup.errorPasswordTooShort'));
       return;
     }
+    // Cùng quy tắc với server (lib/auth/username.ts) — báo ngay thay vì để server từ chối.
+    const username = normalizeUsername(form.username);
+    if (!username) {
+      setError(t('signup.errorUsernameFormat'));
+      return;
+    }
     setBusy(true);
     try {
       const response = await fetch('/api/auth/signup', {
@@ -127,7 +134,7 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: form.full_name,
-          username: form.username,
+          username,
           password: form.password,
           email: form.email || undefined,
           employee_id: form.employee_id || undefined,
@@ -135,14 +142,18 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
+        const code: string | undefined = body?.error?.code;
+        const fields: Record<string, string> = body?.error?.details?.fields ?? {};
         setError(
-          body?.error?.code === 'USERNAME_ALREADY_EXISTS'
-            ? t('signup.errorUsernameTaken')
-            : body?.error?.code === 'EMAIL_ALREADY_EXISTS'
-              ? t('signup.errorEmailTaken')
-              : body?.error?.code === 'LOGIN_RATE_LIMITED'
-                ? t('signup.errorRateLimited')
-                : t('signup.errorGeneric'),
+          code === 'USERNAME_ALREADY_EXISTS' ? t('signup.errorUsernameTaken')
+            : code === 'EMAIL_ALREADY_EXISTS' ? t('signup.errorEmailTaken')
+              : code === 'LOGIN_RATE_LIMITED' ? t('signup.errorRateLimited')
+                : fields.username ? t('signup.errorUsernameFormat')
+                  : fields.email ? t('signup.errorEmailFormat')
+                    : fields.full_name ? t('signup.errorFullName')
+                      : fields.password ? t('signup.errorPasswordTooShort')
+                        : code === 'SERVER_ERROR' ? t('signup.errorServer', { id: body?.error?.request_id ?? '-' })
+                          : t('signup.errorGeneric'),
         );
         return;
       }
@@ -156,7 +167,7 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
 
   if (submitted) {
     return (
-      <div className="login-form">
+      <div className="login-form signup-success" role="status">
         <div className="login-icon"><UserPlus size={24} aria-hidden="true" /></div>
         <p className="eyebrow">{t('signup.requestSubmitted')}</p>
         <h1>{t('signup.almostThere')}</h1>
@@ -169,18 +180,18 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="login-form signup-form">
-      <div className="login-icon"><UserPlus size={24} aria-hidden="true" /></div>
-      <p className="eyebrow">{t('signup.requestAccess')}</p>
-      <h1>{t('signup.requestAnAccount')}</h1>
-      <p className="login-description">{t('signup.description')}</p>
+    <form onSubmit={submit} className="login-form signup-form" aria-label={t('signup.requestAnAccount')} aria-busy={busy}>
+      <div className="login-intro">
+        <h1>{t('signup.requestAnAccount')}</h1>
+        <p>{t('signup.description')}</p>
+      </div>
 
       <div className="signup-fields">
         <div className="signup-field">
           <label htmlFor="full_name">{t('signup.fullName')}</label>
           <div className="login-input">
             <UserRound size={18} aria-hidden="true" />
-            <input id="full_name" required maxLength={200} value={form.full_name}
+            <input id="full_name" autoComplete="name" required maxLength={200} value={form.full_name}
               onChange={(e) => set('full_name', e.target.value)}
               placeholder={t('signup.yourFullName')} />
           </div>
@@ -190,7 +201,7 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
           <label htmlFor="signup-username">{t('signup.desiredUsername')}</label>
           <div className="login-input">
             <UserRound size={18} aria-hidden="true" />
-            <input id="signup-username" required maxLength={64} autoCapitalize="none" spellCheck={false}
+            <input id="signup-username" autoComplete="username" required maxLength={64} autoCapitalize="none" spellCheck={false}
               value={form.username} onChange={(e) => set('username', e.target.value)}
               placeholder={t('signup.usernameHint')} />
           </div>
@@ -216,11 +227,11 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
           </div>
         </div>
 
-        <div className="signup-field signup-field--wide">
+        <div className="signup-field">
           <label htmlFor="signup-email">{t('signup.email')}</label>
           <div className="login-input">
             <Mail size={18} aria-hidden="true" />
-            <input id="signup-email" type="email" maxLength={200} value={form.email}
+            <input id="signup-email" autoComplete="email" type="email" maxLength={200} value={form.email}
               onChange={(e) => set('email', e.target.value)}
               placeholder={t('signup.emailHint')} />
           </div>
@@ -263,54 +274,43 @@ function AuthPanel() {
     : <SignupForm onBackToSignIn={() => setMode('signin')} />;
 }
 
-// A small vector mark stays crisp on both phone and desktop displays.
-function SolarMark() {
-  return (
-    <svg className="solar-mark" viewBox="0 0 180 140" fill="none" aria-hidden="true" focusable="false">
-      <g fill="currentColor">
-        {Array.from({ length: 10 }, (_, i) => (
-          <rect key={i} x="49" y="39" width="17" height="22" rx="3" transform={`rotate(${i * 36} 57.5 86)`} />
-        ))}
-        <circle cx="57.5" cy="86" r="36" />
-      </g>
-      <circle cx="57.5" cy="86" r="22" className="solar-gear-center" />
-      <g stroke="var(--jabil-picton)" strokeWidth="6" strokeLinecap="round">
-        <path d="M90 51a29 29 0 0 1 57 0" />
-        <path d="M118 6v10M84 15l5 9M152 15l-5 9M164 40l9-4" strokeWidth="4" />
-      </g>
-      <path d="M89 57h82l-32 61H56z" fill="var(--jabil-picton)" stroke="var(--solar-mark-ground)" strokeWidth="5" strokeLinejoin="round" />
-      <path d="M116 58l-32 59M144 58l-32 59M74 87h80" stroke="var(--solar-mark-ground)" strokeWidth="4" />
-      <path d="M68 124h66" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export default function LoginPage() {
   const { t } = useTranslation();
   return (
-    <main className="login-page solar-login">
-      <div className="solar-grid" aria-hidden="true" />
-      <section className="solar-visual" aria-label={t('loginBrand.division')}>
-        <div className="solar-photo-frame">
-          <Image
-            src="/Image/TEguy.png"
-            alt={t('loginBrand.photoAlt')}
-            width={1536}
-            height={1024}
-            sizes="(max-width: 900px) 100vw, (max-width: 1600px) 60vw, 1040px"
-            priority
-            className="solar-photo"
-          />
-          <span className="solar-photo-edge" aria-hidden="true" />
+    <main className="login-page jabil-login">
+      <Image
+        src="/login-signup/login-signup-background.webp"
+        alt={t('loginBrand.factoryAlt')}
+        fill
+        priority
+        sizes="100vw"
+        className="auth-background"
+        unoptimized
+      />
+      <div className="auth-layout">
+        <div className="auth-title">
+          <h2><span>{t('loginBrand.equipment')}</span><span>{t('loginBrand.management')}</span></h2>
+          <p>{t('loginBrand.workcellName')}</p>
+          <div className="auth-title-accent" aria-hidden="true" />
+          <ul className="auth-capabilities">
+            {[
+              { Icon: Cpu, action: 'trackAssetsAction', subject: 'trackAssetsSubject' },
+              { Icon: Package, action: 'manageLocationsAction', subject: 'manageLocationsSubject' },
+              { Icon: Wrench, action: 'planMaintenanceAction', subject: 'planMaintenanceSubject' },
+              { Icon: BarChart3, action: 'improveEfficiencyAction', subject: 'improveEfficiencySubject' },
+            ].map(({ Icon, action, subject }) => (
+              <li key={action}>
+                <span className="auth-capability-icon"><Icon size={24} strokeWidth={1.8} aria-hidden="true" /></span>
+                <span className="auth-capability-label">{t(`loginBrand.${action}`)}<br />{t(`loginBrand.${subject}`)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="solar-circuit" aria-hidden="true">
-          <span /><span /><span />
-        </div>
-      </section>
-      <section className="login-main" aria-label={t('login.yourWorkspace')}>
-        <div className="login-form-area"><Suspense fallback={<p role="status">{t('common.loadingEllipsis')}</p>}><AuthPanel /></Suspense></div>
-        <div className="solar-preferences"><PreferenceControls /></div>
-      </section>
+        <section className="login-main" aria-label={t('login.yourWorkspace')}>
+          <div className="login-form-area"><Suspense fallback={<p role="status">{t('common.loadingEllipsis')}</p>}><AuthPanel /></Suspense></div>
+          <div className="auth-preferences"><PreferenceControls /></div>
+        </section>
+      </div>
     </main>
   );
 }

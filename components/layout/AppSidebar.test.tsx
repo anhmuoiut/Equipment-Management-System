@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { AnchorHTMLAttributes } from 'react';
 
 const nav = vi.hoisted(() => ({ pathname: '/' }));
@@ -13,90 +13,43 @@ vi.mock('react-i18next', () => ({
 }));
 
 import { AppSidebar } from './AppSidebar';
+import type { Role } from '@/lib/permissions';
 
-function renderSidebar(role: 'admin' | 'user' | 'viewer', permissions: string[] = []) {
-  return render(
-    <AppSidebar role={role} permissions={permissions} collapsed={false} onToggleCollapse={() => {}} onNavigate={() => {}} />,
-  );
+function renderSidebar(role: Role) {
+  return render(<AppSidebar role={role} pinned={false} onToggleCollapse={() => {}} onNavigate={() => {}} />);
 }
-const adminToggle = () => screen.getByRole('button', { name: 'nav.adminMenu' });
-const adminPanel = () => document.getElementById('sidebar-admin-panel')!;
+const links = () => within(screen.getByRole('navigation', { name: 'nav.mainNavigation' })).getAllByRole('link');
 
 beforeEach(() => { nav.pathname = '/'; });
 
-describe('AppSidebar — workspace', () => {
-  it('lists Archived equipment as a peer of the Masterlist, plus Calibration and Golden master', () => {
+describe('AppSidebar — docs/APP_SHELL.md', () => {
+  it('gives an admin all six items, one level, in menu order', () => {
     renderSidebar('admin');
-    const main = screen.getByRole('navigation', { name: 'nav.mainNavigation' });
-    const links = within(main).getAllByRole('link');
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/', '/equipment', '/equipment/archived', '/calibration', '/golden-master']);
-    const archived = within(main).getByRole('link', { name: 'nav.archivedEquipment' });
-    expect(archived.className).toBe(within(main).getByRole('link', { name: 'nav.equipmentMasterlist' }).className);
-    expect(within(main).getByRole('link', { name: 'nav.goldenMasterList (nav.soon)' })).toBeTruthy();
+    expect(links().map((a) => a.getAttribute('href'))).toEqual(['/', '/equipment', '/calibration', '/golden', '/configuration', '/users']);
+    expect(document.querySelector('.sidebar-divider')).not.toBeNull();
   });
 
-  it('shows Calibration only to accounts holding calibration.view', () => {
+  it.each<Role>(['user', 'readonly'])('gives %s only the first four items and no divider', (role) => {
+    renderSidebar(role);
+    expect(links().map((a) => a.getAttribute('href'))).toEqual(['/', '/equipment', '/calibration', '/golden']);
+    expect(document.querySelector('.sidebar-divider')).toBeNull();
+  });
+
+  it('shows no count badges and no second level', () => {
+    renderSidebar('admin');
+    expect(document.querySelector('.sidebar-link-badge, .sidebar-group')).toBeNull();
+  });
+
+  it('keeps the parent item current on a detail route', () => {
+    nav.pathname = '/equipment/6b0c7a3e-0000-4000-8000-000000000000';
     renderSidebar('user');
-    expect(screen.queryByRole('link', { name: 'nav.calibration' })).toBeNull();
-    screen.getByRole('link', { name: 'nav.goldenMasterList (nav.soon)' });
+    expect(screen.getByRole('link', { name: 'nav.equipment' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'nav.dashboard' }).getAttribute('aria-current')).toBeNull();
   });
 
-  it('gives a viewer Calibration (every .view code) and no Administration', () => {
-    renderSidebar('viewer');
-    screen.getByRole('link', { name: 'nav.calibration' });
-    expect(screen.queryByRole('button', { name: 'nav.adminMenu' })).toBeNull();
-  });
-});
-
-describe('AppSidebar — Administration group', () => {
-  it('starts closed outside the admin area and opens on click to four categories', () => {
-    renderSidebar('admin');
-    expect(adminToggle().getAttribute('aria-expanded')).toBe('false');
-    expect(adminToggle().getAttribute('aria-controls')).toBe('sidebar-admin-panel');
-    expect(adminPanel().inert).toBe(true);
-
-    fireEvent.click(adminToggle());
-    expect(adminToggle().getAttribute('aria-expanded')).toBe('true');
-    expect(adminPanel().inert).toBe(false);
-    const links = within(adminPanel()).getAllByRole('link');
-    expect(links.map((a) => [a.getAttribute('aria-label'), a.getAttribute('href')])).toEqual([
-      ['nav.userManagement', '/admin/users'],
-      ['nav.configuration', '/admin/master-data'],
-      ['nav.fieldManagement', '/admin/fields'],
-      ['nav.systemLogs', '/admin/audit'],
-    ]);
-  });
-
-  it('opens on an admin page and marks the category of the current page', () => {
-    nav.pathname = '/admin/calibration-settings';
-    renderSidebar('admin');
-    expect(adminToggle().getAttribute('aria-expanded')).toBe('true');
-    // The category links to Master data, so on its sibling page it's the current item, not page.
-    expect(screen.getByRole('link', { name: 'nav.configuration' }).getAttribute('aria-current')).toBe('true');
-    expect(screen.getByRole('link', { name: 'nav.userManagement' }).getAttribute('aria-current')).toBeNull();
-  });
-
-  it('marks the exact page, and moves the marker to the toggle when the group is closed', () => {
-    nav.pathname = '/admin/master-data';
+  it('marks Configuration current on every configuration list', () => {
+    nav.pathname = '/configuration/calibration-vendors';
     renderSidebar('admin');
     expect(screen.getByRole('link', { name: 'nav.configuration' }).getAttribute('aria-current')).toBe('page');
-    fireEvent.click(adminToggle());
-    expect(adminToggle().getAttribute('aria-expanded')).toBe('false');
-    expect(adminToggle().getAttribute('data-current')).toBe('true');
-  });
-
-  it('opens when navigation arrives in the admin area', () => {
-    const view = renderSidebar('admin');
-    expect(adminToggle().getAttribute('aria-expanded')).toBe('false');
-    nav.pathname = '/admin/users';
-    view.rerender(<AppSidebar role="admin" permissions={[]} collapsed={false} onToggleCollapse={() => {}} onNavigate={() => {}} />);
-    expect(adminToggle().getAttribute('aria-expanded')).toBe('true');
-  });
-
-  it('shows a delegated field manager only Field management', () => {
-    renderSidebar('user', ['field.manage']);
-    fireEvent.click(adminToggle());
-    const links = within(adminPanel()).getAllByRole('link');
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/admin/fields']);
   });
 });

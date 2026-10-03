@@ -1,15 +1,10 @@
 import { withAuth, ok } from '@/lib/auth/withAuth';
+import { EDITORS } from '@/lib/permissions';
 import { swapEquipment } from '@/lib/services/equipment';
-import { swapSchema, parseBody } from '@/lib/validators/equipment';
+import { childrenMode, parseBody, readJson, reqId, z } from '@/lib/services/core/validate';
 
-/** Swap = 2 lần internal_move trong cùng transaction (mục 24). Dùng can_move. */
-export const POST = withAuth(
-  async (req, { requestId, profile }) => {
-    const b = parseBody(swapSchema, await req.json());
-    const result = await swapEquipment(
-      b.equipment_a_id, b.equipment_b_id, b.version_a, b.version_b, profile.id, requestId, b.note,
-    );
-    return ok(result, requestId);
-  },
-  { role: ['admin', 'user'], action: 'equipment.move' },
-);
+/** Đổi chỗ hai thiết bị (cha + vị trí); `children`: con đi theo (mặc định) hay ở lại chỗ cũ. */
+export const POST = withAuth(async (req, { requestId, profile }) => {
+  const { a, b, children } = parseBody(z.object({ a: reqId, b: reqId, children: childrenMode }), await readJson(req));
+  return ok(await swapEquipment(a, b, profile.id, children), requestId);
+}, { role: EDITORS });

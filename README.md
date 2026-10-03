@@ -75,27 +75,24 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 ### 1. Database
 
-Chạy lần lượt trên Supabase SQL Editor (**dev project trước**, mục 47e):
+Database v2 được dựng lại từ đầu theo [docs/DATABASE_MODIFIED.md](docs/DATABASE_MODIFIED.md). Chạy lần lượt trên Supabase SQL Editor (**dev project trước**) — chi tiết ở [database/README.md](database/README.md):
 
 ```
-database/migrations/001_tables.sql
-database/migrations/002_indexes.sql
-database/migrations/003_rls_lockdown.sql
-database/migrations/004_functions.sql
-database/migrations/005_usernames.sql
-database/migrations/006_local_auth.sql
-database/seed/001_seed.sql        ← SỬA TRƯỚC KHI CHẠY
+database/01_reset_blank.sql   ← XÓA SẠCH schema public (mọi bảng + dữ liệu)
+database/02_schema.sql        ← tạo 19 bảng + 1 view
+database/03_seed_sample.sql   ← tùy chọn: dữ liệu mẫu Configuration
+database/04_functions.sql     ← nghiệp vụ: lịch sử tự động, Move / Swap, tự tính hạn hiệu chuẩn
 ```
 
-`006_local_auth.sql` thêm tài khoản **Local** (username/password tự app quản lý, không qua Supabase Auth — dùng cho self-service signup, xem bên dưới). Bắt buộc với bản cài mới; dự án đang chạy chỉ cần chạy thêm file này một lần.
-
-`001_seed.sql` chứa danh sách location và dropdown option **mẫu**. Đây là 2 trong 6 thứ mục 54 nói phải chốt trước khi code — thay bằng dữ liệu thật của nhà máy.
+Giao diện: khung ứng dụng theo [docs/APP_SHELL.md](docs/APP_SHELL.md); mọi module dùng chung Masterlist + Detail Panel theo [docs/DETAIL_MODEL.md](docs/DETAIL_MODEL.md).
 
 ### 2. Admin đầu tiên
 
 ```bash
-npx tsx scripts/seed-first-admin.ts admin@congty.com "Nguyen Van A"
+npm run seed:admin -- admin@congty.com "Nguyen Van A" ten.dang.nhap
 ```
+
+Hoặc tự đăng ký trên trang đăng nhập rồi nâng quyền bằng SQL — xem [database/README.md](database/README.md#tạo-admin-đầu-tiên).
 
 Bắt buộc. `POST /api/admin/users` yêu cầu role admin, mà chưa có admin nào tồn tại — vòng lặp chicken-and-egg (mục 55.2).
 
@@ -111,13 +108,10 @@ curl localhost:3000/api/health
 ## Test
 
 ```bash
-supabase start                 # Postgres local qua Docker
-bash database/test/run.sh
+npm test
 ```
 
-Chạy trên **Supabase local**, không phải project dev: free tier giới hạn 2 active project/org, đã dùng hết cho dev + production (mục 47c).
-
-59 assertion phủ: cascade location, cycle, optimistic concurrency, whitelist PUT, change-location, detach, swap subtree, archive/restore, archived descendant không bị cascade, depth limit, natural sort, ràng buộc DB.
+Bộ test SQL của database cũ đã bị xóa cùng schema cũ; test cho database v2 viết lại khi code `04_functions.sql`.
 
 ---
 
@@ -208,53 +202,13 @@ Phím tắt: `/` nhảy vào ô tìm kiếm.
 
 Login and the equipment list support EN/VIE and persistent light/dark theme.
 The navy/blue design follows the supplied Jabil reference with softly rounded borders.
-Username is stored independently in user_profiles after migration 005 (see below).
+Username is stored independently in user_profiles.
 The existing admin signs in as academy.mantranqp2507 with the unchanged password.
 Email resolution stays on the server. Inactive accounts are denied.
 The bounded per-instance attempt guard supplements Supabase Auth limits;
 it is not a deployment-wide shared rate limiter.
 
-## Independent usernames (migration 005)
-
-Before starting this version, open the Supabase project used by your .env.local,
-then run database/migrations/005_usernames.sql in SQL Editor. Existing projects
-only need this new migration; do not rerun the initial tables or sample seed.
-The migration is transactional and may be safely rerun. It backfills lowercase
-email prefixes as usernames, preserves email/password/permissions, and rejects
-invalid or duplicate usernames instead of silently renaming accounts.
-
-After success, verify in SQL Editor:
-
-```sql
-select full_name, username, email from public.user_profiles order by full_name;
-```
-
-The existing Man Tran account keeps username academy.mantranqp2507.
-Login and the header now use the stored username. Supabase Auth continues to use
-email internally. Usernames allow 1-64 lowercase letters, numbers, dots,
-underscores, plus signs and hyphens, beginning with a letter or number. Login and
-account creation normalize entered names to lowercase.
-
-POST /api/admin/users now requires username separately from email, plus the
-account's real password and its permissions set one-by-one (no presets), for example:
-
-```json
-{"full_name":"Example User","username":"example.user","email":"contact@example.com","password":"a-strong-password","role":"viewer","can_create":false,"can_move":false,"can_detach":false,"can_archive":false,"editable_fields":[]}
-```
-
-For a new installation, seed-first-admin.ts accepts an optional final username:
-
-```bash
-npx tsx scripts/seed-first-admin.ts admin@company.com "Admin Name" admin.name
-```
-
-If omitted, the script uses the email prefix. Do not rerun it for an existing admin.
-After applying the migration and starting localhost:3000, run
-`node scripts/test-username-login.mjs` with Node 24 and the configured .env.local.
-It creates a temporary viewer whose username differs from the email prefix,
-verifies login, profile and header, then removes that temporary account.
-
-## Local accounts (self-service signup, migration 006)
+## Local accounts (self-service signup)
 
 Every account used to be a real Supabase Auth account (`auth_provider =
 'supabase'`), created by an admin. Migration 006 adds a second kind,
@@ -277,18 +231,11 @@ value signs every local-account session out at once — treat it like
 
 **Known gaps, not built yet:** no self-service "forgot password" for local
 accounts (an admin resets it from the Users screen, same as any account);
-no email collected or verified for local accounts by design; the SQL
-integration suite under `database/test/` predates the V2 schema
-(`database/full_reset.sql`) — types/level/status are now `type_id`/
-`level_id`/`status_id` master-data references instead of free text, and it
-needs a rewrite before it passes again.
+no email collected or verified for local accounts by design.
 
-## Admin hardening (database/migrations/003_admin_hardening.sql)
+## Admin hardening
 
-Run `003_admin_hardening.sql` in the Supabase SQL Editor **before** deploying
-the app version that ships with it — `withAuth` reads the new
-`user_profiles.sessions_revoked_at` column on every request, so the new code
-against an old database fails every request. What it changes:
+Notes from the previous version (to be rewritten for database v2):
 
 - Creating a user, changing role/permissions, activating/deactivating and
   deleting a custom field each run as one database transaction (RPC), with

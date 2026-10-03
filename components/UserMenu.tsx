@@ -16,7 +16,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Eye, EyeOff, LogOut, UserRound } from 'lucide-react';
-import { api, ApiError, type MasterDataRef } from '@/lib/client/api';
+import { api, ApiError } from '@/lib/client/api';
+import type { OptionItem, Options } from '@/lib/types';
 import { Button, Modal, Notice, RequiredMark, Spinner, toast } from '@/components/ui';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { translateError } from '@/lib/i18n/errors';
@@ -91,7 +92,7 @@ function AccountSettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [account, setAccount] = useState<OwnAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
-  const [departments, setDepartments] = useState<MasterDataRef[]>([]);
+  const [departments, setDepartments] = useState<OptionItem[]>([]);
 
   const [profileForm, setProfileForm] = useState({ full_name: '', employee_id: '', department_id: '' });
   const [profileBusy, setProfileBusy] = useState(false);
@@ -112,7 +113,7 @@ function AccountSettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     setLoadError(null);
     void Promise.all([
       api.get<OwnAccount>('/api/me'),
-      api.get<{ departments: MasterDataRef[] }>('/api/master-data'),
+      api.get<Options>('/api/options'),
     ])
       .then(([me, masterData]) => {
         setAccount(me.data);
@@ -198,7 +199,7 @@ function AccountSettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                   value={profileForm.department_id} clearable placeholder={t('dynamicForm.selectPlaceholder')}
                   ariaLabel={t('adminUsers.department')}
                   onChange={(v) => setProfileForm((f) => ({ ...f, department_id: v }))}
-                  options={departments.map((d) => ({ value: d.id, label: d.display_name, disabled: !d.is_active }))}
+                  options={departments.filter((d) => d.is_active || d.id === profileForm.department_id).map((d) => ({ value: d.id, label: d.display_name }))}
                   className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }}
                 />
               </label>

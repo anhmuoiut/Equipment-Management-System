@@ -26,6 +26,18 @@
   --alert-tint: #FFF0EE;
   --success: #17683A;
   --success-tint: #EAF7EF;
+  --info: #1D5BB8;
+  --info-tint: #EAF2FF;
+  --neutral: var(--ink-2);
+  --neutral-tint: color-mix(in srgb, var(--jabil-prussian) 6%, var(--jabil-white));
+  /* 5 màu trạng thái (statuses.color, docs/JABIL_UI.md "Status colors"): chấm,
+     thanh biểu đồ. Chữ trạng thái dùng --success / --warn / --alert / --info /
+     --neutral trên nền -tint. Bộ màu đã kiểm tra mù màu đỏ-lục cho mọi cặp. */
+  --status-green: #3DA535;
+  --status-yellow: #EFC23A;
+  --status-red: #C8202D;
+  --status-blue: #2A72D8;
+  --status-gray: #98A3AD;
   --ok: var(--machine);
   --action-ink: var(--jabil-white);
   --overlay: color-mix(in srgb, var(--jabil-prussian) 48%, transparent);
@@ -77,6 +89,14 @@
   --alert-tint: #422827;
   --success: #8DD7A8;
   --success-tint: #183D2C;
+  --info: #A9C8FF;
+  --info-tint: #1A3A66;
+  --neutral-tint: color-mix(in srgb, var(--jabil-white) 12%, var(--jabil-prussian));
+  --status-green: #65C281;
+  --status-yellow: #F6CE22;
+  --status-red: #E93F2D;
+  --status-blue: #447BE4;
+  --status-gray: #7A858F;
   --machine: var(--jabil-picton);
   --machine-dark: color-mix(in srgb, var(--jabil-picton) 80%, var(--jabil-white));
   --machine-tint: color-mix(in srgb, var(--jabil-picton) 14%, var(--jabil-prussian));

@@ -6,23 +6,36 @@ import { useTranslation } from 'react-i18next';
 import { TopBar } from '@/components/TopBar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ToastViewport } from '@/components/ui';
+import { ViewerProvider } from '@/components/ViewerContext';
+import type { Role } from '@/lib/permissions';
 
-const STORAGE_KEY = 'equipment-sidebar-open';
+const STORAGE_KEY = 'equipment-sidebar-pinned';
 const MOBILE_QUERY = '(max-width: 800px)';
-// Pages built on the Masterlist's full-height table (toolbar and footer stay
-// put, only rows scroll) — the data-page='masterlist' rules in globals.css.
-// Archived equipment is the same list, so it gets the same layout.
-const FULL_HEIGHT_LIST_PAGES = new Set(['/equipment', '/equipment/archived', '/calibration']);
+// Trang Masterlist + Detail Panel chiếm đủ chiều cao (chỉ thân bảng / panel
+// cuộn) — các quy tắc data-page='masterlist' trong workspace.css.
+const FULL_HEIGHT_LIST_PAGES = ['/equipment', '/calibration', '/golden', '/configuration/', '/users'];
+const isListPage = (pathname: string) =>
+  FULL_HEIGHT_LIST_PAGES.some((p) => (p.endsWith('/') ? pathname.startsWith(p) : pathname === p));
 
 export function AppShell({
-  username, fullName, role, permissions = [], children,
+  userId, username, fullName, role, children,
 }: {
-  username: string; fullName: string; role: 'admin' | 'user' | 'viewer';
-  permissions?: string[]; children: React.ReactNode;
+  userId: string; username: string; fullName: string; role: Role; children: React.ReactNode;
 }) {
   const { t } = useTranslation();
   const pathname = usePathname();
-  const [desktopOpen, setDesktopOpen] = useState(true);
+  const [pinned, setPinned] = useState(false);
+  const [hoverOpen, setHoverOpen] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const desktopOpen = pinned || hoverOpen || focusOpen;
+  const cancelClose = () => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+  useEffect(() => () => {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+  }, []);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -32,10 +45,12 @@ export function AppShell({
   const sidebarOpen = isMobile ? mobileOpen : desktopOpen;
 
   useEffect(() => {
-    try { setDesktopOpen(localStorage.getItem(STORAGE_KEY) !== 'false'); } catch {}
+    try { setPinned(localStorage.getItem(STORAGE_KEY) === 'true'); } catch {}
     const media = window.matchMedia(MOBILE_QUERY);
     function syncViewport() {
       setIsMobile(media.matches);
+      setHoverOpen(false);
+      setFocusOpen(false);
       setMobileOpen(false);
       if (panelRef.current?.contains(document.activeElement)) toggleRef.current?.focus();
     }
@@ -54,8 +69,8 @@ export function AppShell({
       if (mobileOpen) closeMobile();
       else setMobileOpen(true);
     } else {
-      const next = !desktopOpen;
-      setDesktopOpen(next);
+      const next = !pinned;
+      setPinned(next);
       try { localStorage.setItem(STORAGE_KEY, String(next)); } catch {}
     }
   }
@@ -116,7 +131,8 @@ export function AppShell({
   }, [isMobile, mobileOpen, closeMobile]);
 
   return (
-    <div ref={shellRef} className="app-shell" data-page={FULL_HEIGHT_LIST_PAGES.has(pathname) ? 'masterlist' : undefined} data-mobile-open={mobileOpen} data-sidebar-open={sidebarOpen}>
+    <ViewerProvider viewer={{ userId, username, fullName, role }}>
+    <div ref={shellRef} className="app-shell" data-page={isListPage(pathname) ? 'masterlist' : undefined} data-sidebar-pinned={pinned} data-mobile-open={mobileOpen} data-sidebar-open={sidebarOpen}>
       {/* Visible only on keyboard focus (ui-requirements.md 3.1) — the
           first focusable element on every page, so Tab from the address
           bar reaches main content without tabbing through the whole header
@@ -138,9 +154,25 @@ export function AppShell({
             off-screen via transform (CSS) instead of unmounting via `hidden` —
             unmounting on close would skip the close transition entirely. The
             `inert` effect above keeps it out of the tab order/AT while closed. */}
-        <div id="app-sidebar-panel" ref={panelRef} className="sidebar-region">
+        <div id="app-sidebar-panel" ref={panelRef} className="sidebar-region"
+          onPointerEnter={(event) => {
+            if (isMobile || event.pointerType === 'touch') return;
+            cancelClose();
+            setHoverOpen(true);
+          }}
+          onPointerLeave={() => {
+            cancelClose();
+            closeTimer.current = setTimeout(() => setHoverOpen(false), 250);
+          }}
+          onFocusCapture={(event) => {
+            if (!isMobile && event.target.matches(':focus-visible')) setFocusOpen(true);
+          }}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setFocusOpen(false);
+          }}>
+
           <AppSidebar
-            role={role} permissions={permissions} collapsed={!isMobile && !desktopOpen} onToggleCollapse={toggleSidebar}
+            role={role} pinned={pinned} onToggleCollapse={toggleSidebar}
             onNavigate={() => { if (isMobile) closeMobile(); }}
           />
         </div>
@@ -148,5 +180,6 @@ export function AppShell({
       </div>
       <ToastViewport />
     </div>
+    </ViewerProvider>
   );
 }

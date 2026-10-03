@@ -1,0 +1,36 @@
+import { AppError } from '@/lib/errors';
+import { configList, STATUS_COLORS, type ConfigListDef } from '@/lib/configuration';
+import { z, optText, reqText, reqId } from '@/lib/services/core/validate';
+
+export function listFromParams(params: Record<string, string>): ConfigListDef {
+  const list = configList(params.list ?? '');
+  if (!list) throw new AppError('NOT_FOUND');
+  return list;
+}
+
+const order = z.number().int().min(0).max(100000);
+
+/** Trường được sửa của từng danh sách — docs/DATABASE_MODIFIED.md mục 5. */
+export function schemaFor(list: ConfigListDef, mode: 'create' | 'update') {
+  let shape: z.ZodRawShape;
+  if (list.isInterval) {
+    shape = {
+      part_number_id: reqId,
+      interval_months: z.number().int().min(1).max(600),
+      warning_days: z.number().int().min(1).max(3650),
+    };
+  } else if (list.isStatus) {
+    shape = {
+      display_name: reqText(100),
+      sort_order: order,
+      applies_to: z.array(z.enum(['equipment', 'calibration', 'golden_sample'])).min(1),
+      requires_remark: z.boolean(),
+      color: z.enum(STATUS_COLORS),
+    };
+  } else {
+    shape = { display_name: reqText(200), sort_order: order, is_active: z.boolean() };
+    if (list.hasDescription) shape.description = optText(1000);
+  }
+  const schema = z.object(shape).strict();
+  return mode === 'create' ? schema : schema.partial();
+}
