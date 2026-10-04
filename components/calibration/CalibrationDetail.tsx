@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
-import { ClipboardCheck, Gauge } from 'lucide-react';
+import { ClipboardCheck } from 'lucide-react';
 import { addMonths, api, formatDate, todayVN } from '@/lib/client/api';
 import { toSelect, useOptions } from '@/lib/client/options';
 import { useCan } from '@/components/ViewerContext';
@@ -67,7 +67,6 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
       loading={ctx.loading}
       error={ctx.error}
       onRetry={ctx.onRetry}
-      icon={<Gauge size={18} />}
       heading={(r) => ({
         title: r.serial_number,
         tags: <StatusTag name={r.status} color={r.status_color} />,
@@ -121,7 +120,7 @@ function RecordCalibrationScreen({ ctx }: { ctx: ActionCtx<CalibrationRow> }) {
 
   return (
     <ActionScreen title={t('cal.record')} description={t('cal.recordDesc', { serial: r.serial_number })}
-      onCancel={ctx.cancel} onConfirm={confirm}
+      onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('cal.record')}
       confirmDisabled={!date}>
       <ActionField label={t('fields.calibration_date')} required>
         <input type="date" value={date} max={todayVN()} onChange={(e) => setDate(e.target.value)} />

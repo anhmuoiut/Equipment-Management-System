@@ -13,11 +13,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Eye, EyeOff, Loader2, LogOut, UserRound } from 'lucide-react';
+import { ChevronDown, Loader2, LogOut, UserRound } from 'lucide-react';
 import { api, errorMessage } from '@/lib/client/api';
 import { useFetch } from '@/lib/client/useFetch';
 import { toSelect, useOptions } from '@/lib/client/options';
-import { Button, ErrorState, Modal, Notice, RequiredMark, Spinner, toast } from '@/components/ui';
+import { Button, ErrorState, Modal, Notice, Spinner, toast } from '@/components/ui';
+import { ActionField } from '@/components/ui/detail/RecordDetail';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { PreferenceMenuItems } from '@/components/Preferences';
 
@@ -170,29 +171,23 @@ function AccountForms({ account }: { account: OwnAccount }) {
 
         {profileError && <Notice tone="alert">{profileError}</Notice>}
 
-        <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-          {t('adminUsers.fullName')}<RequiredMark />
-          <input required value={profileForm.full_name}
-            onChange={(e) => setProfileForm((f) => ({ ...f, full_name: e.target.value }))}
-            className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-            {t('adminUsers.employeeId')}
-            <input value={profileForm.employee_id}
-              onChange={(e) => setProfileForm((f) => ({ ...f, employee_id: e.target.value }))}
-              className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-          </label>
-          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-            {t('adminUsers.department')}
+        <div className="dp-grid">
+          <ActionField htmlFor="acc-full-name" label={t('adminUsers.fullName')} required>
+            <input id="acc-full-name" required value={profileForm.full_name}
+              onChange={(e) => setProfileForm((f) => ({ ...f, full_name: e.target.value }))} />
+          </ActionField>
+          <ActionField htmlFor="acc-employee-id" label={t('adminUsers.employeeId')} wide={false}>
+            <input id="acc-employee-id" value={profileForm.employee_id}
+              onChange={(e) => setProfileForm((f) => ({ ...f, employee_id: e.target.value }))} />
+          </ActionField>
+          <ActionField label={t('adminUsers.department')} wide={false}>
             <SearchableSelect
               value={profileForm.department_id} clearable placeholder={t('dp.selectPlaceholder')}
               ariaLabel={t('adminUsers.department')}
               onChange={(v) => setProfileForm((f) => ({ ...f, department_id: v }))}
               options={toSelect(options?.departments, profileForm.department_id)}
-              className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }}
             />
-          </label>
+          </ActionField>
         </div>
         <div className="flex items-center justify-end gap-3">
           <Button variant="primary" disabled={!profileForm.full_name.trim()} loading={profileBusy} onClick={() => void saveProfile()}>
@@ -206,38 +201,28 @@ function AccountForms({ account }: { account: OwnAccount }) {
 
         {pwError && <Notice tone="alert">{pwError}</Notice>}
 
-        <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-          {t('userMenu.currentPassword')}<RequiredMark />
-          <div className="login-input mt-1">
-            <input required minLength={1} maxLength={256} type={pwVisible ? 'text' : 'password'}
+        <div className="dp-grid">
+          <ActionField htmlFor="acc-pw-current" label={t('userMenu.currentPassword')} required>
+            <input id="acc-pw-current" required minLength={1} maxLength={256} type={pwVisible ? 'text' : 'password'}
               autoComplete="current-password" value={pwForm.current}
-              onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
-              className="w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-          </div>
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-            {t('adminUsers.newPassword')}<RequiredMark />
-            <div className="login-input mt-1">
-              <input required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
-                autoComplete="new-password" value={pwForm.next}
-                onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
-                className="w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-              <button type="button" onClick={() => setPwVisible((v) => !v)}
-                aria-label={pwVisible ? t('login.hidePassword') : t('login.showPassword')}>
-                {pwVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </label>
-          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-            {t('adminUsers.confirmNewPassword')}<RequiredMark />
-            <input required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
+              onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))} />
+          </ActionField>
+          <ActionField htmlFor="acc-pw-new" label={t('adminUsers.newPassword')} required wide={false}>
+            <input id="acc-pw-new" required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
+              autoComplete="new-password" value={pwForm.next}
+              onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))} />
+          </ActionField>
+          <ActionField htmlFor="acc-pw-confirm" label={t('adminUsers.confirmNewPassword')} required wide={false}>
+            <input id="acc-pw-confirm" required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
               autoComplete="new-password" value={pwForm.confirm}
-              onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
-              className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-          </label>
+              onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))} />
+          </ActionField>
         </div>
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <label className="dp-switch">
+            <input type="checkbox" checked={pwVisible} onChange={(e) => setPwVisible(e.target.checked)} />
+            {t('login.showPassword')}
+          </label>
           <Button
             variant="primary" disabled={!pwForm.current || !pwForm.next || !pwForm.confirm} loading={pwBusy}
             onClick={() => void submitPassword()}

@@ -4,7 +4,8 @@
  * Menu chính (docs/APP_SHELL.md mục 1–2): sáu mục, một cấp duy nhất.
  * Nền Prussian, mục đang chọn Picton, thu gọn còn icon, ngăn kéo trên
  * điện thoại. Configuration và User Management chỉ Admin
- * thấy, ngăn với bốn mục trên bằng một đường kẻ. Không có số đếm cạnh menu.
+ * thấy, ngăn với bốn mục trên bằng một đường kẻ. Không có số đếm cạnh menu,
+ * không có chữ chú thích hay dòng trạng thái ở đầu / cuối menu.
  */
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -59,13 +60,11 @@ export function AppSidebar({ role, pinned, onToggleCollapse, onNavigate }: {
         onClick={onToggleCollapse} aria-pressed={pinned} aria-label={collapseLabel} title={collapseLabel}>
         {pinned ? <PinOff size={18} aria-hidden="true" /> : <Pin size={18} aria-hidden="true" />}
       </button>
-      <p className="sidebar-caption">{t('nav.workspace')}</p>
       <nav aria-label={t('nav.mainNavigation')}>
         {workspace.map(link)}
         {admin.length > 0 && <div className="sidebar-divider" aria-hidden="true" />}
         {admin.map(link)}
       </nav>
-      <div className="sidebar-note"><span className="sidebar-status" /><span>{t('nav.equipmentControlSystem')}</span></div>
     </aside>
   );
 }

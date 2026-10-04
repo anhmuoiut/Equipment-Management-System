@@ -20,6 +20,7 @@ import { usePhone } from '@/lib/client/usePhone';
 import { Button, EmptyState, ErrorState, Modal, Skeleton, TableSkeleton, toast } from '@/components/ui';
 import { ActionMenu, type MoreItem } from '@/components/ui/ActionMenu';
 import { ColumnSettings, useColumnPrefs } from './ColumnSettings';
+import { ToolbarButton } from './ToolbarButton';
 import { exportToExcel } from './exportExcel';
 
 export type Column<R> = {
@@ -238,9 +239,7 @@ export function Masterlist<R extends { id: string }>({
   ];
 
   const toolButtons = tools?.map((x) => (
-    <Button key={x.key} size="sm" aria-pressed={x.active} data-active={x.active} onClick={x.onClick}>
-      {x.icon}{x.label}
-    </Button>
+    <ToolbarButton key={x.key} label={x.label} icon={x.icon} aria-pressed={x.active} data-active={x.active} onClick={x.onClick} />
   ));
 
   return (
@@ -277,9 +276,8 @@ export function Masterlist<R extends { id: string }>({
             ))}
             <div className="ml-toolbar-end">
               <ColumnSettings columns={columns} prefs={prefs} />
-              <Button size="sm" onClick={doExport} loading={exporting} disabled={view.length === 0}>
-                <Download size={14} aria-hidden="true" />{t('ml.export')}
-              </Button>
+              <ToolbarButton label={t('ml.export')} icon={<Download size={14} aria-hidden="true" />}
+                onClick={doExport} loading={exporting} disabled={view.length === 0} />
               {toolButtons}
               {onAdd && (
                 <Button size="sm" variant="primary" onClick={onAdd}>
@@ -389,7 +387,8 @@ export function Masterlist<R extends { id: string }>({
                       const content = c.render ? c.render(r) : c.value(r);
                       return (
                         <td key={c.key} title={String(c.value(r) ?? '')} data-wrap={c.wrap || undefined}>
-                          {content === null || content === '' || content === undefined ? <span className="ml-empty">—</span> : content}
+                          {content === null || content === '' || content === undefined ? <span className="ml-empty">—</span>
+                            : c.wrap ? <div className="ml-clamp">{content}</div> : content}
                         </td>
                       );
                     })}
@@ -406,6 +405,8 @@ export function Masterlist<R extends { id: string }>({
             title={rows.length === 0 ? t('ml.emptyTitle') : t('ml.noMatch')}
             action={rows.length > 0 ? (
               <Button size="sm" onClick={() => { setSearch(''); setFilters({}); setQuick(null); }}>{t('ml.clearFilters')}</Button>
+            ) : onAdd ? (
+              <Button size="sm" variant="primary" onClick={onAdd}><Plus size={14} aria-hidden="true" />{addLabel ?? t('ml.add')}</Button>
             ) : undefined}
           />
         )}

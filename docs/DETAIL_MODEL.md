@@ -21,28 +21,30 @@ Không bao giờ hiện: mật khẩu đã băm, mã phiên đăng nhập và c�
 │ Equipment                                                    1.245 thiết bị   │  ← tiêu đề trang + tổng số
 │ [🔍 Tìm kiếm…        ] [Bộ lọc ▾] [Tùy chọn hiển thị] [Xuất Excel] [Import] [+ Thêm] │  ← thanh công cụ
 ├──────────────────────────────────────────────────────────────────────────────┤
-│    No  Status    Jabil ID  Part number  Serial number  Asset    Type   …      │  ← tiêu đề cột: bấm để sắp xếp
-│ ⊟  1   ● Active  P12316    P12316       SN-001         A-00045  Tester …      │
-│ └  2   ● Active  P20001    P20001       SN-002         A-00046  Base   …      │  ← bấm dòng → mở Detail Panel
+│    No  Status    Serial number  Part number  Location  Type   Jabil ID  …     │  ← tiêu đề cột: bấm để sắp xếp
+│ ⊟  1   ● Active  SN-001         P12316       B3F1      Tester J-100201  …     │
+│ └  2   ● Active  SN-002         P20001       B3F1      Base   J-100202  …     │  ← bấm dòng → mở Detail Panel
 │ …                                                                             │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Thành phần | Quy tắc chung cho mọi module |
 | --- | --- |
-| Tiêu đề trang | Tên module + tổng số bản ghi (theo bộ lọc hiện tại) |
+| Tiêu đề trang | Tên module + tổng số bản ghi (theo bộ lọc hiện tại) trên **cùng một dòng** |
 | Tìm kiếm | Một ô, tìm trên các cột chữ (serial, part number, tên…) |
 | Bộ lọc | Lọc theo các cột chọn từ danh sách (Status, Type, Location, Nhóm quyền…) |
 | Tùy chọn hiển thị | Mỗi người tự ẩn / hiện cột, kéo đổi thứ tự, "Khôi phục mặc định". Mặc định **hiện đủ cột**. Lưu trên trình duyệt của từng người |
 | Xuất Excel | Mọi nhóm quyền (xem được thì xuất được); xuất đúng các cột và bộ lọc đang hiện |
+| Thanh công cụ hẹp | Khi danh sách hẹp (Detail Panel đang mở cạnh, dưới ~800px), `Tùy chọn hiển thị`, `Xuất Excel` và công cụ của module (Import…) chỉ còn icon — vẫn có tên (`aria-label`) và tooltip — để thanh công cụ nằm một hàng. `Bộ lọc` và `+ Thêm` luôn có chữ |
 | Import | Chỉ trang có import (Equipment, Golden) — Admin, User. Mở trong khung bên phải như `+ Thêm` (`?tool=import`): 1. tải file mẫu, 2. chọn file → kiểm tra (chưa ghi), 3. hết lỗi → Import. Xem mục 7 |
 | `+ Thêm` | Admin, User (Configuration, User Management: chỉ Admin). Mở Detail Panel ở chế độ Thêm mới |
 | Cột đầu | `No` (số thứ tự theo bộ lọc / sắp xếp hiện tại). Equipment thêm cột quan hệ cha–con trước `No` |
 | Cột Status | Đứng ngay sau `No` ở mọi module có trạng thái; tag có chữ + màu |
+| Cột định danh | Ngay sau Status là serial (chữ đậm), rồi part number và vị trí, cột phụ (Jabil ID, Asset, Level, Remark…) ở cuối. Khi Detail Panel mở, danh sách chỉ còn chỗ cho vài cột đầu — những cột đó phải đủ để nhận ra thiết bị |
 | Sắp xếp | Bấm tiêu đề cột để sắp xếp tăng / giảm |
 | Bấm dòng | Mở Detail Panel của dòng đó; dòng đang mở được tô nền chọn |
-| Trống / đang tải / lỗi | Dùng trạng thái chung: khung xương khi tải, thông báo khi trống hoặc không khớp bộ lọc |
-| Bảng rộng | Cuộn ngang **bên trong** khung bảng, tiêu đề cột luôn hiện khi cuộn dọc. (Điện thoại không dùng bảng: xem [3.11](#311-trên-điện-thoại)) |
+| Trống / đang tải / lỗi | Dùng trạng thái chung: khung xương khi tải; chưa có bản ghi nào → thông báo + nút `+ Thêm` (nếu có quyền); không khớp bộ lọc → thông báo + `Xóa bộ lọc`; tải lỗi → thông báo lỗi + `Thử lại` |
+| Bảng rộng | Cuộn ngang **bên trong** khung bảng, tiêu đề cột luôn hiện khi cuộn dọc. Ô nhiều chữ (Remark, Mô tả…) chỉ hiện tối đa hai dòng — đủ chữ ở tooltip và trong Detail Panel — để một ghi chú dài không làm cả dòng cao gấp ba. (Điện thoại không dùng bảng: xem [3.11](#311-trên-điện-thoại)) |
 
 ---
 
@@ -52,7 +54,7 @@ Không bao giờ hiện: mật khẩu đã băm, mã phiên đăng nhập và c�
 
 ```
 ┌──────────────────────────────────────┬────────────────────────────────────┐
-│ Masterlist (vẫn dùng được)           │ ‹ ›  [icon] SN-001 [● Active]       │
+│ Masterlist (vẫn dùng được)           │ ‹ ›  SN-001 [● Active]              │
 │                                      │ P12316 · Tester  [Sửa][Thao tác▾][✕]│
 │  No Status  P/N     S/N     Type …   │       📍 B3F1 · Cập nhật 10:24 …     │
 │  1  ●       P12316  SN-001  Tester … │ ◀ đang chọn                         │
@@ -74,19 +76,19 @@ Cùng nội dung, chỉ khác cách đặt theo độ rộng màn hình:
 
 | Màn hình | Cách hiện | Masterlist |
 | --- | --- | --- |
-| **Desktop rộng** (≥ 1280px) | Panel **bên phải**, rộng 640px, đặt cạnh masterlist | Vẫn hiện và bấm được; bấm dòng khác thì panel đổi theo |
+| **Desktop rộng** (≥ 1280px) | Panel **bên phải**, rộng 640px (hẹp dần tới 560px khi màn hình dưới ~1450px, để danh sách còn đủ chỗ), đặt cạnh masterlist | Vẫn hiện và bấm được; bấm dòng khác thì panel đổi theo |
 | **Laptop nhỏ / tablet** (801–1279px) | Panel trượt ra **phủ lên** phần phải của masterlist, rộng 640px (tối đa bằng màn hình trừ 48px) | Phần còn thấy được làm mờ; bấm vào phần mờ **không** đóng panel. Chuyển bản ghi bằng `‹ ›` |
 | **Điện thoại** (≤ 800px) | Panel chiếm **toàn màn hình** — xem [3.11](#311-trên-điện-thoại) | Danh sách thẻ, ẩn khi panel mở; nút `←` quay về đúng vị trí cũ |
 
-Nút `⤢` (desktop / tablet) mở cùng nội dung ở trang riêng (`/equipment/{id}`, `/golden/{id}`…), rộng hết màn hình. Link QR cũng mở trang này.
+Nút `⤢` (desktop / tablet) mở cùng nội dung ở trang riêng (`/equipment/{id}`, `/golden/{id}`…), rộng hết màn hình. Link QR cũng mở trang này. Trang riêng có `←` (về danh sách, mở đúng bản ghi) thay cho `✕`, và không có `‹ ›`.
 
 ### 3.2 Header
 
 | Dòng | Nội dung | Ghi chú |
 | --- | --- | --- |
-| 1 | `‹ ›` · Icon module · **Tên chính** · tag trạng thái | Tên chính = định danh dễ nhận nhất (serial, họ tên, `display_name`) |
+| 1 | `‹ ›` · **Tên chính** · tag trạng thái | Tên chính = định danh dễ nhận nhất (serial, họ tên, `display_name`). `‹ ›` chỉ hiện khi có bản ghi trước / sau; không có icon trang trí |
 | 2 | Định danh phụ | Ví dụ part number · loại |
-| 3 | Thông tin nhanh | Vị trí, cập nhật lần cuối (giờ + người). Tối đa 3 mục |
+| 3 | Thông tin nhanh | Vị trí (chữ đậm hơn, vì đó là điều người dùng tìm đầu tiên), cập nhật lần cuối (giờ + người). Tối đa 3 mục |
 | Phải | Nút chính của module (nếu có) · `[Sửa]` · `[Thao tác ▾]` · `[⤢]` · `[✕]` | `[Thao tác ▾]` (nút có chữ — nút chỉ có dấu ⋯ dễ bị bỏ qua) chứa các thao tác khác; Xóa luôn ở cuối, màu đỏ |
 
 Header và thanh tab **luôn hiện** khi cuộn; chỉ phần thân cuộn.
@@ -128,7 +130,7 @@ Khi **thêm mới** chỉ có tab Thông tin.
 | **Xem** (mặc định) | Bấm dòng trong masterlist, `‹ ›`, link / QR | Mọi trường chỉ đọc. Không có footer |
 | **Sửa** | Nút `[Sửa]` | Ô thành ô nhập tại chỗ; footer `[Hoàn tác] [Hủy] [Lưu]`. Nút Lưu tắt khi chưa có thay đổi |
 | **Thêm mới** | Nút `+ Thêm` trên masterlist | Cùng panel, ô trống, chỉ tab Thông tin, header ghi "Thêm …". Lưu xong chuyển sang Xem bản ghi vừa tạo |
-| **Thao tác** | Nút chính của module hoặc một mục trong `[Thao tác ▾]` (ví dụ Đổi vị trí, Swap, Ghi nhận hiệu chuẩn, Duyệt) | Thân panel được **thay bằng màn hình thao tác** (tiêu đề + vài trường + xem trước kết quả); nút `← Quay lại` và footer `[Hủy] [Xác nhận]`. **Không mở hộp thoại thứ hai** |
+| **Thao tác** | Nút chính của module hoặc một mục trong `[Thao tác ▾]` (ví dụ Đổi vị trí, Swap, Ghi nhận hiệu chuẩn, Duyệt) | Thân panel được **thay bằng màn hình thao tác** (tiêu đề + vài trường + xem trước kết quả); nút `← Quay lại` và footer `[Hủy] [tên thao tác]` — nút chính ghi đúng việc nó làm (`Swap`, `Đổi vị trí`, `Gắn vào cha`, `Duyệt`…), chỉ dùng `Xác nhận` khi không có tên nào cụ thể hơn. Khi đang chạy chỉ có **một** chỉ báo tải. **Không mở hộp thoại thứ hai** |
 
 **Xóa** cũng không mở hộp thoại: footer đổi sang màu đỏ "Xóa SN-001? Không hoàn tác được. `[Hủy]` `[Xóa]`".
 
@@ -251,10 +253,10 @@ Mỗi module gồm: **Masterlist** (các cột, mặc định hiện đủ) và 
 
 **Masterlist:**
 
-| | No | Status | Jabil ID | Part number | Serial number | Asset | Type | Level | Location | Remark |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ⊟ | 1 | ● Active | P12316 | P12316 | SN-001 | A-00045 | Tester | EOL | B3F1 | |
-| └ | 2 | ● Active | P20001 | P20001 | SN-002 | A-00046 | Base | EOL | B3F1 | |
+| | No | Status | Serial number | Part number | Location | Type | Jabil ID | Asset | Level | Parent | Remark |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ⊟ | 1 | ● Active | SN-001 | P12316 | B3F1 | Tester | J-100201 | A-00045 | EOL | | |
+| └ | 2 | ● Active | SN-002 | P20001 | B3F1 | Base | J-100202 | A-00046 | EOL | SN-001 | |
 
 Cột đầu (⊟ / └) cho biết thiết bị có con / là con của thiết bị khác.
 

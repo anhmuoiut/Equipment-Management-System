@@ -2,7 +2,6 @@
 
 /** Configuration › HỆ THỐNG › Error log — chỉ xem; cùng Masterlist + Detail Panel. */
 import { useTranslation } from 'react-i18next';
-import { Bug } from 'lucide-react';
 import { formatTime } from '@/lib/client/api';
 import { DetailPanel, DetailSection, DetailValue } from '@/components/ui/detail/DetailPanel';
 import { ErrorState, Spinner } from '@/components/ui';
@@ -33,7 +32,7 @@ export function ErrorLogWorkspace() {
       exportName="error-log"
       canAdd={false}
       renderDetail={(ctx) => (
-        <DetailPanel layout="panel" icon={<Bug size={18} />} title={ctx.row?.request_id ?? '…'}
+        <DetailPanel layout="panel" title={ctx.row?.request_id ?? '…'}
           subtitle={ctx.row ? formatTime(ctx.row.created_at) : undefined} nav={ctx.nav} onClose={ctx.onClose}>
           {ctx.error ? <ErrorState message={ctx.error} onRetry={ctx.onRetry} />
             : !ctx.row ? <Spinner label={t('common.loadingEllipsis')} /> : (

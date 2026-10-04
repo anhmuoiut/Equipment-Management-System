@@ -35,6 +35,11 @@ describe('AppSidebar — docs/APP_SHELL.md', () => {
     expect(document.querySelector('.sidebar-divider')).toBeNull();
   });
 
+  it('has no decorative caption above the items and no static status line below', () => {
+    renderSidebar('admin');
+    expect(document.querySelector('.sidebar-caption, .sidebar-note, .sidebar-status')).toBeNull();
+  });
+
   it('shows no count badges and no second level', () => {
     renderSidebar('admin');
     expect(document.querySelector('.sidebar-link-badge, .sidebar-group')).toBeNull();

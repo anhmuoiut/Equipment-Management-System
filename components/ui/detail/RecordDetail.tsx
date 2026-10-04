@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { ApiError, errorMessage, formatTime } from '@/lib/client/api';
 import { usePhone } from '@/lib/client/usePhone';
 import { Button, ErrorState, LoadingOverlay, Notice, RequiredMark, Skeleton, toast } from '@/components/ui';
@@ -98,7 +98,6 @@ export type RecordDetailProps<R extends { id: string } & Audit> = {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
-  icon?: ReactNode;
   heading: (record: R) => Heading;
   /** Tiêu đề form thêm mới (module có thêm mới). */
   createTitle?: string;
@@ -132,7 +131,7 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
 
 export function RecordDetail<R extends { id: string } & Audit>(props: RecordDetailProps<R>) {
   const {
-    layout, record, creating, loading, error, onRetry, icon, heading, createTitle, sections, extraTabs, historyUrl,
+    layout, record, creating, loading, error, onRetry, heading, createTitle, sections, extraTabs, historyUrl,
     historyFilter, historyLabels, canEdit, defaults, validate, onSave, actions = [], canDelete, deleteLabel, onDelete, deleteWarning,
     nav, onClose, onExpand, onSaved, onDeleted, leaveRef,
   } = props;
@@ -306,7 +305,7 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
   // ------------------------------------------------------------ Đang tải / lỗi
   if (!creating && (loading || error || !record)) {
     return (
-      <DetailPanel layout={layout} icon={icon} title={record ? heading(record).title : <Skeleton className="h-5" style={{ width: 160 }} />}
+      <DetailPanel layout={layout} title={record ? heading(record).title : <Skeleton className="h-5" style={{ width: 160 }} />}
         nav={nav} onClose={onClose}>
         {error ? <ErrorState message={error} onRetry={onRetry} /> : (
           <div className="dp-skeleton">
@@ -329,7 +328,7 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
       key: a.key, label: a.label, icon: a.icon, danger: a.danger,
       onClick: () => trigger(a),
     })) : []),
-    ...(canDelete && onDelete ? [{ key: 'delete', label: deleteLabel ?? t('common.delete'), danger: true, onClick: () => setMode({ kind: 'delete' }) }] : []),
+    ...(canDelete && onDelete ? [{ key: 'delete', label: deleteLabel ?? t('common.delete'), icon: <Trash2 size={14} aria-hidden="true" />, danger: true, onClick: () => setMode({ kind: 'delete' }) }] : []),
   ] : [];
 
   const head = record && mode.kind !== 'create' ? heading(record) : { title: createTitle ?? '' } as Heading;
@@ -466,7 +465,7 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
 
   return (
     <DetailPanel
-      layout={layout} icon={icon} title={head.title} tags={mode.kind === 'create' ? undefined : head.tags}
+      layout={layout} title={head.title} tags={mode.kind === 'create' ? undefined : head.tags}
       subtitle={mode.kind === 'create' ? undefined : head.subtitle} meta={mode.kind === 'view' ? head.meta : undefined}
       nav={mode.kind === 'create' ? undefined : { onPrev: nav?.onPrev && (() => guard(nav.onPrev!)), onNext: nav?.onNext && (() => guard(nav.onNext!)) }}
       actions={headerActions} more={phone ? undefined : moreItems} moreBusy={running}
@@ -589,6 +588,7 @@ export function ActionScreen({ title, description, children, onCancel, onConfirm
   children?: ReactNode;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
+  /** What the button does ("Swap", "Approve"…); "Confirm" only when nothing more specific fits. */
   confirmLabel?: string;
   confirmDisabled?: boolean;
   danger?: boolean;
@@ -624,7 +624,8 @@ export function ActionScreen({ title, description, children, onCancel, onConfirm
       </div>
       <div className="dp-action-footer">
         <Button onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button>
-        <Button variant={danger ? 'danger' : 'primary'} loading={busy} disabled={confirmDisabled} onClick={() => void confirm()}>
+        {/* With a body the dimmed LoadingOverlay is the one indicator; without one the button itself spins. */}
+        <Button variant={danger ? 'danger' : 'primary'} loading={busy && !children} disabled={busy || confirmDisabled} onClick={() => void confirm()}>
           {confirmLabel ?? t('dp.confirm')}
         </Button>
       </div>
@@ -632,13 +633,17 @@ export function ActionScreen({ title, description, children, onCancel, onConfirm
   );
 }
 
-/** Ô nhập trong màn hình thao tác (cùng kiểu với ô của panel). */
-export function ActionField({ label, required, children, hint, error }: {
-  label: string; required?: boolean; children: ReactNode; hint?: ReactNode; error?: string;
+/**
+ * Ô nhập ngoài panel (màn hình thao tác, Account settings) — cùng kiểu với ô của panel.
+ * `htmlFor`: nhãn thật gắn với ô nhập (bắt buộc cho input / textarea); `wide: false`: nửa hàng.
+ */
+export function ActionField({ label, required, children, hint, error, htmlFor, wide = true }: {
+  label: string; required?: boolean; children: ReactNode; hint?: ReactNode; error?: string; htmlFor?: string; wide?: boolean;
 }) {
+  const text = <>{label}{required && <RequiredMark />}</>;
   return (
-    <div className="dp-field" data-wide data-invalid={!!error || undefined}>
-      <span className="dp-label">{label}{required && <RequiredMark />}</span>
+    <div className="dp-field" data-wide={wide || undefined} data-invalid={!!error || undefined}>
+      {htmlFor ? <label className="dp-label" htmlFor={htmlFor}>{text}</label> : <span className="dp-label">{text}</span>}
       <div className="dp-input">{children}</div>
       {error ? <span className="dp-error">{error}</span> : hint && <span className="dp-hint">{hint}</span>}
     </div>

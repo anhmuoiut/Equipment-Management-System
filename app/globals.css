@@ -272,23 +272,6 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .sidebar-collapse-toggle { align-self: flex-start; margin-bottom: 18px; }
 .sidebar-collapse-toggle svg { transition: transform var(--sidebar-duration) var(--sidebar-ease); }
 .app-shell[data-sidebar-open='false'] .sidebar-collapse-toggle svg { transform: rotate(180deg); }
-.sidebar-caption {
-  color: color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)); font-size: 10px; font-weight: 500; letter-spacing: .1em; padding: 0 14px; margin-bottom: var(--space-3);
-  max-height: 20px; border-top: 1px solid transparent;
-  opacity: 1; visibility: visible; overflow: hidden;
-  transition: opacity var(--sidebar-label-in-duration) var(--sidebar-ease) var(--sidebar-label-in-delay), visibility 0s linear 0s,
-              max-height var(--sidebar-duration) var(--sidebar-ease), margin var(--sidebar-duration) var(--sidebar-ease), padding var(--sidebar-duration) var(--sidebar-ease);
-}
-/* Rail mode removes the caption from layout entirely rather than just
-   fading it. The workspace items and the admin-only items are separated by
-   .sidebar-divider (below) in both modes, so nothing depends on caption
-   text to keep the two groups apart. */
-.app-shell[data-sidebar-open='false'] .sidebar-caption {
-  max-height: 0; margin-bottom: 0; padding-left: 0; padding-right: 0;
-  opacity: 0; visibility: hidden; pointer-events: none;
-  transition: opacity var(--sidebar-label-out-duration) var(--sidebar-ease) var(--sidebar-label-out-delay), visibility 0s linear var(--sidebar-duration),
-              max-height var(--sidebar-duration) var(--sidebar-ease), margin var(--sidebar-duration) var(--sidebar-ease), padding var(--sidebar-duration) var(--sidebar-ease);
-}
 /* minmax(0, 1fr): an `auto` column grows to the widest link's unbreakable
    label, pushing every link past the sidebar edge; bounded, a long label
    (e.g. Vietnamese) truncates with an ellipsis and its title shows it all. */
@@ -302,23 +285,12 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
 .sidebar-link-icon svg { flex-shrink: 0; }
 .sidebar-link:hover { background: color-mix(in srgb, var(--jabil-white) 4.71%, transparent); }
 .sidebar-link[aria-current='page'] { color: white; background: color-mix(in srgb, var(--jabil-white) 7.06%, transparent); border-color: color-mix(in srgb, var(--jabil-white) 12.55%, transparent); border-left-color: var(--jabil-picton); font-weight: 500; }
-.sidebar-note {
-  margin-top: auto; display: flex; gap: 8px; align-items: center; font-size: 10px; color: color-mix(in srgb, var(--jabil-prussian) 40%, var(--jabil-white)); padding: 28px 12px 0;
-  opacity: 1; visibility: visible;
-  transition: opacity var(--sidebar-label-in-duration) var(--sidebar-ease) var(--sidebar-label-in-delay), visibility 0s linear 0s;
-}
-.sidebar-status { height: 5px; width: 5px; flex-shrink: 0; background: var(--jabil-picton); border-radius: 50%; }
 /* Collapsed rail: icons only — the accessible name moves to aria-label
    (always set) and a hover title, so nothing is lost for anyone, just not
-   shown at 72px wide. Caption/note/label fade out and only leave the
-   accessibility tree once the width shrink is nearly finished (opacity
-   starts at --sidebar-label-out-delay, visibility flips at the very end),
-   rather than vanishing the instant the toggle is pressed. */
-.app-shell[data-sidebar-open='false'] .sidebar-caption,
-.app-shell[data-sidebar-open='false'] .sidebar-note {
-  opacity: 0; visibility: hidden; pointer-events: none;
-  transition: opacity var(--sidebar-label-out-duration) var(--sidebar-ease) var(--sidebar-label-out-delay), visibility 0s linear var(--sidebar-duration);
-}
+   shown at 72px wide. The label fades out and only leaves the accessibility
+   tree once the width shrink is nearly finished (opacity starts at
+   --sidebar-label-out-delay, visibility flips at the very end), rather than
+   vanishing the instant the toggle is pressed. */
 .sidebar-link-label {
   display: inline-block; white-space: nowrap; overflow: hidden;
   opacity: 1; visibility: visible; transform: translateX(0);
@@ -333,7 +305,7 @@ button.border, span.border, [role='dialog'] { border-radius: 7px; }
               visibility 0s linear var(--sidebar-duration);
 }
 /* A rule separates the workspace items from the admin-only ones
-   (Configuration, User Management) — no second caption needed. */
+   (Configuration, User Management). */
 .sidebar-divider { flex-shrink: 0; height: 1px; margin: var(--space-3) var(--space-2); background: var(--on-brand-active-border); }
 .topbar-actions { display: flex; align-items: center; gap: 16px; margin-left: auto; flex-shrink: 0; }
 .user-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: var(--machine-tint); color: var(--ok); font-size: 11px; font-weight: 600; }

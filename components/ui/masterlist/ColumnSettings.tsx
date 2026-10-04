@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, Columns3 } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { ToolbarButton } from './ToolbarButton';
 
 export type ColumnPrefs = {
   order: string[];
@@ -87,9 +88,8 @@ export function ColumnSettings({ columns, prefs }: { columns: { key: string; lab
 
   return (
     <div className="ml-colsettings" ref={ref}>
-      <Button size="sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <Columns3 size={14} aria-hidden="true" />{t('ml.columns')}
-      </Button>
+      <ToolbarButton label={t('ml.columns')} icon={<Columns3 size={14} aria-hidden="true" />}
+        onClick={() => setOpen((o) => !o)} aria-expanded={open} />
       {open && (
         <div className="ml-popover" role="dialog" aria-label={t('ml.columns')}>
           <ul>

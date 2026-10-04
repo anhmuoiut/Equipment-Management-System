@@ -8,7 +8,7 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileSpreadsheet, FolderOpen } from 'lucide-react';
+import { Download, FolderOpen } from 'lucide-react';
 import { api, ApiError, errorMessage } from '@/lib/client/api';
 import { Button, LoadingOverlay, Notice, toast } from '@/components/ui';
 import { DetailPanel } from '@/components/ui/detail/DetailPanel';
@@ -119,7 +119,7 @@ export function ImportPanel({ endpoint, columns, title, templateDesc, importLabe
   return (
     <DetailPanel
       // Đang import (một giao dịch, có thể lâu): không đóng khung giữa chừng.
-      layout="panel" icon={<FileSpreadsheet size={18} />} title={title} onClose={busy === 'import' ? undefined : onClose}
+      layout="panel" title={title} onClose={busy === 'import' ? undefined : onClose}
       footer={(
         <div className="dp-footer-row">
           <Button onClick={onClose} disabled={busy === 'import'}>{committed ? t('common.close') : t('common.cancel')}</Button>

@@ -18,8 +18,8 @@ export function GoldenWorkspace() {
 
   const columns: Column<GoldenRow>[] = [
     { key: 'status', label: t('fields.status'), value: (r) => r.status, render: (r) => <StatusTag name={r.status} color={r.status_color} />, filter: true },
-    { key: 'part_number', label: t('fields.part_number'), value: (r) => r.part_number, filter: true },
     { key: 'serial_number', label: t('fields.serial_number'), value: (r) => r.serial_number, render: (r) => <strong>{r.serial_number}</strong> },
+    { key: 'part_number', label: t('fields.part_number'), value: (r) => r.part_number, filter: true },
     { key: 'utd_part_number', label: t('fields.utd_part_number'), value: (r) => r.utd_part_number },
     { key: 'location', label: t('fields.location'), value: (r) => r.location, filter: true },
     { key: 'origin', label: t('fields.origin'), value: (r) => r.origin, filter: true },

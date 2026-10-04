@@ -1,6 +1,6 @@
 # UI requirements: SolarEdge Equipment Management
 
-Updated: 4 October 2026 (phone layout reworked: cards, bottom bars, account-menu preferences). Status: accepted design baseline.
+Updated: 4 October 2026 (phone layout reworked: cards, bottom bars, account-menu preferences; laptop/desktop review: scan-friendly Masterlist, adaptive toolbar, cleaner panel header). Status: accepted design baseline.
 
 ## Read this before changing UI
 
@@ -60,7 +60,7 @@ The menu is defined in [APP_SHELL.md](APP_SHELL.md).
 
 - The sidebar has **one flat level** with six items in this order: Dashboard (`/`), Equipment (`/equipment`), Calibration (`/calibration`), Golden (`/golden`), then a divider, then Configuration (`/configuration/…`) and User Management (`/users`). There is no second sidebar tier and no Administration group.
 - Configuration and User Management are shown only to Admin. User and Readonly see the first four items and no divider. The server layouts enforce the same rules, and an unauthorized route redirects to the Dashboard.
-- Menu items carry no count badges.
+- Menu items carry no count badges. The sidebar holds only the items and the divider: no caption above them and no status/footer line below (a static dot reads as a live status that it is not).
 - A detail route (for example `/equipment/{id}`) marks its parent item as current.
 - Configuration picks its lists from an in-page grouped sub-list: DỮ LIỆU GỐC, HIỆU CHUẨN and HỆ THỐNG (Error log). Each group header is a disclosure button with `aria-expanded`. The group holding the current page is always open. On phones the sub-list becomes a grouped select at the top of the page.
 - Sidebar grids use `minmax(0, 1fr)` columns, so a long label (often Vietnamese) truncates with an ellipsis instead of widening every link past the sidebar edge. Its `title` shows the full name.
@@ -72,7 +72,7 @@ These are the baseline for shared workspace UI. Reuse the existing classes; do n
 | Element | Desktop baseline | Responsive behavior |
 | --- | --- | --- |
 | Header | 52px high | 56px at 800px and below |
-| Sidebar | 216px expanded / 68px rail | Overlay at 800px and below; width limited to viewport |
+| Sidebar | 216px expanded / 64px rail | Overlay at 800px and below; width limited to viewport |
 | Content padding | 16px | 12px at 800px and below |
 | Page heading | 23px, weight 600 | 21px on mobile |
 | Body type | 14px | Keep readable; do not shrink the entire UI |
@@ -117,7 +117,10 @@ Use the existing `lucide-react` icon style and established sizing. Decorative ic
 - Module lists use `Masterlist` (`.ml-*` in [`app/workspace.css`](../app/workspace.css)). Other tables reuse `.page-heading` and `.grid-table`.
 - Keep search, filters, counts and actions compact and clearly grouped. Preserve sorting, filtering, pagination and permission-based actions.
 - **Phones do not squeeze the table.** The Masterlist becomes a list of cards (serial + status, then location / part number / type; Calibration adds the coloured due date). The toolbar is search + Filter & sort (a bottom sheet) + a ⋮ menu (Export, Import); a floating + adds a record. Details: [DETAIL_MODEL.md](DETAIL_MODEL.md) §3.11.
-- Tables use subtle dividers, restrained alternating row tint, and readable hover/focus states. Wide tables scroll inside their panel; they must not widen the whole page or silently lose columns.
+- Tables use subtle dividers, restrained alternating row tint, and readable hover/focus states (a keyboard-focused row gets a Picton outline, not just the hover tint). Wide tables scroll inside their panel; they must not widen the whole page or silently lose columns.
+- **Column order is a scanning order**: Status first (documented), then what it is (serial, part number), where it is (location), then secondary columns. With the Detail Panel open only the first few columns are visible, so they must identify the record. Wrapping columns (Remark, Description…) show at most two lines (`.ml-clamp`); the full text is in the cell tooltip and the Detail Panel.
+- **The toolbar adapts to the list, not the window**: when the list is narrow (a Detail Panel beside it, below ~800px) Columns, Export and module tools such as Import keep their icon and name (`aria-label`, tooltip) and drop the text (`ToolbarButton`, a container query on `.ws-list`). Filters and + Add always keep their text. Do not hide a toolbar action on desktop to save space.
+- Title and record count share one line on list pages. A list with no records offers the + Add action; a list that filters hide offers Clear filters.
 - Let the equipment table use the available workspace height. Do not add arbitrary minimum heights that push content beyond the viewport.
 - Dashboard cards use compact spacing, small corner icons, tabular values, restrained Picton charts and semantic highlights. Do not invent metrics or status data to decorate a screen.
 - The Dashboard **Status overview** shows Equipment, Calibration and Golden side by side (one column each, stacked on phones). Each has a stacked bar in status colors (2px gaps, ordered by the status sort order, not by count) and a legend with dot, name, count and percent, which works as the table view. Overdue and Due soon KPIs tint their icon red / amber only when the count is above zero.
@@ -163,7 +166,9 @@ Keep visible status text on desktop and mobile. Supplement color with text, icon
 - Record forms are the Detail Panel itself: fields switch to inputs in place. Labels stay above values, required fields carry a red `*`, and errors appear under the field. Other forms reuse the existing input, validation and modal patterns.
 - Dialog headers/close controls remain accessible while long bodies scroll. Stack fields on narrow screens and keep actions reachable, including the mobile safe area.
 - On phones, pickers and filters are **bottom sheets** (`Modal` with `sheet`; `SearchableSelect` uses it too) and action menus open from the bottom with 48px rows. Escape closes only the newest dialog. Primary actions of a record sit in the Detail Panel's bottom bar, in thumb reach.
-- Toasts appear below the header; the stack is portaled to `<body>`, so it must not depend on CSS variables defined on `.app-shell` (use a fallback).
+- Toasts appear below the header; the stack is portaled to `<body>`, so it must not depend on CSS variables defined on `.app-shell` (use a fallback). Error toasts use `role="alert"`; the others `role="status"`.
+- A dialog closes on a backdrop click only when the press also started on the backdrop: selecting text in a field and releasing outside the dialog must not throw the form away. Forms outside the Detail Panel (Account settings) reuse its field styling (`ActionField` with `htmlFor`), not their own inputs.
+- Action buttons say what they do: **Save** persists a record form, **Delete** removes, and a workflow screen names its verb (**Swap**, **Change location**, **Attach**, **Approve**…). Use the generic **Confirm** only when nothing more specific fits. One async operation shows one loading indicator.
 - Preserve keyboard navigation, focus trapping/restoration and Escape handling. Dropdowns/popovers stay inside the viewport and use the established layering tokens.
 - Keep disabled and loading states meaningful; prevent duplicate submissions through the existing behavior.
 - Use subtle borders and existing radii/shadows rather than a new visual style for each dialog.
@@ -190,7 +195,7 @@ Keep visible keyboard focus, semantic labels and readable contrast. Respect redu
 | [`components/ui/ActionMenu.tsx`](../components/ui/ActionMenu.tsx) | `Actions ▾` / ⋮ menu (dropdown; bottom sheet on phones) |
 | [`lib/permissions/index.ts`](../lib/permissions/index.ts), [`components/ViewerContext.tsx`](../components/ViewerContext.tsx) | Role groups (Admin / User / Readonly) and which buttons a viewer sees |
 | [`app/workspace.css`](../app/workspace.css) | Masterlist, Detail Panel, history, equipment tree, Configuration sub-list, Dashboard |
-| [`components/ui/masterlist/`](../components/ui/masterlist) | `Masterlist`, `ColumnSettings`, Excel export |
+| [`components/ui/masterlist/`](../components/ui/masterlist) | `Masterlist`, `ColumnSettings`, `ToolbarButton`, Excel export |
 | [`components/ui/detail/`](../components/ui/detail) | `DetailPanel`, `RecordDetail`, `ActionScreen`, `DetailHistory` |
 | [`components/ui/workspace/`](../components/ui/workspace) | `ModuleWorkspace` (list + panel page), `RecordPage` (full-page detail) |
 | [`components/ui/tags.tsx`](../components/ui/tags.tsx) | `StatusTag`, `DueDate`, `AccountStatusTag` |

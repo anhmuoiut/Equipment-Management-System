@@ -2,7 +2,7 @@
 
 /**
  * Khung chi tiết dùng chung (docs/DETAIL_MODEL.md mục 3): header (‹ ›, tên
- * chính, tag, ⤢, ✕), tab, thân cuộn, footer. Header và tab luôn hiện; chỉ
+ * chính, tag, ⤢, ✕; trang riêng: ← thay cho ✕), tab, thân cuộn, footer. Header và tab luôn hiện; chỉ
  * thân cuộn. Cùng một khung cho Detail Panel (bên phải masterlist) và
  * Detail Page (toàn trang, link QR).
  */
@@ -14,11 +14,10 @@ import { ActionMenu, type MoreItem } from '@/components/ui/ActionMenu';
 export type PanelLayout = 'panel' | 'page';
 
 export function DetailPanel({
-  layout, icon, title, tags, subtitle, meta, nav, actions, more, moreBusy, onExpand, onClose,
+  layout, title, tags, subtitle, meta, nav, actions, more, moreBusy, onExpand, onClose,
   tabs, activeTab, onTab, footer, mobileBar, children,
 }: {
   layout: PanelLayout;
-  icon?: ReactNode;
   title: ReactNode;
   tags?: ReactNode;
   subtitle?: ReactNode;
@@ -40,17 +39,19 @@ export function DetailPanel({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  // Both arrows would be disabled (a single record, or the full page of one record): no dead buttons.
+  const showNav = !!(nav && (nav.onPrev || nav.onNext));
   return (
     <aside className="dp" data-layout={layout} aria-label={typeof title === 'string' ? title : undefined}>
-      <header className="dp-header">
+      <header className="dp-header" data-nav={showNav || undefined}>
         <div className="dp-header-row">
           {onClose && (
             <button type="button" className="dp-icon-btn dp-back" onClick={onClose} aria-label={t('dp.back')}>
               <ArrowLeft size={18} aria-hidden="true" />
             </button>
           )}
-          {nav && (
-            <div className="dp-nav" data-empty={!nav.onPrev && !nav.onNext || undefined}>
+          {showNav && nav && (
+            <div className="dp-nav">
               <button type="button" className="dp-icon-btn" onClick={nav.onPrev} disabled={!nav.onPrev} aria-label={t('dp.prev')} title={t('dp.prev')}>
                 <ChevronLeft size={18} aria-hidden="true" />
               </button>
@@ -59,7 +60,6 @@ export function DetailPanel({
               </button>
             </div>
           )}
-          {icon && <span className="dp-module-icon" aria-hidden="true">{icon}</span>}
           <div className="dp-title">
             <h2>{title}</h2>
             {tags && <div className="dp-tags">{tags}</div>}

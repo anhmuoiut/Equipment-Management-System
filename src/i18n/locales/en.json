@@ -123,7 +123,6 @@
     "qrAlt": "QR code linking to equipment {{serial}}"
   },
   "nav": {
-    "workspace": "WORKSPACE",
     "dashboard": "Dashboard",
     "equipment": "Equipment",
     "calibration": "Calibration",
@@ -132,7 +131,6 @@
     "users": "User Management",
     "sidebarMenu": "Sidebar menu",
     "mainNavigation": "Main navigation",
-    "equipmentControlSystem": "Equipment Control System",
     "closeMenu": "Close menu",
     "hideMenu": "Hide menu",
     "pinMenu": "Pin menu open",
@@ -318,6 +316,8 @@
     "preview": "Result",
     "movePreview": "Under {{serial}} · location {{location}}",
     "moved": "Moved.",
+    "moveConfirm": "Move",
+    "attachConfirm": "Attach",
     "swap": "Swap",
     "swapDesc": "The two equipment exchange places (parent + location).",
     "swapWith": "Swap with",

@@ -28,8 +28,8 @@ Sáu mục, **một cấp duy nhất**, đúng thứ tự:
 | Phần | Quy tắc |
 | --- | --- |
 | Top bar | Logo Jabil + **SolarEdge Equipment Management** bên trái (một dòng); bên phải: ngôn ngữ + sáng / tối · chuông thông báo · menu tài khoản. Điện thoại: chỉ còn `☰` · thương hiệu · chuông · tài khoản (nút tròn, không mũi tên); **ngôn ngữ và sáng / tối nằm trong menu tài khoản** (English ✓ / Tiếng Việt, Chuyển sang chế độ tối) |
-| Sidebar | Nền Prussian, mục đang chọn màu Picton; nút thu gọn ở đầu sidebar (còn icon, rê chuột hiện tên, ghi nhớ lựa chọn); dòng ghi chú cuối sidebar |
-| Điện thoại / màn hẹp (≤ 800px) | Sidebar ẩn, nút `☰` trên top bar mở sidebar phủ lên nội dung, chọn menu xong tự đóng. Ngăn kéo chỉ có sáu mục (không có chữ "Workspace" và dòng ghi chú cuối). Bảng thông báo phủ ngang màn hình ngay dưới top bar |
+| Sidebar | Nền Prussian, mục đang chọn màu Picton; nút thu gọn ở đầu sidebar (còn icon, rê chuột hiện tên, ghi nhớ lựa chọn). Sidebar chỉ có các mục menu: không có chữ chú thích phía trên và không có dòng trạng thái / ghi chú phía dưới |
+| Điện thoại / màn hẹp (≤ 800px) | Sidebar ẩn, nút `☰` trên top bar mở sidebar phủ lên nội dung, chọn menu xong tự đóng. Ngăn kéo chỉ có sáu mục. Bảng thông báo phủ ngang màn hình ngay dưới top bar |
 | Tiêu đề trang | Nằm trong nội dung trang, không lặp lại trên top bar |
 | Kích thước | Theo bảng "Current compact dimensions" trong [JABIL_UI.md](JABIL_UI.md) |
 

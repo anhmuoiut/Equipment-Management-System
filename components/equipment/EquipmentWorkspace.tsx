@@ -17,15 +17,17 @@ export function EquipmentWorkspace({ extensions }: { extensions?: SectionDef<Equ
   const can = useCan();
   const list = useList<EquipmentRow>('/api/equipment');
 
+  // Status, then what it is (serial, part number), where it is (location), then the rest: with the
+  // Detail Panel open only the first few columns are visible, and those must identify the equipment.
   const columns: Column<EquipmentRow>[] = [
     { key: 'status', label: t('fields.status'), value: (r) => r.status, render: (r) => <StatusTag name={r.status} color={r.status_color} />, filter: true },
-    { key: 'jabil_id', label: t('fields.jabil_id'), value: (r) => r.jabil_id },
-    { key: 'part_number', label: t('fields.part_number'), value: (r) => r.part_number, filter: true },
     { key: 'serial_number', label: t('fields.serial_number'), value: (r) => r.serial_number, render: (r) => <strong>{r.serial_number}</strong> },
-    { key: 'asset', label: t('fields.asset'), value: (r) => r.asset },
-    { key: 'type', label: t('fields.type'), value: (r) => r.type, filter: true },
-    { key: 'level', label: t('fields.level'), value: (r) => r.level, filter: true },
+    { key: 'part_number', label: t('fields.part_number'), value: (r) => r.part_number, filter: true },
     { key: 'location', label: t('fields.location'), value: (r) => r.location, filter: true },
+    { key: 'type', label: t('fields.type'), value: (r) => r.type, filter: true },
+    { key: 'jabil_id', label: t('fields.jabil_id'), value: (r) => r.jabil_id },
+    { key: 'asset', label: t('fields.asset'), value: (r) => r.asset },
+    { key: 'level', label: t('fields.level'), value: (r) => r.level, filter: true },
     { key: 'parent', label: t('fields.parent'), value: (r) => r.parent_serial, filter: true },
     { key: 'remark', label: t('fields.remark'), value: (r) => r.remark, wrap: true, width: 180 },
   ];

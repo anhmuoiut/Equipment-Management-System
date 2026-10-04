@@ -2,7 +2,7 @@
 
 /** Chi tiết golden sample (docs/DETAIL_MODEL.md 4.3). */
 import { useTranslation } from 'react-i18next';
-import { MapPin, CircuitBoard } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { api, formatRelativeTime } from '@/lib/client/api';
 import { statusRequiresRemark, statusSelect, toSelect, useOptions } from '@/lib/client/options';
 import { useCan } from '@/components/ViewerContext';
@@ -57,7 +57,6 @@ export function GoldenDetail({ ctx, layout }: { ctx: DetailCtx<GoldenRow>; layou
       loading={ctx.loading}
       error={ctx.error}
       onRetry={ctx.onRetry}
-      icon={<CircuitBoard size={18} />}
       createTitle={t('gs.addTitle')}
       heading={(r) => ({
         title: r.serial_number,
@@ -65,7 +64,7 @@ export function GoldenDetail({ ctx, layout }: { ctx: DetailCtx<GoldenRow>; layou
         subtitle: r.part_number,
         meta: (
           <>
-            {r.location && <span><MapPin size={12} aria-hidden="true" /> {r.location}</span>}
+            {r.location && <span data-primary><MapPin size={12} aria-hidden="true" /> {r.location}</span>}
             <span>{t('dp.updated', { when: formatRelativeTime(r.updated_at, language), who: r.updated_by_name ?? '—' })}</span>
           </>
         ),

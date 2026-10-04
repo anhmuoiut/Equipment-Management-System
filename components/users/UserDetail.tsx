@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, KeyRound, Lock, LockOpen, UserRound, X } from 'lucide-react';
+import { Check, KeyRound, Lock, LockOpen, X } from 'lucide-react';
 import { api, formatTime } from '@/lib/client/api';
 import { toSelect, useOptions } from '@/lib/client/options';
 import { useViewer } from '@/components/ViewerContext';
@@ -64,7 +64,6 @@ export function UserDetail({ ctx, layout }: { ctx: DetailCtx<UserRow>; layout: P
       loading={ctx.loading}
       error={ctx.error}
       onRetry={ctx.onRetry}
-      icon={<UserRound size={18} />}
       createTitle={t('usr.addTitle')}
       heading={(r) => ({
         title: r.full_name,

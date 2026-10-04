@@ -86,6 +86,9 @@ export function Modal({
   // as "something about the modal changed" and re-grabbing focus mid-type.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // A press that starts inside the dialog (selecting text in a field) and is released over the backdrop
+  // still produces a click on the backdrop — that must not close the dialog and throw the form away.
+  const pressStartedInside = useRef(false);
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -127,7 +130,8 @@ export function Modal({
     <div className={`modal-overlay${sheet ? ' modal-overlay--sheet' : ''}`}
          data-action-dialog="true"
          style={{ background: 'var(--overlay)' }}
-         onClick={(e) => { e.stopPropagation(); onClose(); }}>
+         onMouseDown={(e) => { pressStartedInside.current = e.target !== e.currentTarget; }}
+         onClick={(e) => { e.stopPropagation(); if (!pressStartedInside.current) onClose(); pressStartedInside.current = false; }}>
       <div
         ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title}
         onClick={(e) => e.stopPropagation()}
@@ -296,7 +300,7 @@ export function ToastViewport() {
       {items.map((item) => {
         const Icon = TOAST_ICON[item.tone];
         return (
-          <div key={item.id} className="toast-item" data-tone={item.tone} role="status">
+          <div key={item.id} className="toast-item" data-tone={item.tone} role={item.tone === 'error' ? 'alert' : 'status'}>
             <Icon size={16} aria-hidden="true" className="toast-item-icon" />
             <span className="toast-item-message">{item.message}</span>
             <button type="button" onClick={() => dismissToast(item.id)} aria-label={t('common.close')} className="toast-item-close">

@@ -123,7 +123,6 @@
     "qrAlt": "Mã QR liên kết tới thiết bị {{serial}}"
   },
   "nav": {
-    "workspace": "KHÔNG GIAN LÀM VIỆC",
     "dashboard": "Dashboard",
     "equipment": "Equipment",
     "calibration": "Calibration",
@@ -132,7 +131,6 @@
     "users": "User Management",
     "sidebarMenu": "Menu bên",
     "mainNavigation": "Điều hướng chính",
-    "equipmentControlSystem": "Hệ thống quản lý thiết bị",
     "closeMenu": "Đóng menu",
     "hideMenu": "Thu gọn menu",
     "pinMenu": "Ghim menu mở",
@@ -318,6 +316,8 @@
     "preview": "Kết quả",
     "movePreview": "Thuộc {{serial}} · vị trí {{location}}",
     "moved": "Đã đổi cha.",
+    "moveConfirm": "Đổi cha",
+    "attachConfirm": "Gắn vào cha",
     "swap": "Swap",
     "swapDesc": "Hai thiết bị đổi chỗ (thiết bị cha + vị trí) cho nhau.",
     "swapWith": "Đổi chỗ với",

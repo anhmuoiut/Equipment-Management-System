@@ -77,6 +77,46 @@ describe('Masterlist — docs/DETAIL_MODEL.md mục 2', () => {
     expect(onSelect).toHaveBeenLastCalledWith('c');
   });
 
+  it('keeps a name on the icon-only toolbar buttons (Columns, Export) for assistive tech and tooltips', () => {
+    setup();
+    for (const name of ['ml.columns', 'ml.export']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.getAttribute('title')).toBe(name);
+      expect(button.classList.contains('ml-btn--collapsible')).toBe(true);
+    }
+  });
+
+  it('clamps a wrapping column to two lines so one long remark cannot make a row tall', () => {
+    const wrapRows = [{ ...rows[0]!, note: 'x'.repeat(400) }];
+    render(
+      <Masterlist<Row & { note: string }> title="Wrap" rows={wrapRows} loading={false} error={null}
+        columns={[...columns, { key: 'note', label: 'Note', value: (r) => r.note, wrap: true }] as Column<Row & { note: string }>[]}
+        storageKey={`w-${Math.random()}`} selectedId={null} onSelect={() => {}} exportName="test" />,
+    );
+    const cell = document.querySelector('td[data-wrap]') as HTMLElement;
+    expect(cell.querySelector('.ml-clamp')?.textContent).toHaveLength(400);
+    expect(cell.title).toHaveLength(400); // the full text stays reachable
+    expect(document.querySelector('td:not([data-wrap]) .ml-clamp')).toBeNull();
+  });
+
+  it('offers the add action when the list is genuinely empty — not when filters hide everything', () => {
+    const onAdd = vi.fn();
+    const { unmount } = render(
+      <Masterlist<Row> title="Empty" rows={[]} loading={false} error={null} columns={columns} storageKey={`e-${Math.random()}`}
+        selectedId={null} onSelect={() => {}} exportName="test" onAdd={onAdd} addLabel="Add thing" />,
+    );
+    expect(screen.getByText('ml.emptyTitle')).toBeTruthy();
+    const buttons = screen.getAllByRole('button', { name: /Add thing/ });
+    fireEvent.click(buttons[buttons.length - 1]!);
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    unmount();
+
+    setup();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'no-such-row' } });
+    expect(screen.getByText('ml.noMatch')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'ml.clearFilters' })).toBeTruthy();
+  });
+
   it('hides a column from Column settings and keeps the others', () => {
     setup();
     fireEvent.click(screen.getByRole('button', { name: /ml.columns/ }));

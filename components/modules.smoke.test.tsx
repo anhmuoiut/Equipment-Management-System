@@ -210,7 +210,7 @@ describe('modules smoke', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'eq.swapWith' })); });
     await act(async () => { fireEvent.click(screen.getByRole('option', { name: /SN-OTHER/ })); });
     expect(screen.getByText(/eq.chooseChildren/)).toBeTruthy();
-    const confirm = screen.getByRole('button', { name: 'dp.confirm' }) as HTMLButtonElement;
+    const confirm = screen.getByRole('button', { name: 'eq.swap' }) as HTMLButtonElement; // the button says what it does, not "Confirm"
     expect(confirm.disabled).toBe(true);
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: /eq.childrenStay/ })); });
     expect(confirm.disabled).toBe(false);

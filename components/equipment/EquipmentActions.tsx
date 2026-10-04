@@ -94,7 +94,7 @@ export function ChangeLocationScreen({ ctx, rows }: ScreenProps) {
     ctx.done(r.data, t('eq.locationChanged'));
   }
   return (
-    <ActionScreen title={t('eq.changeLocation')} onCancel={ctx.cancel} onConfirm={confirm}
+    <ActionScreen title={t('eq.changeLocation')} onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('eq.changeLocation')}
       confirmDisabled={!location || location === ctx.record.location_id || !rows || (kids.length > 0 && !mode)}>
       <ActionField label={t('eq.currentLocation')}>{ctx.record.location ?? '—'}</ActionField>
       <ActionField label={t('eq.newLocation')} required>
@@ -129,7 +129,8 @@ export function MoveScreen({ ctx, rows }: ScreenProps) {
     : t('eq.stayAlone', { location: ctx.record.location ?? '—' });
   return (
     <ActionScreen title={ctx.record.parent_id ? t('eq.move') : t('eq.attachParent')} description={t('eq.moveDesc')}
-      onCancel={ctx.cancel} onConfirm={confirm} confirmDisabled={!parent || (kids.length > 0 && !mode)}>
+      onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={ctx.record.parent_id ? t('eq.moveConfirm') : t('eq.attachConfirm')}
+      confirmDisabled={!parent || (kids.length > 0 && !mode)}>
       {ctx.record.parent_id && <ActionField label={t('eq.currentParent')}>{ctx.record.parent_serial}</ActionField>}
       <ActionField label={t('eq.newParent')} required>
         <SearchableSelect value={parent} onChange={setParent} options={choices} placeholder={rows ? t('dp.selectPlaceholder') : t('common.loadingEllipsis')}
@@ -181,7 +182,7 @@ export function SwapScreen({ ctx, rows }: ScreenProps) {
     ...bKids.map((k) => `${k.serial_number} → ${a.serial_number}`),
   ].join(', ') : '';
   return (
-    <ActionScreen title={t('eq.swap')} description={t('eq.swapDesc')} onCancel={ctx.cancel} onConfirm={confirm}
+    <ActionScreen title={t('eq.swap')} description={t('eq.swapDesc')} onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('eq.swap')}
       confirmDisabled={!other || (hasKids && !mode) || noChange}>
       <ActionField label={t('eq.swapWith')} required>
         <SearchableSelect value={other} onChange={(v) => { setOther(v); setMode(null); }} options={choices}
@@ -221,7 +222,7 @@ export function DetachScreen({ ctx, rows }: ScreenProps) {
     ctx.done(r.data, t('eq.detached'));
   }
   return (
-    <ActionScreen title={t('eq.detach')} onCancel={ctx.cancel} onConfirm={confirm}
+    <ActionScreen title={t('eq.detach')} onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('eq.detach')}
       confirmDisabled={!rows || (kids.length > 0 && !mode)}
       description={t('eq.detachDesc', { serial: ctx.record.parent_serial ?? '—', location: ctx.record.location ?? '—' })}>
       {kids.length > 0 && (

@@ -6,7 +6,7 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowRightLeft, Cpu, GitBranch, Link2, MapPin, Plus, Trash2, Unlink } from 'lucide-react';
+import { ArrowRightLeft, GitBranch, Link2, MapPin, Plus, Trash2, Unlink } from 'lucide-react';
 import { api, formatRelativeTime } from '@/lib/client/api';
 import { useFetch } from '@/lib/client/useFetch';
 import { statusRequiresRemark, statusSelect, toSelect, useOptions } from '@/lib/client/options';
@@ -161,7 +161,6 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
       loading={ctx.loading}
       error={ctx.error}
       onRetry={ctx.onRetry}
-      icon={<Cpu size={18} />}
       createTitle={ctx.defaults?.parent_id ? t('eq.addChildTitle', { serial: parentOf(ctx.defaults)?.serial_number ?? '' }) : t('eq.addTitle')}
       defaults={ctx.defaults}
       heading={(r) => ({
@@ -170,7 +169,7 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
         subtitle: [r.part_number, r.type].filter(Boolean).join(' · ') || undefined,
         meta: (
           <>
-            {r.location && <span><MapPin size={12} aria-hidden="true" /> {r.location}</span>}
+            {r.location && <span data-primary><MapPin size={12} aria-hidden="true" /> {r.location}</span>}
             {r.parent_serial && <span>{t('eq.parentShort')}: {r.parent_serial}</span>}
             <span>{t('dp.updated', { when: formatRelativeTime(r.updated_at, language), who: r.updated_by_name ?? '—' })}</span>
           </>

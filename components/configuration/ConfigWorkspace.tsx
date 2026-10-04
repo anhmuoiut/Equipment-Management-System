@@ -8,7 +8,7 @@
  * của PN tự lên Dashboard hiệu chuẩn (database).
  */
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, SlidersHorizontal } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useFetch } from '@/lib/client/useFetch';
 import { refreshOptions, toSelect, useOptions } from '@/lib/client/options';
@@ -116,7 +116,6 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
           loading={ctx.loading}
           error={ctx.error}
           onRetry={ctx.onRetry}
-          icon={<SlidersHorizontal size={18} />}
           createTitle={t('cfg.addTitle', { list: listName })}
           heading={(r) => ({
             title: r.display_name,
