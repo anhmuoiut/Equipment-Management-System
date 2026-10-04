@@ -1,5 +1,5 @@
 /**
- * Kiểu dữ liệu trao đổi giữa server và client (database v2 —
+ * Kiểu dữ liệu trao đổi giữa server và client (theo
  * docs/DATABASE_MODIFIED.md). Chỉ có type, dùng được ở cả hai phía.
  * FK luôn đi kèm chữ hiển thị (display_name) để UI không phải tra lại.
  */
@@ -17,12 +17,13 @@ export type Audit = {
 
 // ---------------------------------------------------------------- Lựa chọn
 export type OptionItem = { id: string; display_name: string; sort_order: number; is_active: boolean };
+/** Trang có cột trạng thái (Dashboard đếm theo từng trang). Một danh sách trạng thái chung cho mọi trang. */
 export type StatusPage = 'equipment' | 'calibration' | 'golden_sample';
 /** 5 màu hệ thống của trạng thái (statuses.color) — mã màu ở globals.css. */
 export type StatusColor = 'green' | 'yellow' | 'red' | 'blue' | 'gray';
 export type StatusOption = {
   id: string; display_name: string; sort_order: number;
-  applies_to: StatusPage[]; requires_remark: boolean; color: StatusColor;
+  requires_remark: boolean; color: StatusColor;
 };
 export type Options = {
   part_numbers: OptionItem[];
@@ -90,10 +91,6 @@ export type CalibrationRow = Audit & {
   remark: string | null;
 };
 
-export type CalibrationCandidate = {
-  id: string; serial_number: string; part_number: string | null; type: string | null;
-  location: string | null; interval_months: number;
-};
 
 // ---------------------------------------------------------- Golden sample
 export type GoldenRow = Audit & {
@@ -114,7 +111,7 @@ export type GoldenRow = Audit & {
 // ---------------------------------------------------------- Configuration
 export type ConfigList =
   | 'part-numbers' | 'locations' | 'types' | 'statuses' | 'levels' | 'departments'
-  | 'calibration-intervals' | 'calibration-vendors';
+  | 'calibration-setup' | 'calibration-vendors';
 
 export type ConfigRow = Audit & {
   id: string;
@@ -122,12 +119,11 @@ export type ConfigRow = Audit & {
   sort_order: number;
   is_active: boolean;
   description?: string | null;                 // types
-  applies_to?: StatusPage[];                   // statuses
   requires_remark?: boolean;                   // statuses
   color?: StatusColor;                         // statuses
-  part_number_id?: string;                     // calibration-intervals
-  interval_months?: number;                    // calibration-intervals
-  warning_days?: number;                       // calibration-intervals
+  part_number_id?: string;                     // calibration-setup
+  interval_months?: number;                    // calibration-setup
+  warning_days?: number;                       // calibration-setup
 };
 
 export type ErrorLogRow = {
@@ -168,7 +164,8 @@ export type HistoryEntry = {
 };
 
 export type HistoryModule = 'equipment' | 'calibration' | 'golden_sample' | 'configuration' | 'user';
-export type RecentActivity = HistoryEntry & { module: HistoryModule; object_id: string };
+/** `item_count` > 1: một lần Import Excel gộp thành một dòng (số dòng của lần import). */
+export type RecentActivity = HistoryEntry & { module: HistoryModule; object_id: string; item_count: number };
 
 // ------------------------------------------------------------- Thông báo
 export type NotificationType =
@@ -194,5 +191,4 @@ export type DashboardData = {
   by_type: CountItem[];
   overdue: CalibrationRow[];
   due_soon: CalibrationRow[];
-  no_date: number;
 };

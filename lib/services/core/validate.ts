@@ -11,6 +11,11 @@ export function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
   if (!r.success) {
     const fields: Record<string, string> = {};
     r.error.issues.slice(0, 20).forEach((issue) => {
+      // .strict(): key thừa nằm ở issue gốc (path rỗng) — ghi từng key để log / client thấy được.
+      if (issue.code === 'unrecognized_keys') {
+        issue.keys.forEach((k) => { fields[[...issue.path, k].join('.')] ??= 'unknown_field'; });
+        return;
+      }
       const key = issue.path.join('.');
       if (key && !fields[key]) fields[key] = issue.code === 'too_small' ? 'required' : issue.message;
     });

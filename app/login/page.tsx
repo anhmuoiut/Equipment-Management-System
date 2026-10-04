@@ -5,9 +5,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, BarChart3, Cpu, Eye, EyeOff, LockKeyhole, Mail, Package, UserPlus, UserRound, Wrench } from 'lucide-react';
 import { PreferenceControls } from '@/components/Preferences';
+import { JabilLogo } from '@/components/JabilLogo';
 import Image from 'next/image';
 import './login.css';
+import { api, ApiError, errorMessage } from '@/lib/client/api';
 import { normalizeUsername, safeLoginDestination } from '@/lib/auth/username';
+import { SUPPORT_EMAIL } from '@/lib/support';
+
+function SupportEmail() {
+  return <a className="support-email" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>;
+}
 
 function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
   const router = useRouter();
@@ -16,31 +23,33 @@ function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [visible, setVisible] = useState(false);
-  const [error, setError] = useState<'credentials' | 'network' | 'limit' | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
+    if (!username.trim() || !password) {
+      setError(t(!username.trim() ? 'login.errorUsernameRequired' : 'login.errorPasswordRequired'));
+      const field = e.currentTarget as HTMLFormElement;
+      field.querySelector<HTMLInputElement>(!username.trim() ? '#username' : '#password')?.focus();
+      return;
+    }
+    setBusy(true);
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      if (!response.ok) {
-        setError(response.status === 429 ? 'limit' : response.status >= 500 ? 'network' : 'credentials');
-        return;
-      }
+      await api.post('/api/auth/login', { username, password });
+      // Giữ trạng thái đang đăng nhập tới khi rời trang (không bấm lặp).
       router.replace(destination);
       router.refresh();
-    } catch { setError('network'); }
-    finally { setBusy(false); }
+    } catch (err) {
+      // Sai mật khẩu, chờ duyệt, bị khóa, quá số lần, lỗi server, mất mạng — mỗi lỗi một câu riêng.
+      setError(errorMessage(err, t));
+      setBusy(false);
+    }
   }
 
   return (
-    <form onSubmit={submit} className="login-form" aria-label={t('login.signIn')} aria-busy={busy}>
+    <form noValidate onSubmit={submit} className="login-form" aria-label={t('login.signIn')} aria-busy={busy}>
       <div className="login-intro">
         <h1>{t('login.welcomeBack')}</h1>
         <p>{t('login.description')}</p>
@@ -64,14 +73,13 @@ function LoginForm({ onRequestAccount }: { onRequestAccount: () => void }) {
           {visible ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
       </div>
-      {error && <p id="login-error" className="login-error" role="alert">{
-        error === 'credentials' ? t('login.errorCredentials') :
-          error === 'limit' ? t('login.errorLimit') :
-            t('login.errorNetwork')
-      }</p>}
+      {error && <p id="login-error" className="login-error" role="alert">{error}</p>}
       <details className="login-recovery">
         <summary>{t('login.forgotPassword')}</summary>
-        <p>{t('login.contactAdmin')}</p>
+        <div className="login-recovery-body">
+          <p>{t('login.contactAdmin')}</p>
+          <p><SupportEmail /></p>
+        </div>
       </details>
       <button className="sign-in-button" type="submit" disabled={busy}>
         {busy ? t('login.signingIn') : t('login.signIn')}
@@ -113,6 +121,14 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!form.full_name.trim()) {
+      setError(t('signup.errorFullName'));
+      return;
+    }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError(t('signup.errorEmailFormat'));
+      return;
+    }
     if (form.password !== form.confirm) {
       setError(t('signup.errorPasswordMismatch'));
       return;
@@ -129,37 +145,24 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
     }
     setBusy(true);
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: form.full_name,
-          username,
-          password: form.password,
-          email: form.email || undefined,
-          employee_id: form.employee_id || undefined,
-        }),
+      await api.post('/api/auth/signup', {
+        full_name: form.full_name,
+        username,
+        password: form.password,
+        email: form.email || undefined,
+        employee_id: form.employee_id || undefined,
       });
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        const code: string | undefined = body?.error?.code;
-        const fields: Record<string, string> = body?.error?.details?.fields ?? {};
-        setError(
-          code === 'USERNAME_ALREADY_EXISTS' ? t('signup.errorUsernameTaken')
-            : code === 'EMAIL_ALREADY_EXISTS' ? t('signup.errorEmailTaken')
-              : code === 'LOGIN_RATE_LIMITED' ? t('signup.errorRateLimited')
-                : fields.username ? t('signup.errorUsernameFormat')
-                  : fields.email ? t('signup.errorEmailFormat')
-                    : fields.full_name ? t('signup.errorFullName')
-                      : fields.password ? t('signup.errorPasswordTooShort')
-                        : code === 'SERVER_ERROR' ? t('signup.errorServer', { id: body?.error?.request_id ?? '-' })
-                          : t('signup.errorGeneric'),
-        );
-        return;
-      }
       setSubmitted(true);
-    } catch {
-      setError(t('signup.errorNetwork'));
+    } catch (err) {
+      // Lỗi theo trường → câu hướng dẫn cụ thể của form; còn lại (trùng username / email, quá số lần, server, mạng) theo mã lỗi.
+      const fields = err instanceof ApiError ? err.fieldErrors : {};
+      setError(
+        fields.username ? t('signup.errorUsernameFormat')
+          : fields.email ? t('signup.errorEmailFormat')
+            : fields.full_name ? t('signup.errorFullName')
+              : fields.password ? t('signup.errorPasswordTooShort')
+                : errorMessage(err, t),
+      );
     } finally {
       setBusy(false);
     }
@@ -172,6 +175,7 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
         <p className="eyebrow">{t('signup.requestSubmitted')}</p>
         <h1>{t('signup.almostThere')}</h1>
         <p className="login-description">{t('signup.submittedDescription')}</p>
+        <p className="login-description">{t('signup.needHelp')} <SupportEmail /></p>
         <button type="button" className="sign-in-button" onClick={onBackToSignIn}>
           {t('signup.backToSignIn')}
         </button>
@@ -180,7 +184,7 @@ function SignupForm({ onBackToSignIn }: { onBackToSignIn: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="login-form signup-form" aria-label={t('signup.requestAnAccount')} aria-busy={busy}>
+    <form noValidate onSubmit={submit} className="login-form signup-form" aria-label={t('signup.requestAnAccount')} aria-busy={busy}>
       <div className="login-intro">
         <h1>{t('signup.requestAnAccount')}</h1>
         <p>{t('signup.description')}</p>
@@ -289,6 +293,7 @@ export default function LoginPage() {
       />
       <div className="auth-layout">
         <div className="auth-title">
+          <div className="auth-mobile-brand"><JabilLogo /><span>TEST ENGINEERING</span></div>
           <h2><span>{t('loginBrand.equipment')}</span><span>{t('loginBrand.management')}</span></h2>
           <p>{t('loginBrand.workcellName')}</p>
           <div className="auth-title-accent" aria-hidden="true" />

@@ -32,8 +32,8 @@ const options = {
   part_numbers: [opt('pn1', 'P12316')], locations: [opt('l1', 'B3F1'), opt('l2', 'B3F2')], types: [opt('t1', 'Tester')],
   levels: [opt('lv1', 'EOL')], departments: [opt('d1', 'TE')], calibration_vendors: [opt('v1', 'Internal')],
   statuses: [
-    { id: 's1', display_name: 'Active', sort_order: 1, applies_to: ['equipment', 'calibration', 'golden_sample'], requires_remark: false, color: 'green' },
-    { id: 's2', display_name: 'Repair', sort_order: 2, applies_to: ['equipment'], requires_remark: true, color: 'yellow' },
+    { id: 's1', display_name: 'Active', sort_order: 1, requires_remark: false, color: 'green' },
+    { id: 's2', display_name: 'Repair', sort_order: 2, requires_remark: true, color: 'yellow' },
   ],
 };
 const equipment = [
@@ -63,8 +63,8 @@ const users = [{
 }];
 const config = {
   'part-numbers': [{ id: 'pn1', display_name: 'P12316', sort_order: 0, is_active: true, ...audit }],
-  statuses: [{ id: 's1', display_name: 'Active', sort_order: 1, is_active: true, applies_to: ['equipment'], requires_remark: false, color: 'green', ...audit }],
-  'calibration-intervals': [{ id: 'cc1', display_name: 'P12316', sort_order: 0, is_active: true, part_number_id: 'pn1', interval_months: 12, warning_days: 30, ...audit }],
+  statuses: [{ id: 's1', display_name: 'Active', sort_order: 1, is_active: true, requires_remark: false, color: 'green', ...audit }],
+  'calibration-setup': [{ id: 'cc1', display_name: 'P12316', sort_order: 0, is_active: true, part_number_id: 'pn1', interval_months: 12, warning_days: 30, ...audit }],
 };
 const errorLog = [{ id: 'x1', request_id: 'req_1', route: 'GET /api/x', user_id: null, user_name: null, error_code: 'SERVER_ERROR', message: 'boom', stack: 'at x', created_at: audit.created_at }];
 
@@ -78,7 +78,11 @@ function respond(url: string): unknown {
   ] };
   if (path.endsWith('/history')) return [{ id: 'h1', label: 'SN-ROOT', action: 'CHANGE_LOCATION', changes: { location: { old: 'B3F1', new: 'B3F2' } },
     note: 'via_parent:SN-ROOT', source: 'ui', created_at: audit.created_at, created_by: 'u1', created_by_name: 'Admin' }];
-  if (path.startsWith('/api/calibration/by-equipment/')) return calibration[0];
+  // e1 đang theo dõi; e2 / e3 chưa có part number → chưa đưa vào được.
+  // e1 có PN trong Setup hiệu chuẩn (tự lên Dashboard); e2 / e3 thì không.
+  if (path === '/api/calibration/by-equipment/e1') return calibration[0];
+  if (path.startsWith('/api/calibration/by-equipment/')) return null;
+  if (path === '/api/equipment/part-numbers') return ['pn1'];
   if (path === '/api/calibration') return calibration;
   if (path === '/api/golden') return golden;
   if (path === '/api/users') return users;
@@ -144,6 +148,14 @@ describe('modules smoke', () => {
     expect(screen.getByText('hist.action.CHANGE_LOCATION')).toBeTruthy();
     await clickTab('dp.tabInfo');
     await clickEdit();
+  });
+
+  it('Equipment whose part number is not set up for calibration: says why, no manual Add', async () => {
+    await mount(<EquipmentPage />);
+    await openRow('SN-OTHER');
+    expect(screen.getByText('cal.notTracked')).toBeTruthy();
+    expect(screen.getByText('cal.needsPartNumber')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /cal\./ })).toBeNull();
   });
 
   it('Equipment child: parent is editable, location is locked with the reason', async () => {
@@ -263,10 +275,17 @@ describe('modules smoke', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(3);
   });
 
-  it.each(['part-numbers', 'statuses', 'calibration-intervals'] as const)('Configuration %s: list → panel → edit', async (list) => {
+  it.each(['part-numbers', 'statuses', 'calibration-setup'] as const)('Configuration %s: list → panel → edit', async (list) => {
     await mount(<ConfigWorkspace listKey={list} />);
     await openRow(list === 'statuses' ? 'Active' : 'P12316');
     await clickEdit();
+    // Setup hiệu chuẩn: part number khóa khi sửa (đổi PN = xóa rồi thêm lại).
+    if (list === 'calibration-setup') expect(screen.getByText('cfg.partNumberFixed')).toBeTruthy();
+  });
+
+  it('Calibration masterlist has no manual Add (equipment joins via Configuration › Calibration › Setup)', async () => {
+    await mount(<CalibrationWorkspace />);
+    expect(screen.queryByRole('button', { name: /ml.add/ })).toBeNull();
   });
 
   it('Configuration statuses: color chip in list; 5-color picker, required when adding', async () => {
@@ -304,11 +323,16 @@ describe('modules smoke', () => {
             golden_sample: [],
           },
           by_location: [], by_type: [],
-          overdue: calibration, due_soon: [], no_date: 0 }, meta: {} };
+          overdue: calibration, due_soon: [] }, meta: {} };
       }
       if (url.startsWith('/api/dashboard/activities')) {
-        return { data: [{ id: 'a1', module: 'equipment', object_id: 'e1', label: 'SN-ROOT', action: 'UPDATE',
-          changes: { asset: { old: null, new: 'A1' } }, note: null, source: 'ui', created_at: audit.created_at, created_by: 'u1', created_by_name: 'Admin' }], meta: {} };
+        const base = { created_at: audit.created_at, created_by: 'u1', created_by_name: 'Admin', item_count: 1 };
+        return { data: [
+          { ...base, id: 'a1', module: 'equipment', object_id: 'e1', label: 'SN-ROOT', action: 'UPDATE',
+            changes: { asset: { old: null, new: 'A1' } }, note: 'swap_with:SN-2', source: 'ui' },
+          { ...base, id: 'a2', module: 'golden_sample', object_id: 'g1', label: 'G-1', action: 'CREATE',
+            changes: {}, note: null, source: 'import', item_count: 40 },
+        ], meta: {} };
       }
       return { data: respond(url), meta: {} };
     });
@@ -321,5 +345,9 @@ describe('modules smoke', () => {
     expect(screen.getByText('Repair')).toBeTruthy();
     expect(screen.getAllByText('SN-ROOT').length).toBeGreaterThan(0);
     expect(screen.getByText('hist.action.UPDATE')).toBeTruthy();
+    // Note của lịch sử hiện ở Dashboard; một lần import gộp thành một dòng, không liệt kê từng bản ghi.
+    expect(screen.getByText('hist.swapWith')).toBeTruthy();
+    expect(screen.getByText('dash.importedBatch')).toBeTruthy();
+    expect(screen.queryByText('G-1')).toBeNull();
   });
 });

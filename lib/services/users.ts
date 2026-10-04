@@ -43,9 +43,8 @@ export async function listUsers(): Promise<UserRow[]> {
 }
 
 export async function getUser(id: string): Promise<UserRow> {
-  const row = await selectOne<DbUser>('user_profiles', id, COLUMNS);
-  if (!row) throw new AppError('USER_NOT_FOUND');
-  return toRow(row, await loadLookups());
+  const [row, lookups] = await Promise.all([load(id), loadLookups()]);
+  return toRow(row, lookups);
 }
 
 async function load(id: string): Promise<DbUser> {
@@ -180,7 +179,7 @@ export async function resetUserPassword(id: string, password: string, actor: str
     }, actor, { action: 'PASSWORD_RESET' });
   } else {
     const { error } = await db().auth.admin.updateUserById(id, { password });
-    if (error) throw new AppError('SERVER_ERROR', { stage: 'set_password' });
+    if (error) throw new AppError('SERVER_ERROR', {}, { stage: 'set_password', auth: error.message });
     await appWrite('user_profiles', 'update', id, {
       must_change_password: true, sessions_revoked_at: new Date().toISOString(),
     }, actor, { action: 'PASSWORD_RESET' });

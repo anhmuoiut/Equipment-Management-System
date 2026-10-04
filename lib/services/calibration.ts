@@ -3,26 +3,27 @@ import 'server-only';
 /**
  * Module Calibration — bảng calibration_equipments, calibration_histories.
  * Phụ thuộc một chiều vào Equipment (đọc thông tin thiết bị); Equipment không
- * đọc bảng này. due_date do database tự tính (04_functions.sql).
+ * đọc bảng này. Dòng hiệu chuẩn do database tự thêm / bỏ theo Configuration ›
+ * Hiệu chuẩn › Setup; due_date do database tự tính (04_functions.sql mục 4).
  */
 import { appWrite, db, selectAll, selectOne } from './core/db';
 import { readHistory } from './core/history';
-import { assertActive, assertStatus, auditOf, loadLookups, nameOf, statusColorOf, type Lookups } from './core/lookups';
+import { assertActive, auditOf, loadLookups, nameOf, statusColorOf, type Lookups } from './core/lookups';
 import { AppError, mapRpcError } from '@/lib/errors';
-import type { CalibrationCandidate, CalibrationRow, DueState, HistoryEntry } from '@/lib/types';
+import type { CalibrationRow, DueState, HistoryEntry } from '@/lib/types';
 
 type DbCalibration = {
-  id: string; equipment_id: string; status_id: string | null; vendor_id: string | null;
+  id: string; equipment_id: string; vendor_id: string | null;
   calibration_date: string | null; due_date: string | null; remark: string | null;
   created_at: string; created_by: string | null; updated_at: string; updated_by: string | null;
 };
 type DbEquipmentRef = {
-  id: string; serial_number: string; part_number_id: string | null; type_id: string | null; location_id: string;
+  id: string; serial_number: string; part_number_id: string | null; type_id: string | null; location_id: string; status_id: string;
 };
 type DbInterval = { part_number_id: string; interval_months: number; warning_days: number };
 
 export type CalibrationInput = {
-  status_id?: string | null; vendor_id?: string | null; calibration_date?: string | null; remark?: string | null;
+  vendor_id?: string | null; calibration_date?: string | null; remark?: string | null;
 };
 
 /** Hôm nay theo giờ Việt Nam (yyyy-mm-dd). */
@@ -48,7 +49,8 @@ function toRow(c: DbCalibration, e: DbEquipmentRef | undefined, intervals: Map<s
     part_number: nameOf(lookups.part_numbers, e?.part_number_id),
     type: nameOf(lookups.types, e?.type_id),
     location: nameOf(lookups.locations, e?.location_id),
-    status_id: c.status_id, status: nameOf(lookups.statuses, c.status_id), status_color: statusColorOf(lookups, c.status_id),
+    // Trạng thái là của thiết bị — một nguồn, không giữ bản sao ở Calibration.
+    status_id: e?.status_id ?? null, status: nameOf(lookups.statuses, e?.status_id), status_color: statusColorOf(lookups, e?.status_id),
     vendor_id: c.vendor_id, vendor: nameOf(lookups.calibration_vendors, c.vendor_id),
     calibration_date: c.calibration_date,
     due_date: c.due_date,
@@ -60,89 +62,52 @@ function toRow(c: DbCalibration, e: DbEquipmentRef | undefined, intervals: Map<s
   };
 }
 
-async function context() {
-  const [equipment, intervals, lookups] = await Promise.all([
-    selectAll<DbEquipmentRef>('equipments', 'id, serial_number, part_number_id, type_id, location_id'),
+/** `lookups`: dữ liệu gốc đã (đang) tải ở chỗ gọi — dùng chung thay vì đọc lại. */
+async function context(lookups: Lookups | Promise<Lookups> = loadLookups()) {
+  const [equipment, intervals, resolved] = await Promise.all([
+    selectAll<DbEquipmentRef>('equipments', 'id, serial_number, part_number_id, type_id, location_id, status_id'),
     selectAll<DbInterval>('calibration_configurations', 'id, part_number_id, interval_months, warning_days'),
-    loadLookups(),
+    lookups,
   ]);
   return {
     equipment: new Map(equipment.map((e) => [e.id, e])),
     intervals: new Map(intervals.map((i) => [i.part_number_id, i])),
-    lookups,
-    equipmentList: equipment,
+    lookups: resolved,
   };
 }
 
-export async function listCalibration(): Promise<CalibrationRow[]> {
-  const [rows, ctx] = await Promise.all([selectAll<DbCalibration>('calibration_equipments'), context()]);
+export async function listCalibration(lookups?: Promise<Lookups>): Promise<CalibrationRow[]> {
+  const [rows, ctx] = await Promise.all([selectAll<DbCalibration>('calibration_equipments'), context(lookups)]);
   return rows.map((r) => toRow(r, ctx.equipment.get(r.equipment_id), ctx.intervals, ctx.lookups));
 }
 
 export async function getCalibration(id: string): Promise<CalibrationRow> {
-  const row = await selectOne<DbCalibration>('calibration_equipments', id);
+  const [row, ctx] = await Promise.all([selectOne<DbCalibration>('calibration_equipments', id), context()]);
   if (!row) throw new AppError('NOT_FOUND');
-  const ctx = await context();
   return toRow(row, ctx.equipment.get(row.equipment_id), ctx.intervals, ctx.lookups);
 }
 
-/** Extension point cho chi tiết thiết bị: dòng hiệu chuẩn của một thiết bị (hoặc null). */
+/** Extension point cho chi tiết thiết bị: dòng hiệu chuẩn của thiết bị, null = PN không có trong Setup hiệu chuẩn. */
 export async function getCalibrationByEquipment(equipmentId: string): Promise<CalibrationRow | null> {
-  const { data, error } = await db().from('calibration_equipments').select('*').eq('equipment_id', equipmentId).maybeSingle();
-  if (error) throw mapRpcError(error);
-  if (!data) return null;
-  const ctx = await context();
-  return toRow(data as DbCalibration, ctx.equipment.get(equipmentId), ctx.intervals, ctx.lookups);
-}
-
-/** Thiết bị có thể đưa vào Dashboard: chưa có trên Dashboard và part number có chu kỳ. */
-export async function listCandidates(): Promise<CalibrationCandidate[]> {
-  const [existing, ctx] = await Promise.all([
-    selectAll<{ equipment_id: string }>('calibration_equipments', 'id, equipment_id'),
+  const [{ data, error }, ctx] = await Promise.all([
+    db().from('calibration_equipments').select('*').eq('equipment_id', equipmentId).maybeSingle(),
     context(),
   ]);
-  const taken = new Set(existing.map((r) => r.equipment_id));
-  return ctx.equipmentList
-    .filter((e) => !taken.has(e.id) && e.part_number_id && ctx.intervals.has(e.part_number_id))
-    .map((e) => ({
-      id: e.id, serial_number: e.serial_number,
-      part_number: nameOf(ctx.lookups.part_numbers, e.part_number_id),
-      type: nameOf(ctx.lookups.types, e.type_id),
-      location: nameOf(ctx.lookups.locations, e.location_id),
-      interval_months: ctx.intervals.get(e.part_number_id!)!.interval_months,
-    }))
-    .sort((a, b) => a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true }));
-}
-
-export async function addCalibration(equipmentId: string, actor: string): Promise<CalibrationRow> {
-  const { data: existing, error } = await db().from('calibration_equipments').select('id').eq('equipment_id', equipmentId).maybeSingle();
   if (error) throw mapRpcError(error);
-  if (existing) throw new AppError('ALREADY_IN_CALIBRATION');
-  const equipment = await selectOne<DbEquipmentRef>('equipments', equipmentId, 'id');
-  if (!equipment) throw new AppError('EQUIPMENT_NOT_FOUND');
-  const created = await appWrite<DbCalibration>('calibration_equipments', 'insert', null, { equipment_id: equipmentId }, actor);
-  return getCalibration(created.id);
+  return data ? toRow(data as DbCalibration, ctx.equipment.get(equipmentId), ctx.intervals, ctx.lookups) : null;
 }
 
 function validate(input: CalibrationInput, lookups: Lookups, before: DbCalibration) {
   assertActive(lookups.calibration_vendors, input.vendor_id, 'vendor_id', before.vendor_id);
-  const statusId = input.status_id !== undefined ? input.status_id : before.status_id;
-  const remark = input.remark !== undefined ? input.remark : before.remark;
-  if (statusId !== before.status_id || input.remark !== undefined) assertStatus(lookups, statusId, 'calibration', remark);
 }
 
 /** Sửa thông tin nhập sai (UPDATE) hoặc ghi nhận lần hiệu chuẩn mới (đổi ngày → CALIBRATE). */
 export async function updateCalibration(id: string, input: CalibrationInput, actor: string): Promise<CalibrationRow> {
-  const before = await selectOne<DbCalibration>('calibration_equipments', id);
+  const [before, lookups] = await Promise.all([selectOne<DbCalibration>('calibration_equipments', id), loadLookups()]);
   if (!before) throw new AppError('NOT_FOUND');
-  validate(input, await loadLookups(), before);
+  validate(input, lookups, before);
   if (Object.keys(input).length) await appWrite('calibration_equipments', 'update', id, input, actor);
   return getCalibration(id);
-}
-
-/** Bỏ khỏi Dashboard — chỉ Admin. */
-export async function removeCalibration(id: string, actor: string): Promise<void> {
-  await appWrite('calibration_equipments', 'delete', id, null, actor);
 }
 
 export async function calibrationHistory(id: string, onlyCalibrations: boolean): Promise<HistoryEntry[]> {

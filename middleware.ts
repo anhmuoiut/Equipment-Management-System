@@ -4,12 +4,12 @@ import { LOCAL_SESSION_COOKIE, verifyLocalSession } from '@/lib/auth/localSessio
 
 /**
  * Middleware chỉ làm hai việc: refresh session cookie và redirect khi chưa
- * đăng nhập (mục 3a — middleware KHÔNG chứa logic phân quyền, logic đó nằm ở
- * withAuth để chỉ có một nơi duy nhất quyết định quyền).
+ * đăng nhập. Middleware KHÔNG chứa logic phân quyền — logic đó nằm ở withAuth
+ * để chỉ có một nơi duy nhất quyết định quyền.
  *
  * "Logged in" here also accepts a valid local-account session cookie
  * (auth_provider = 'local' accounts have no Supabase Auth session at all).
- * This only checks the cookie's signature and expiry — not is_active or
+ * This only checks the cookie's signature and expiry — not account_status or
  * whether the password has changed since (token_version) — the same way
  * this middleware never re-checked those for Supabase sessions either. The
  * authoritative check is always withAuth / the server layouts, on every

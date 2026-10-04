@@ -1,26 +1,32 @@
 'use client';
 
 /**
- * A single searchable dropdown used everywhere a native `<select>` used to
- * be — equipment filters, the equipment form's Location/dropdown fields,
- * the Location-change dialog, the field-type editor, the error log's
- * page-size picker. One component means one look, one keyboard behavior
- * and one search behavior across the whole app instead of each screen
- * growing its own slightly different `<select>`.
+ * The one searchable dropdown for choosing from a list — select fields in
+ * the Detail Panel, action screens (new location / parent / swap target,
+ * calibration status / vendor) and Account settings. One component means
+ * one look, one keyboard behavior and one search behavior everywhere.
  *
  * Renders as a button + a small listbox popover. The popover is portaled
  * to `document.body` and positioned from the trigger's own bounding box
  * (recomputed on scroll/resize while open) so it always escapes whatever
- * `overflow: hidden/auto` container it happens to open inside — most of
- * these are used inside a Modal's scrolling body.
+ * `overflow: hidden/auto` container it opens inside (the panel body, a modal).
+ *
+ * Phones: a bottom sheet with 48px rows instead — a popover under a small
+ * field gets covered by the keyboard. The search box shows only for long lists
+ * and is not focused automatically, so the keyboard doesn't open by itself.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, Search } from 'lucide-react';
+import { Modal } from '@/components/ui';
+import { usePhone } from '@/lib/client/usePhone';
 
 export type SelectOption = { value: string; label: string; disabled?: boolean };
+
+/** Phone sheet: show the search box only above this many options. */
+const SEARCH_FROM = 7;
 
 type Props = {
   value: string;
@@ -39,6 +45,7 @@ export function SearchableSelect({
   value, onChange, options, placeholder, ariaLabel, disabled, clearable, className, style,
 }: Props) {
   const { t } = useTranslation();
+  const phone = usePhone();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
@@ -80,8 +87,9 @@ export function SearchableSelect({
     setOpen(true);
   }
 
+  // Popover only (desktop): outside click, reposition, focus the search box. The phone sheet is a Modal.
   useEffect(() => {
-    if (!open) return;
+    if (!open || phone) return;
     function onDocDown(e: MouseEvent) {
       const target = e.target as Node;
       if (triggerRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
@@ -98,7 +106,7 @@ export function SearchableSelect({
       window.removeEventListener('resize', onReposition);
       cancelAnimationFrame(frame);
     };
-  }, [open]);
+  }, [open, phone]);
 
   useEffect(() => { setHighlight(0); }, [query]);
 
@@ -142,7 +150,36 @@ export function SearchableSelect({
         <ChevronDown size={14} aria-hidden="true" style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
       </button>
 
-      {open && rect && createPortal(
+      {open && phone && createPortal(
+        <Modal sheet title={ariaLabel ?? placeholder ?? ''} onClose={() => { setOpen(false); triggerRef.current?.focus(); }}>
+          {options.length > SEARCH_FROM && (
+            <label className="ss-search">
+              <Search size={16} aria-hidden="true" />
+              <input ref={inputRef} type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('common.searchPlaceholder')} aria-label={t('common.search')} />
+            </label>
+          )}
+          <div role="listbox" aria-label={ariaLabel} className="ss-options">
+            {clearable && (
+              <button type="button" role="option" aria-selected={value === ''} className="ss-option ss-option--clear" onClick={() => commit('')}>
+                {placeholder}
+              </button>
+            )}
+            {filtered.length === 0 ? (
+              <p className="ss-empty">{t('common.noOptionsFound')}</p>
+            ) : filtered.map((o) => (
+              <button key={o.value} type="button" role="option" aria-selected={o.value === value} disabled={o.disabled}
+                className="ss-option" onClick={() => commit(o.value)}>
+                <span>{o.label}</span>
+                {o.value === value && <Check size={16} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+        </Modal>,
+        document.body,
+      )}
+
+      {open && !phone && rect && createPortal(
         <div
           ref={popoverRef}
           // z-[100] must stay above every other fixed-position layer in the
@@ -152,8 +189,7 @@ export function SearchableSelect({
           style={{ ...rect, borderColor: 'var(--rule)', background: 'var(--panel)' }}
           // This popover is portaled to document.body, so any mousedown
           // inside it (search input, an option) would otherwise bubble past
-          // a parent popover that listens for outside clicks on `document`
-          // — e.g. the equipment Filters dropdown this renders inside of —
+          // a parent popover that listens for outside clicks on `document`,
           // closing that ancestor before the click/commit below ever fires
           // and silently dropping the selection.
           onMouseDown={(e) => e.stopPropagation()}

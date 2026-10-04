@@ -6,7 +6,7 @@ import 'server-only';
  */
 import { selectAll } from './db';
 import { AppError } from '@/lib/errors';
-import type { OptionItem, Options, StatusColor, StatusOption, StatusPage } from '@/lib/types';
+import type { OptionItem, Options, StatusColor, StatusOption } from '@/lib/types';
 
 type Named = { id: string; display_name: string; sort_order: number; is_active: boolean };
 
@@ -35,7 +35,7 @@ export async function loadLookups(): Promise<Lookups> {
     selectAll<Named>('levels', BASIC),
     selectAll<Named>('departments', BASIC),
     selectAll<Named>('calibration_vendors', BASIC),
-    selectAll<StatusOption>('statuses', 'id, display_name, sort_order, applies_to, requires_remark, color'),
+    selectAll<StatusOption>('statuses', 'id, display_name, sort_order, requires_remark, color'),
     selectAll<{ id: string; full_name: string }>('user_profiles', 'id, full_name'),
   ]);
   return {
@@ -94,15 +94,11 @@ export function assertActive(
   if (!row.is_active) throw new AppError('INACTIVE_OPTION', { fields: { [field]: 'inactive' } });
 }
 
-/** Trạng thái phải dành cho trang này; remark bắt buộc khi trạng thái yêu cầu. */
-export function assertStatus(
-  lookups: Lookups, statusId: string | null | undefined, page: StatusPage, remark: string | null | undefined,
-): void {
-  if (!statusId) return;
+/** Thiết bị / golden sample luôn có trạng thái (một danh sách chung); remark bắt buộc khi trạng thái yêu cầu. */
+export function assertStatus(lookups: Lookups, statusId: string | null | undefined, remark: string | null | undefined): void {
+  if (!statusId) throw new AppError('VALIDATION_ERROR', { fields: { status_id: 'required' } });
   const status = lookups.statuses.get(statusId);
-  if (!status || !status.applies_to.includes(page)) {
-    throw new AppError('STATUS_NOT_ALLOWED', { fields: { status_id: 'not_allowed' } });
-  }
+  if (!status) throw new AppError('VALIDATION_ERROR', { fields: { status_id: 'not_found' } });
   if (status.requires_remark && !remark?.trim()) {
     throw new AppError('REMARK_REQUIRED_FOR_STATUS', { fields: { remark: 'required' } });
   }

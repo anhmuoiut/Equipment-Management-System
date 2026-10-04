@@ -4,61 +4,44 @@
 
 Web app nội bộ quản lý Tester / Base / Fixture / Equipment, thay cách ghi chép bằng Excel.
 
-Triển khai theo **Spec v0.9**. Mọi quyết định kiến trúc trong code đều có chú thích trỏ về số mục trong spec — khi sửa code, sửa spec trước.
+Thiết kế nằm ngay trong repo: [docs/DATABASE_MODIFIED.md](docs/DATABASE_MODIFIED.md) (database), [docs/APP_SHELL.md](docs/APP_SHELL.md), [docs/DETAIL_MODEL.md](docs/DETAIL_MODEL.md) và [docs/JABIL_UI.md](docs/JABIL_UI.md) (giao diện). Đổi thiết kế thì sửa tài liệu trong `docs/` cùng lúc với code.
 
-**Quy mô mục tiêu (mục 1a):** pilot 10–20 người, 1.000–2.000 thiết bị, Excel vẫn chạy song song.
+**Quy mô mục tiêu:** pilot 10–20 người, 1.000–2.000 thiết bị, Excel vẫn chạy song song.
 
 ---
 
 ## Tình trạng hiện tại
 
-| Phase | Nội dung | Trạng thái |
-|---|---|---|
-| 0 | Scaffold, config, portability (`output: standalone`) | ✅ Xong |
-| 1 | Toàn bộ bảng, index, trigger, RLS lockdown, RPC + grants, seed | ✅ Xong, **59/59 test pass** |
-| 2 | `withAuth`, session, User Management API | ✅ API xong |
-| 3 | Field Config, Preset, Location Config API | ✅ API xong |
-| 4 | Form engine sinh từ `field_definitions` | ✅ Xong |
-| 5 | Dashboard: search/filter/sort/pagination server-side | ✅ Xong |
-| 6 | Chuỗi phân cấp, drawer chi tiết, thao tác cấu trúc | ✅ Xong |
-| 7 | (RPC — đã xong ở Phase 1) | ✅ Xong |
-| 8 | Lịch sử thay đổi | ✅ Xong |
-| 8b | **Giao diện Quản trị** (users, preset, location, field, lỗi) | ✅ Xong |
-| 9 | Migration script từ Excel + reconcile.sql | ⬜ Chưa làm |
-| 10 | Backup workflow + keepalive | ✅ Xong |
+Database và giao diện đã xong:
 
-Backend, database và giao diện vận hành chính đã hoàn chỉnh: `tsc --noEmit` 0 lỗi, `next build` sạch, 27 route + 2 trang.
-Còn lại: giao diện Quản trị (API đã sẵn, gọi bằng curl được) và script nhập liệu từ Excel.
+| Phần | Nội dung |
+|---|---|
+| Khung ứng dụng | Top bar, sidebar 6 mục, EN / VI, sáng / tối, chuông thông báo — [docs/APP_SHELL.md](docs/APP_SHELL.md) |
+| Dashboard | Số liệu tổng, trạng thái theo màu, quá hạn / sắp đến hạn hiệu chuẩn, phân bố theo vị trí / loại, thay đổi gần đây |
+| Equipment | Masterlist + Detail Panel, cây thiết bị, Đổi vị trí / Đổi cha / Swap / Tách khỏi cha / Xóa (con đi theo hoặc ở lại), Import Excel, nhãn QR in được |
+| Calibration | Dashboard hiệu chuẩn tự đồng bộ theo Setup (part number), ghi nhận hiệu chuẩn, hạn tự tính theo chu kỳ |
+| Golden | Masterlist + Detail Panel |
+| Configuration | 8 danh sách (Dữ liệu gốc; Hiệu chuẩn: Setup, Vendor) + Error log (chỉ Admin) |
+| User Management | Duyệt / từ chối tài khoản tự đăng ký, tạo tài khoản, khóa, đặt lại mật khẩu (chỉ Admin) |
+
+Mọi module dùng chung Masterlist + Detail Panel theo [docs/DETAIL_MODEL.md](docs/DETAIL_MODEL.md). Chưa làm: module Repair.
 
 ---
 
-## Run on macOS
+## Chạy trên máy
 
-Use Node.js 24.9 or newer. From the outer `Inventory Managerment` folder,
-double-click `Start-App.command`, keep its Terminal window open, and open the
-Local URL shown when Next.js reports Ready (normally http://127.0.0.1:3000).
-Press Control+C in Terminal to stop. `Start-App.cmd` is the Windows launcher.
-
-To start manually from this folder:
+Dùng Node.js 24.9 trở lên.
 
 ```bash
 npm ci
 npm run dev -- --hostname 127.0.0.1
 ```
 
-Keep your existing `.env.local` to use the same Supabase project and accounts.
-Changing computers does not require rerunning database migrations or seeding
-the admin account. For a new configuration, copy `.env.example` to `.env.local`
-and fill in the Supabase values before starting.
+Mở địa chỉ Local mà Next.js in ra khi báo Ready (thường là http://127.0.0.1:3000).
 
-Do not reuse `node_modules` or `.next` from Windows: they contain platform-specific
-dependencies and generated output. Install dependencies separately on each OS
-with `npm ci` and let Next.js rebuild its cache. The original Windows dependencies
-and caches from the Mac setup are preserved in the outer `.runtime-backups` folder.
-
-For OneDrive, mark the source folder as **Always Keep on This Device** before
-running it. Prefer a separate working copy outside OneDrive on each computer so
-Windows and macOS do not overwrite each other's `node_modules` and `.next`.
+- Giữ `.env.local` cũ là dùng lại đúng Supabase project và tài khoản — đổi máy không cần chạy lại SQL hay tạo lại admin.
+- Không chép `node_modules` hoặc `.next` giữa Windows và macOS (chứa thư viện / file build theo hệ điều hành) — mỗi máy tự `npm ci`.
+- Không chạy `npm run build` trong lúc `npm run dev` đang chạy: hai lệnh dùng chung thư mục `.next` và làm hỏng nhau. Lỡ chạy thì tắt dev server, xóa `.next`, chạy lại `npm run dev`.
 
 ## Chạy lần đầu
 
@@ -67,7 +50,7 @@ npm install
 cp .env.example .env.local     # điền giá trị từ Supabase → Settings → API
 ```
 
-Điền thêm `LOCAL_AUTH_SECRET` — một chuỗi ngẫu nhiên bất kỳ, ít nhất 32 ký tự, giữ bí mật như `SUPABASE_SERVICE_ROLE_KEY`. Dùng để ký session cho tài khoản **Local** (mục "Tài khoản Local" bên dưới). Sinh nhanh bằng:
+Điền thêm `LOCAL_AUTH_SECRET` — một chuỗi ngẫu nhiên bất kỳ, ít nhất 32 ký tự, giữ bí mật như `SUPABASE_SERVICE_ROLE_KEY`. Dùng để ký phiên đăng nhập của tài khoản **local** (xem [Tài khoản](#tài-khoản)). Sinh nhanh bằng:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
@@ -75,16 +58,14 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 ### 1. Database
 
-Database v2 được dựng lại từ đầu theo [docs/DATABASE_MODIFIED.md](docs/DATABASE_MODIFIED.md). Chạy lần lượt trên Supabase SQL Editor (**dev project trước**) — chi tiết ở [database/README.md](database/README.md):
+Chạy lần lượt trên Supabase SQL Editor (**dev project trước**) — chi tiết và cách kiểm tra kết quả ở [database/README.md](database/README.md):
 
 ```
 database/01_reset_blank.sql   ← XÓA SẠCH schema public (mọi bảng + dữ liệu)
-database/02_schema.sql        ← tạo 19 bảng + 1 view
+database/02_schema.sql        ← tạo 20 bảng + 1 view
 database/03_seed_sample.sql   ← tùy chọn: dữ liệu mẫu Configuration
-database/04_functions.sql     ← nghiệp vụ: lịch sử tự động, Move / Swap, tự tính hạn hiệu chuẩn
+database/04_functions.sql     ← nghiệp vụ: lịch sử tự động, Move / Swap, Import, tự tính hạn hiệu chuẩn
 ```
-
-Giao diện: khung ứng dụng theo [docs/APP_SHELL.md](docs/APP_SHELL.md); mọi module dùng chung Masterlist + Detail Panel theo [docs/DETAIL_MODEL.md](docs/DETAIL_MODEL.md).
 
 ### 2. Admin đầu tiên
 
@@ -94,7 +75,7 @@ npm run seed:admin -- admin@congty.com "Nguyen Van A" ten.dang.nhap
 
 Hoặc tự đăng ký trên trang đăng nhập rồi nâng quyền bằng SQL — xem [database/README.md](database/README.md#tạo-admin-đầu-tiên).
 
-Bắt buộc. `POST /api/admin/users` yêu cầu role admin, mà chưa có admin nào tồn tại — vòng lặp chicken-and-egg (mục 55.2).
+Bắt buộc: duyệt và tạo tài khoản ở User Management cần quyền Admin, mà lúc đầu chưa có admin nào.
 
 ### 3. Chạy
 
@@ -105,13 +86,14 @@ curl localhost:3000/api/health
 
 ---
 
-## Test
+## Kiểm tra
 
 ```bash
-npm test
+npm run lint
+npm run typecheck
+npm test          # vitest: service, auth, API client + smoke test từng module (jsdom) — không cần database
+npm run build
 ```
-
-Bộ test SQL của database cũ đã bị xóa cùng schema cũ; test cho database v2 viết lại khi code `04_functions.sql`.
 
 ---
 
@@ -122,10 +104,10 @@ Bộ test SQL của database cũ đã bị xóa cùng schema cũ; test cho datab
 ### 1. Không route nào export handler trần
 
 ```ts
-export const POST = withAuth(handler, { role: ['admin','user'], action: 'move' });
+export const POST = withAuth(handler, { role: EDITORS });
 ```
 
-`service_role` bypass RLS hoàn toàn, nên RLS **không** bảo vệ được rủi ro "quên check quyền trong một route". `withAuth` là lớp bảo vệ thật (mục 3c). Kiểm tra:
+`service_role` bypass RLS hoàn toàn, nên RLS **không** bảo vệ được rủi ro "quên check quyền trong một route". `withAuth` là lớp bảo vệ thật. Kiểm tra:
 
 ```bash
 grep -rLn "withAuth" app/api --include=route.ts     # phải rỗng
@@ -133,18 +115,15 @@ grep -rLn "withAuth" app/api --include=route.ts     # phải rỗng
 
 ### 2. `service_role` key chỉ đọc ở đúng một file
 
-`lib/supabase/admin.ts`. Ba lớp chặn, đều đã được kiểm chứng là hoạt động:
-`import 'server-only'` (build fail nếu lọt vào client bundle) → ESLint `no-restricted-imports` → không có tiền tố `NEXT_PUBLIC_`.
+`lib/supabase/admin.ts`. Ba lớp chặn: `import 'server-only'` (build fail nếu lọt vào client bundle) → ESLint `no-restricted-imports` → không có tiền tố `NEXT_PUBLIC_`.
 
-### 3. Mọi RPC phải có `revoke` + `grant`
+### 3. Mọi function trong database phải có `revoke` + `grant`
 
-PostgreSQL mặc định `GRANT EXECUTE` cho `PUBLIC`. Không có khối grant ở cuối `004_functions.sql`, bất kỳ ai có anon key (nằm công khai trong bundle frontend) đều gọi được `archive_equipment` và bypass toàn bộ tầng permission.
-
-Đã kiểm chứng: anon và authenticated bị chặn 10/10 trên cả bảng lẫn function.
+PostgreSQL mặc định `GRANT EXECUTE` cho `PUBLIC`. Không có khối `revoke` / `grant` ở cuối `database/02_schema.sql` và `database/04_functions.sql`, bất kỳ ai có anon key (nằm công khai trong bundle frontend) đều gọi được `app_write` / `equipment_*` và bypass toàn bộ tầng phân quyền.
 
 ### 4. Không dùng API riêng của Vercel
 
-Nguyên tắc portability (mục 3a). Không `Vercel KV / Blob / Postgres / Cron`, không Edge Runtime cho business logic. Cron đặt ở GitHub Actions.
+Nguyên tắc portability. Không `Vercel KV / Blob / Postgres / Cron`, không Edge Runtime cho business logic. Cron đặt ở GitHub Actions.
 
 Tuân thủ đúng thì rời Vercel = viết một Dockerfile + đổi env ≈ 1 ngày công. Vi phạm thì con số đó thành vài tuần. `output: 'standalone'` đã bật sẵn.
 
@@ -152,11 +131,11 @@ Tuân thủ đúng thì rời Vercel = viết một Dockerfile + đổi env ≈ 
 
 ## Ba điều dễ hiểu nhầm trong code
 
-**Descendants không bump version khi Move/Change Location.** Có chủ đích (mục 23). Location của child đã là read-only nên không có kịch bản save đè; bump chỉ tạo `OPTIMISTIC_CONFLICT` giả khiến user mất nội dung đang gõ. Vẫn cascade location và vẫn ghi `MOVE_CASCADE` để audit.
+**Lịch sử do database ghi, không phải server.** Trigger `write_history` ghi vào `<module>_histories` trong cùng giao dịch với thay đổi. Server chỉ ghi qua `app_write` / các RPC `equipment_*` (kèm người thao tác, hành động, ghi chú) — đừng tự insert dòng lịch sử.
 
-**PUT không nhận `current_location_id` và `parent_id`.** Đổi location của root là thao tác cascade multi-row, không phải Edit thường — nó có endpoint riêng `/change-location` (mục 21a). Parent chỉ đổi qua move/detach/swap. Chặn ở 3 tầng: validator, whitelist trong RPC, và không có trong `field_definitions`.
+**Đổi cha / vị trí thiết bị luôn đi qua RPC `equipment_*`.** Cả cây con phải đi theo (hoặc ở lại chỗ cũ — tham số `p_children`) trong một giao dịch, nên `PUT /api/equipment/{id}` nhận `parent_id` / `location_id` nhưng chuyển sang các RPC này thay vì ghi thẳng. Thiết bị có cha thì vị trí theo cha (`LOCATION_INHERITED_READ_ONLY`).
 
-**Swap không có RPC riêng.** Swap = 2 lần `internal_move` trong cùng transaction (mục 24). Bug fix trong logic cascade chỉ phải sửa một chỗ.
+**Lỗi trả về theo mã, chữ hiển thị nằm ở client.** API trả `{ code, message, details, request_id }`; `errorMessage()` (`lib/client/api.ts`) đổi `code` thành câu theo ngôn ngữ đang chọn (`src/i18n/locales/*.json` › `errors`). Thêm mã lỗi mới ở `lib/errors` thì thêm cả câu EN / VI — `lib/client/api.test.ts` báo thiếu.
 
 ---
 
@@ -166,88 +145,56 @@ Tuân thủ đúng thì rời Vercel = viết một Dockerfile + đổi env ≈ 
 |---|---|
 | Backup | `.github/workflows/backup.yml` — cần secret `SUPABASE_DB_URL` |
 | Chống Supabase pause | `.github/workflows/keepalive.yml` — cần variable `APP_URL` |
-| Tra lỗi user báo lại | `GET /api/admin/errors`, tìm theo `request_id` |
-| Lấy dữ liệu ra (rollback) | `npx tsx scripts/export-to-csv.ts` |
-| Quy trình sự cố | `RUNBOOK.md` |
+| Tra lỗi user báo lại | Configuration → Hệ thống → Error log, tìm theo `request_id` |
+| Lấy dữ liệu ra | **Xuất Excel** trên Masterlist từng module; bản sao lưu hằng ngày (RUNBOOK mục 7) |
+| Quy trình sự cố | [RUNBOOK.md](RUNBOOK.md) |
 
-Log Vercel Hobby chỉ giữ ~1 giờ, nên `error_log` trong DB mới là nơi điều tra lỗi cũ (mục 47d).
+Log Vercel Hobby chỉ giữ ~1 giờ, nên `error_log` trong DB mới là nơi điều tra lỗi cũ. Lỗi 4xx không vào `error_log` — câu báo trên màn hình đã nói lý do; khi chạy `npm run dev`, terminal in thêm mã và lý do.
 
-**Backup chưa restore thử là backup chưa tồn tại.** Phải test restore ít nhất 1 lần trước khi cho user vào (mục 55.8).
+**Backup chưa restore thử là backup chưa tồn tại.** Phải test restore ít nhất 1 lần trước khi cho user vào (RUNBOOK mục 7).
 
 ---
 
 ## Giao diện
 
-| Màn hình | Đường dẫn |
-|---|---|
-| Đăng nhập | `/login` |
-| Danh sách thiết bị + drawer chi tiết | `/` |
+| Màn hình | Đường dẫn | Ai vào được |
+|---|---|---|
+| Đăng nhập / đăng ký | `/login` | Mọi người |
+| Đổi mật khẩu bắt buộc | `/change-password` | Tài khoản có mật khẩu do admin đặt |
+| Dashboard | `/` | Mọi nhóm |
+| Equipment | `/equipment`, `/equipment/{id}`, nhãn QR `/equipment/{id}/label` | Mọi nhóm |
+| Calibration | `/calibration`, `/calibration/{id}` | Mọi nhóm |
+| Golden | `/golden`, `/golden/{id}` | Mọi nhóm |
+| Configuration | `/configuration/{danh sách}`, `/configuration/error-log` | Admin |
+| User Management | `/users`, `/users/{id}` | Admin |
 
-Hướng thiết kế lấy từ vernacular xưởng máy: nền xám ngả lục, màu chính là sơn men máy công cụ `#0E5245`, chữ IBM Plex Sans + Plex Mono. Mono **chỉ** dùng cho định danh (serial, part, asset) với tabular figures — trên sàn xưởng `1089` và `l089` là hai thứ khác nhau.
-
-Bảng dữ liệu dày, không card bo góc, không shadow. Điểm nhấn duy nhất là chuỗi phân cấp dạng dây xích trong tab Phân cấp.
-
-Phím tắt: `/` nhảy vào ô tìm kiếm.
+Màu, font, kích thước, sáng / tối và điện thoại theo [docs/JABIL_UI.md](docs/JABIL_UI.md). Khi đang mở chi tiết: ↑ ↓ (hoặc K / J) chuyển bản ghi theo thứ tự danh sách đang hiện, `?id=` trên đường dẫn mở lại đúng bản ghi, nút ⤢ mở chi tiết toàn trang.
 
 ---
 
 ## Việc còn lại trước khi mở pilot
 
-1. Giao diện Quản trị — API đã xong, chỉ thiếu màn hình
-2. Migration script từ Excel + `reconcile.sql` (mục 46, 55.4)
-3. Điền `help_text` cho **mọi** field — cột đã có trong schema, đừng để trống (mục 55.5)
-4. Chạy hết checklist mục 55.8
+1. Khôi phục thử bản sao lưu vào project dev (RUNBOOK mục 7).
+2. Nhập dữ liệu Excel đang dùng bằng **Equipment → Import Excel** (file mẫu tải trên giao diện).
+3. Module Repair (Sửa chữa) — chưa thiết kế; [docs/DATABASE_MODIFIED.md](docs/DATABASE_MODIFIED.md) ghi là làm sau.
 
-## UI and username login (2026-09-18)
+---
 
-Login and the equipment list support EN/VIE and persistent light/dark theme.
-The navy/blue design follows the supplied Jabil reference with softly rounded borders.
-Username is stored independently in user_profiles.
-The existing admin signs in as academy.mantranqp2507 with the unchanged password.
-Email resolution stays on the server. Inactive accounts are denied.
-The bounded per-instance attempt guard supplements Supabase Auth limits;
-it is not a deployment-wide shared rate limiter.
+## Tài khoản
 
-## Local accounts (self-service signup)
+Đăng nhập bằng **username** (chữ thường không dấu, số và `. _ + -`), không bằng email. Có hai loại tài khoản (`user_profiles.auth_provider`):
 
-Every account used to be a real Supabase Auth account (`auth_provider =
-'supabase'`), created by an admin. Migration 006 adds a second kind,
-`auth_provider = 'local'`: username + password chosen by the user themself
-on the login page ("Request an account"), stored and verified by the app
-directly (`lib/auth/password.ts`, scrypt — no auth.users row at all) with
-its own signed session cookie (`lib/auth/localSession.ts`) instead of a
-Supabase session. Admin accounts should still be created the normal way
-(Quản trị → Người dùng → New user) and keep using Supabase Auth.
+- **local** — người dùng tự đăng ký ở trang đăng nhập (**Đăng ký**), hoặc Admin tạo ở User Management. Mật khẩu do app lưu và kiểm tra (`lib/auth/password.ts`, scrypt — không có dòng nào trong `auth.users`), phiên đăng nhập là cookie do app ký (`lib/auth/localSession.ts`).
+- **supabase** — admin đầu tiên tạo bằng `npm run seed:admin`. Email chỉ dùng ở server để đăng nhập qua Supabase Auth.
 
-A submitted request lands with `is_active = false` and every action
-permission off — it cannot sign in until an admin reactivates it from the
-Users screen (same button used to un-deactivate anyone else; there's no
-separate approval queue). The Users table's **Account** column shows
-"Supabase", "Local" or "Local · pending" so it's obvious which is which.
+Tài khoản tự đăng ký vào ở trạng thái **chờ duyệt** (`pending`), chưa đăng nhập được; mọi Admin nhận thông báo. Admin **Duyệt** (chọn nhóm quyền) hoặc **Từ chối** ở User Management (lọc nhanh "Chờ duyệt").
 
-Requires `LOCAL_AUTH_SECRET` in `.env.local` (see above). Changing that
-value signs every local-account session out at once — treat it like
-`SUPABASE_SERVICE_ROLE_KEY`, not like a config toggle.
+Nhóm quyền ([lib/permissions/index.ts](lib/permissions/index.ts)): **Admin** — mọi thứ; **User** — xem, thêm, sửa, không xóa, không vào Configuration / User Management; **Readonly** — xem, tìm kiếm, xuất Excel. API kiểm tra lại quyền ở mọi request (`withAuth`), không dựa vào việc ẩn nút.
 
-**Known gaps, not built yet:** no self-service "forgot password" for local
-accounts (an admin resets it from the Users screen, same as any account);
-no email collected or verified for local accounts by design.
-
-## Admin hardening
-
-Notes from the previous version (to be rewritten for database v2):
-
-- Creating a user, changing role/permissions, activating/deactivating and
-  deleting a custom field each run as one database transaction (RPC), with
-  old → new values in the audit log. Admin → **Audit log** shows them.
-- An admin can't deactivate or demote themselves or reset their own
-  password from the Users screen, and the last active admin can't be
-  removed (`LAST_ADMIN`).
-- Roles are Administrator / User / Viewer. Self-requested (Local) accounts
-  arrive as Viewer: **Reactivate** approves them, switching the role to User
-  lets them do more than view.
-- A password set by an admin (new account or reset) must be replaced at the
-  next sign-in (`/change-password`); a reset also signs the account out
-  everywhere. The first admin created by `seed-first-admin.ts` goes through
-  the same screen.
-- The unused `user.manage` permission is removed; `error_log` keeps 90 days.
+- Mật khẩu do admin đặt (tài khoản mới, đặt lại mật khẩu) phải đổi ở lần đăng nhập tới (`/change-password`); đặt lại mật khẩu còn đăng xuất mọi phiên cũ của người đó.
+- Admin không tự đổi nhóm quyền, tự khóa hay tự đặt lại mật khẩu của mình ở User Management (`CANNOT_MODIFY_SELF`), và luôn phải còn ít nhất một Admin đang hoạt động (`LAST_ADMIN`).
+- Tài khoản không bao giờ bị xóa, chỉ khóa — còn được tham chiếu trong lịch sử.
+- Mỗi lần thêm / sửa / xóa ghi lịch sử cũ → mới: tab **Lịch sử** của từng bản ghi và **Thay đổi gần đây** trên Dashboard.
+- Có giới hạn số lần đăng nhập sai trên mỗi instance (bổ sung cho giới hạn của Supabase Auth), không phải rate limit dùng chung toàn hệ thống.
+- Đổi `LOCAL_AUTH_SECRET` sẽ đăng xuất toàn bộ tài khoản local cùng lúc — coi nó như `SUPABASE_SERVICE_ROLE_KEY`, không phải một tùy chọn cấu hình.
+- Chưa có "quên mật khẩu" tự phục vụ: Admin đặt lại mật khẩu ở User Management (RUNBOOK mục 1). Hệ thống không gửi email.

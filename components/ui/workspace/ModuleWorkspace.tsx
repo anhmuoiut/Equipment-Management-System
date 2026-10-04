@@ -10,11 +10,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
+import { Plus } from 'lucide-react';
+import { useFetch } from '@/lib/client/useFetch';
 import { PageHeading } from '@/components/layout/PageHeading';
 import { Masterlist, type Column, type QuickFilter } from '@/components/ui/masterlist/Masterlist';
-import { Button } from '@/components/ui';
 
 export type ListState<R> = {
   rows: R[];
@@ -25,27 +24,19 @@ export type ListState<R> = {
   remove: (id: string) => void;
 };
 
-/** Tải danh sách của module một lần; sửa / thêm / xóa cập nhật tại chỗ. */
+/** Mảng rỗng cố định: `rows` phải giữ nguyên identity khi chưa có dữ liệu (Masterlist memo theo nó). */
+const NO_ROWS: never[] = [];
+
+/** Tải danh sách của module một lần; sửa / thêm / xóa cập nhật tại chỗ, tải lại giữ dòng cũ. */
 export function useList<R extends { id: string }>(url: string): ListState<R> {
-  const { i18n } = useTranslation();
-  const [rows, setRows] = useState<R[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ApiError | null>(null);
-  const reload = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    api.get<R[]>(url)
-      .then((r) => setRows(r.data))
-      .catch((e) => { if (e instanceof ApiError) setError(e); })
-      .finally(() => setLoading(false));
-  }, [url]);
-  useEffect(() => { reload(); }, [reload]);
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
+  const { data, setData, loading, error, reload } = useFetch<R[]>(url);
   return {
-    rows, loading, reload,
-    error: error ? translateError(error.code, language, error.message) : null,
-    upsert: (row) => setRows((list) => (list.some((r) => r.id === row.id) ? list.map((r) => (r.id === row.id ? row : r)) : [row, ...list])),
-    remove: (id) => setRows((list) => list.filter((r) => r.id !== id)),
+    rows: data ?? NO_ROWS, loading, error, reload,
+    upsert: (row) => setData((list) => {
+      const rows = list ?? [];
+      return rows.some((r) => r.id === row.id) ? rows.map((r) => (r.id === row.id ? row : r)) : [row, ...rows];
+    }),
+    remove: (id) => setData((list) => (list ?? []).filter((r) => r.id !== id)),
   };
 }
 
@@ -54,6 +45,8 @@ export type DetailCtx<R> = {
   creating: boolean;
   loading: boolean;
   error: string | null;
+  /** Thử tải lại bản ghi khi `error` (trang chi tiết riêng). */
+  onRetry?: () => void;
   nav: { onPrev?: () => void; onNext?: () => void };
   onClose: () => void;
   onExpand?: () => void;
@@ -83,11 +76,13 @@ export type WorkspaceTool = {
 
 export function ModuleWorkspace<R extends { id: string }>({
   title, list, columns, storageKey, exportName, quickFilters, leading, rowTone, canAdd, addLabel,
-  toolbarExtra, tools, renderDetail, detailPath, beforeList,
+  tools, renderDetail, detailPath, beforeList, mobileCard,
 }: {
   title: string;
   list: ListState<R>;
   columns: Column<R>[];
+  /** Thẻ dòng trên điện thoại (RowCard); mặc định dựng từ các cột. */
+  mobileCard?: (row: R) => ReactNode;
   storageKey: string;
   exportName: string;
   quickFilters?: QuickFilter<R>[];
@@ -95,8 +90,7 @@ export function ModuleWorkspace<R extends { id: string }>({
   rowTone?: (row: R) => 'alert' | 'warn' | undefined;
   canAdd: boolean;
   addLabel?: string;
-  toolbarExtra?: ReactNode;
-  /** Nút công cụ đứng sau Xuất Excel, trước + Thêm. */
+  /** Nút công cụ đứng sau Xuất Excel, trước + Thêm (điện thoại: mục trong menu ⋮). */
   tools?: WorkspaceTool[];
   renderDetail: (ctx: DetailCtx<R>) => ReactNode;
   /** Trang chi tiết toàn trang (nút ⤢). */
@@ -185,28 +179,28 @@ export function ModuleWorkspace<R extends { id: string }>({
   const notFound = !!selectedId && !list.loading && !row && !list.error;
 
   return (
-    <div className="ws" data-open={open || undefined}>
+    <div className="ws" data-open={open || undefined} data-add={canAdd || undefined}>
       <PageHeading title={title} subtitle={list.loading ? undefined : t('ml.count', { count: viewIds.length, total: list.rows.length })} />
       {beforeList}
+      {/* Điện thoại: một nút + nổi cho mọi module (CSS ẩn nó trên desktop, nơi có nút + Thêm trên thanh công cụ). */}
+      {canAdd && !open && (
+        <button type="button" className="ws-add-fab" aria-label={addLabel ?? t('ml.add')}
+          title={addLabel ?? t('ml.add')} onClick={() => create()}>
+          <Plus size={26} aria-hidden="true" />
+        </button>
+      )}
       <div className="ws-main">
         <div className="ws-list">
           <Masterlist
             title={title} rows={list.rows} loading={list.loading} error={list.error} onRetry={list.reload}
-            columns={columns} storageKey={storageKey} exportName={exportName} quickFilters={quickFilters}
+            columns={columns} mobileCard={mobileCard} storageKey={storageKey} exportName={exportName} quickFilters={quickFilters}
             leading={leading} rowTone={rowTone} selectedId={selectedId} onSelect={select}
             onAdd={canAdd ? () => create() : undefined}
             addLabel={addLabel} onViewChange={setViewIds}
-            toolbarExtra={tools?.length ? (
-              <>
-                {tools.map((x) => (
-                  <Button key={x.key} size="sm" aria-pressed={toolKey === x.key} data-active={toolKey === x.key}
-                    onClick={() => guarded(() => { setSelectedId(null); setCreating(false); setToolKey(x.key); })}>
-                    {x.icon}{x.label}
-                  </Button>
-                ))}
-                {toolbarExtra}
-              </>
-            ) : toolbarExtra}
+            tools={tools?.map((x) => ({
+              key: x.key, label: x.label, icon: x.icon, active: toolKey === x.key,
+              onClick: () => guarded(() => { setSelectedId(null); setCreating(false); setToolKey(x.key); }),
+            }))}
           />
         </div>
         {open && <div className="ws-scrim" aria-hidden="true" />}
@@ -216,7 +210,9 @@ export function ModuleWorkspace<R extends { id: string }>({
               row: creating ? null : row,
               creating,
               loading: list.loading && !row,
-              error: notFound ? t('dp.notFound') : null,
+              // Danh sách tải lỗi → panel báo cùng lỗi (không kẹt ở khung đang tải).
+              error: !row && list.error ? list.error : notFound ? t('dp.notFound') : null,
+              onRetry: list.reload,
               nav,
               onClose: close,
               onExpand: detailPath && selectedId ? () => router.push(detailPath(selectedId)) : undefined,

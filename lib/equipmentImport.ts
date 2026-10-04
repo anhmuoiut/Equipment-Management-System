@@ -1,6 +1,7 @@
 /**
  * Import Excel cho Equipment — phần dùng chung server (đọc / kiểm tra file,
  * sinh file mẫu) và giao diện (báo lỗi theo cột). docs/DETAIL_MODEL.md mục 2.
+ * Golden dùng lại giới hạn, báo cáo và loại lỗi (lib/goldenImport.ts).
  */
 
 export const IMPORT_MAX_ROWS = 1000;
@@ -13,8 +14,8 @@ export type ImportColumnKey =
 /** Danh sách Configuration mà cột chọn từ đó. */
 export type ImportListKey = 'part_numbers' | 'types' | 'levels' | 'statuses' | 'locations';
 
-export type ImportColumn = {
-  key: ImportColumnKey;
+export type ImportColumn<K extends string = ImportColumnKey> = {
+  key: K;
   /** Tiêu đề cột trong file. Đổi chữ này thì file đã tải trước đó không nhận ra cột. */
   header: string;
   required?: boolean;
@@ -41,7 +42,7 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
   { key: 'asset', header: 'Asset', max: 200, width: 16 },
   { key: 'type_id', header: 'Type', list: 'types', page: 'Type', width: 18 },
   { key: 'level_id', header: 'Level', list: 'levels', page: 'Level', width: 16 },
-  { key: 'status_id', header: 'Status', list: 'statuses', page: 'Status', width: 20 },
+  { key: 'status_id', header: 'Status', required: true, list: 'statuses', page: 'Status', width: 20 },
   { key: 'location_id', header: 'Location', requiredUnlessParent: true, list: 'locations', page: 'Location', width: 20 },
   { key: 'parent_serial', header: 'Parent serial number', max: 200, width: 24 },
   { key: 'parent_part_number', header: 'Parent part number', list: 'part_numbers', page: 'Part Number', width: 22 },
@@ -49,14 +50,14 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
 ];
 
 export type ImportIssueCode =
-  | 'required' | 'too_long' | 'not_found' | 'inactive' | 'status_not_allowed' | 'remark_required'
+  | 'required' | 'too_long' | 'not_found' | 'inactive' | 'remark_required'
   | 'parent_not_found' | 'parent_ambiguous' | 'parent_cycle' | 'location_follows_parent';
 
 /**
  * Lỗi của một ô. `value`: chữ trong ô (remark_required: tên trạng thái;
  * location_follows_parent: vị trí của thiết bị cha). `count`: parent_ambiguous.
  */
-export type ImportIssue = { column: ImportColumnKey; code: ImportIssueCode; value?: string; max?: number; count?: number };
+export type ImportIssue = { column: string; code: ImportIssueCode; value?: string; max?: number; count?: number };
 
 export type ImportRowReport = {
   /** Số dòng trong Excel. */

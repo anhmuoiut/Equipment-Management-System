@@ -45,7 +45,7 @@ export async function changeOwnPassword(userId: string, currentPassword: string,
     await setLocalSessionCookie(userId, nextTokenVersion);
   } else {
     const { error: updErr } = await db().auth.admin.updateUserById(userId, { password: newPassword });
-    if (updErr) throw new AppError('SERVER_ERROR', { stage: 'set_password' });
+    if (updErr) throw new AppError('SERVER_ERROR', {}, { stage: 'set_password', auth: updErr.message });
     const { error: flagErr } = await db().from('user_profiles').update({ must_change_password: false }).eq('id', userId);
     if (flagErr) throw mapRpcError(flagErr);
   }

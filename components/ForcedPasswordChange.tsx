@@ -8,20 +8,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Eye, EyeOff, LockKeyhole, LogOut } from 'lucide-react';
-import { api, ApiError } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
+import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, LogOut } from 'lucide-react';
+import { api, errorMessage } from '@/lib/client/api';
 import { PreferenceControls } from '@/components/Preferences';
 import '@/app/login/login.css';
 
 export function ForcedPasswordChange({ username }: { username: string }) {
   const router = useRouter();
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
+  const { t } = useTranslation();
   const [form, setForm] = useState({ current: '', next: '', confirm: '' });
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'save' | 'signout' | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,21 +27,30 @@ export function ForcedPasswordChange({ username }: { username: string }) {
     if (form.next !== form.confirm) { setError(t('adminUsers.errorPasswordMismatch')); return; }
     if (form.next.length < 10) { setError(t('adminUsers.errorPasswordTooShort')); return; }
     if (form.next === form.current) { setError(t('forcedPassword.errorSameAsCurrent')); return; }
-    setBusy(true);
+    setBusy('save');
     try {
       await api.put('/api/me/password', { current_password: form.current, new_password: form.next });
+      // Giữ trạng thái đang lưu tới khi rời trang.
       router.replace('/');
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? translateError(err.code, language, err.message) : t('login.errorNetwork'));
-      setBusy(false);
+      setError(errorMessage(err, t));
+      setBusy(null);
     }
   }
 
   async function signOut() {
-    try { await api.post('/api/auth/logout'); } catch { /* going to /login either way */ }
-    router.replace('/login');
-    router.refresh();
+    setError(null);
+    setBusy('signout');
+    try {
+      await api.post('/api/auth/logout');
+      router.replace('/login');
+      router.refresh();
+    } catch (err) {
+      // Phiên chưa xóa được thì /login sẽ đưa về lại đây — báo lỗi thay vì chuyển trang im lặng.
+      setError(errorMessage(err, t));
+      setBusy(null);
+    }
   }
 
   const input = (key: 'current' | 'next' | 'confirm', label: string, autoComplete: string, withToggle = false) => (
@@ -70,7 +77,7 @@ export function ForcedPasswordChange({ username }: { username: string }) {
       <div className="solar-grid" aria-hidden="true" />
       <section className="login-main" aria-label={t('forcedPassword.title')}>
         <div className="login-form-area">
-          <form onSubmit={submit} className="login-form" aria-busy={busy}>
+          <form onSubmit={submit} className="login-form" aria-busy={busy !== null}>
             <div className="login-intro">
               <p className="solar-overline">{t('forcedPassword.overline')}</p>
               <h1>{t('forcedPassword.title')}</h1>
@@ -81,12 +88,12 @@ export function ForcedPasswordChange({ username }: { username: string }) {
             {input('next', t('adminUsers.newPassword'), 'new-password')}
             {input('confirm', t('adminUsers.confirmNewPassword'), 'new-password')}
             {error && <p id="pw-error" className="login-error" role="alert">{error}</p>}
-            <button className="sign-in-button" type="submit" disabled={busy}>
-              {busy ? t('forcedPassword.saving') : t('forcedPassword.submit')}
+            <button className="sign-in-button" type="submit" disabled={busy !== null}>
+              {busy === 'save' ? t('forcedPassword.saving') : t('forcedPassword.submit')}
               <ArrowRight size={18} aria-hidden="true" />
             </button>
-            <button type="button" className="request-account-link" onClick={() => void signOut()}>
-              <LogOut size={15} aria-hidden="true" />
+            <button type="button" className="request-account-link" disabled={busy !== null} onClick={() => void signOut()}>
+              {busy === 'signout' ? <Loader2 size={15} aria-hidden="true" className="ui-spin" /> : <LogOut size={15} aria-hidden="true" />}
               {t('nav.signOut')}
             </button>
           </form>

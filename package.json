@@ -9,9 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:reset": "supabase db reset",
-    "seed:admin": "tsx scripts/seed-first-admin.ts",
-    "export:csv": "tsx scripts/export-to-csv.ts"
+    "seed:admin": "tsx scripts/seed-first-admin.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

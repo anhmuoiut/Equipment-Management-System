@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { TopBar } from '@/components/TopBar';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { ToastViewport } from '@/components/ui';
+import { usePhone } from '@/lib/client/usePhone';
 import { ViewerProvider } from '@/components/ViewerContext';
 import type { Role } from '@/lib/permissions';
 
 const STORAGE_KEY = 'equipment-sidebar-pinned';
-const MOBILE_QUERY = '(max-width: 800px)';
 // Trang Masterlist + Detail Panel chiếm đủ chiều cao (chỉ thân bảng / panel
 // cuộn) — các quy tắc data-page='masterlist' trong workspace.css.
 const FULL_HEIGHT_LIST_PAGES = ['/equipment', '/calibration', '/golden', '/configuration/', '/users'];
@@ -36,7 +36,7 @@ export function AppShell({
   useEffect(() => () => {
     if (closeTimer.current !== null) clearTimeout(closeTimer.current);
   }, []);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = usePhone();
   const [mobileOpen, setMobileOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -46,18 +46,15 @@ export function AppShell({
 
   useEffect(() => {
     try { setPinned(localStorage.getItem(STORAGE_KEY) === 'true'); } catch {}
-    const media = window.matchMedia(MOBILE_QUERY);
-    function syncViewport() {
-      setIsMobile(media.matches);
-      setHoverOpen(false);
-      setFocusOpen(false);
-      setMobileOpen(false);
-      if (panelRef.current?.contains(document.activeElement)) toggleRef.current?.focus();
-    }
-    syncViewport();
-    media.addEventListener('change', syncViewport);
-    return () => media.removeEventListener('change', syncViewport);
   }, []);
+
+  // Phone ↔ desktop: drop transient sidebar state (hover / focus / open drawer).
+  useEffect(() => {
+    setHoverOpen(false);
+    setFocusOpen(false);
+    setMobileOpen(false);
+    if (panelRef.current?.contains(document.activeElement)) toggleRef.current?.focus();
+  }, [isMobile]);
 
   const closeMobile = useCallback(() => {
     setMobileOpen(false);
@@ -133,7 +130,7 @@ export function AppShell({
   return (
     <ViewerProvider viewer={{ userId, username, fullName, role }}>
     <div ref={shellRef} className="app-shell" data-page={isListPage(pathname) ? 'masterlist' : undefined} data-sidebar-pinned={pinned} data-mobile-open={mobileOpen} data-sidebar-open={sidebarOpen}>
-      {/* Visible only on keyboard focus (ui-requirements.md 3.1) — the
+      {/* Visible only on keyboard focus — the
           first focusable element on every page, so Tab from the address
           bar reaches main content without tabbing through the whole header
           and sidebar first. */}

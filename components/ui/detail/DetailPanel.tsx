@@ -6,15 +6,15 @@
  * thân cuộn. Cùng một khung cho Detail Panel (bên phải masterlist) và
  * Detail Page (toàn trang, link QR).
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { ArrowLeft, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react';
+import { ActionMenu, type MoreItem } from '@/components/ui/ActionMenu';
 
 export type PanelLayout = 'panel' | 'page';
 
 export function DetailPanel({
-  layout, icon, title, tags, subtitle, meta, nav, actions, more, onExpand, onClose,
+  layout, icon, title, tags, subtitle, meta, nav, actions, more, moreBusy, onExpand, onClose,
   tabs, activeTab, onTab, footer, mobileBar, children,
 }: {
   layout: PanelLayout;
@@ -27,6 +27,8 @@ export function DetailPanel({
   nav?: { onPrev?: () => void; onNext?: () => void };
   actions?: ReactNode;
   more?: MoreItem[];
+  /** Một mục của [Thao tác ▾] đang chạy — nút quay, không mở lại được. */
+  moreBusy?: boolean;
   onExpand?: () => void;
   onClose?: () => void;
   tabs?: { key: string; label: string }[];
@@ -48,7 +50,7 @@ export function DetailPanel({
             </button>
           )}
           {nav && (
-            <div className="dp-nav">
+            <div className="dp-nav" data-empty={!nav.onPrev && !nav.onNext || undefined}>
               <button type="button" className="dp-icon-btn" onClick={nav.onPrev} disabled={!nav.onPrev} aria-label={t('dp.prev')} title={t('dp.prev')}>
                 <ChevronLeft size={18} aria-hidden="true" />
               </button>
@@ -64,7 +66,7 @@ export function DetailPanel({
           </div>
           <div className="dp-actions">
             {actions}
-            {more && more.length > 0 && <MoreMenu items={more} />}
+            {more && more.length > 0 && <ActionMenu items={more} busy={moreBusy} />}
             {onExpand && (
               <button type="button" className="dp-icon-btn dp-expand" onClick={onExpand} aria-label={t('dp.expand')} title={t('dp.expand')}>
                 <Maximize2 size={16} aria-hidden="true" />
@@ -77,8 +79,12 @@ export function DetailPanel({
             )}
           </div>
         </div>
-        {subtitle && <div className="dp-subtitle">{subtitle}</div>}
-        {meta && <div className="dp-meta">{meta}</div>}
+        {(subtitle || meta) && (
+          <div className="dp-sub">
+            {subtitle && <div className="dp-subtitle">{subtitle}</div>}
+            {meta && <div className="dp-meta">{meta}</div>}
+          </div>
+        )}
         {tabs && tabs.length > 1 && (
           <div className="dp-tabs" role="tablist">
             {tabs.map((tab) => (
@@ -93,49 +99,6 @@ export function DetailPanel({
       <div className="dp-body">{children}</div>
       {footer ? <footer className="dp-footer">{footer}</footer> : mobileBar ? <footer className="dp-mobilebar">{mobileBar}</footer> : null}
     </aside>
-  );
-}
-
-export type MoreItem = { key: string; label: string; onClick: () => void; danger?: boolean; icon?: ReactNode };
-
-/**
- * Nút **Thao tác ▾** (có chữ — nút chỉ có dấu ⋯ dễ bị bỏ qua) mở danh sách thao
- * tác; Xóa luôn ở cuối, màu đỏ. Trên điện thoại mở từ đáy màn hình.
- */
-export function MoreMenu({ items }: { items: MoreItem[] }) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey, true);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey, true); };
-  }, [open]);
-  const sorted = [...items.filter((i) => !i.danger), ...items.filter((i) => i.danger)];
-  return (
-    <div className="dp-more" ref={ref}>
-      <Button size="sm" className="dp-more-trigger" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu">
-        {t('dp.actionsMenu')}<ChevronDown size={14} aria-hidden="true" />
-      </Button>
-      {open && (
-        <>
-          <div className="dp-more-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
-          <ul className="dp-more-list" role="menu">
-            {sorted.map((item) => (
-              <li key={item.key} role="none">
-                <button type="button" role="menuitem" data-danger={item.danger || undefined}
-                  onClick={() => { setOpen(false); item.onClick(); }}>
-                  {item.icon}{item.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
   );
 }
 

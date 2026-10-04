@@ -14,7 +14,7 @@ export const PUT = withAuth(async (req, { requestId, profile, params }) => {
   return ok(await updateConfig(list, assertUuid(params.id), body, profile.id), requestId);
 }, { role: ADMINS });
 
-/** Xóa thật — chỉ Status và Calibration Interval. */
+/** Xóa thật — chỉ Status, Hiệu chuẩn › Setup và Interval. */
 export const DELETE = withAuth(async (_req, { requestId, profile, params }) => {
   await deleteConfig(listFromParams(params), assertUuid(params.id), profile.id);
   return ok({ deleted: true }, requestId);

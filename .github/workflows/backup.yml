@@ -1,4 +1,4 @@
-# Spec v0.9 mục 47 — Backup & Recovery.
+# Backup & Recovery.
 #
 # Gói Supabase Free KHÔNG bao gồm automatic backup (daily backup bắt đầu từ Pro,
 # PITR là add-on trả phí). Đây là điểm yếu duy nhất của free tier không thương
@@ -7,7 +7,7 @@
 # Secret cần đặt trong repo: SUPABASE_DB_URL (connection string production)
 #
 # QUAN TRỌNG: backup chưa restore thử là backup chưa tồn tại.
-# Phải test restore ít nhất 1 lần trước khi cho user vào (mục 55.8).
+# Phải test restore ít nhất 1 lần trước khi cho user vào (RUNBOOK.md mục 7).
 name: Daily database backup
 
 on:

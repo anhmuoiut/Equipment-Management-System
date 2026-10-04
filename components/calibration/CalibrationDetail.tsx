@@ -1,57 +1,43 @@
 'use client';
 
 /** Chi tiết hiệu chuẩn (docs/DETAIL_MODEL.md 4.2) + màn hình "Ghi nhận hiệu chuẩn". */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 import { ClipboardCheck, Gauge } from 'lucide-react';
-import { addMonths, api, ApiError, formatDate, todayVN } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
-import { statusRequiresRemark, statusSelect, toSelect, useOptions } from '@/lib/client/options';
+import { addMonths, api, formatDate, todayVN } from '@/lib/client/api';
+import { toSelect, useOptions } from '@/lib/client/options';
 import { useCan } from '@/components/ViewerContext';
 import { DueDate, StatusTag } from '@/components/ui/tags';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { ActionField, ActionScreen, RecordDetail, type ActionCtx, type SectionDef } from '@/components/ui/detail/RecordDetail';
 import type { PanelLayout } from '@/components/ui/detail/DetailPanel';
 import type { DetailCtx } from '@/components/ui/workspace/ModuleWorkspace';
-import type { CalibrationCandidate, CalibrationRow } from '@/lib/types';
+import type { CalibrationRow } from '@/lib/types';
 
 export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationRow>; layout: PanelLayout }) {
   const { t } = useTranslation();
   const options = useOptions();
   const can = useCan();
-  const [candidates, setCandidates] = useState<CalibrationCandidate[] | null>(null);
   const hidden = ` (${t('cfg.hidden')})`;
 
-  useEffect(() => {
-    if (!ctx.creating) return;
-    setCandidates(null);
-    void api.get<CalibrationCandidate[]>('/api/calibration/candidates').then((r) => setCandidates(r.data)).catch(() => setCandidates([]));
-  }, [ctx.creating]);
-
-  const sections: SectionDef<CalibrationRow>[] = ctx.creating ? [{
-    key: 'add', title: t('cal.groupEquipment'), fields: [{
-      key: 'equipment_id', label: t('cal.pickEquipment'), kind: 'select', required: true, wide: true,
-      hint: candidates && candidates.length === 0 ? t('cal.noCandidates') : t('cal.pickEquipmentHint'),
-      options: () => (candidates ?? []).map((c) => ({
-        value: c.id, label: `${c.serial_number} · ${c.part_number ?? '—'} · ${t('cal.months', { count: c.interval_months })}`,
-      })),
-    }],
-  }] : [
+  // Thiết bị lên / rời Dashboard tự động theo Configuration › Hiệu chuẩn › Setup — không có form thêm.
+  const sections: SectionDef<CalibrationRow>[] = [
     {
       key: 'equipment', title: t('cal.groupEquipment'), fields: [
         { key: 'serial_number', label: t('fields.serial_number'), readOnly: true },
         { key: 'part_number', label: t('fields.part_number'), readOnly: true },
         { key: 'type', label: t('fields.type'), readOnly: true },
         { key: 'location', label: t('fields.location'), readOnly: true },
+        // Trạng thái là của thiết bị (một nguồn) — sửa ở Equipment.
+        { key: 'status', label: t('fields.status'), readOnly: true, hint: t('cal.statusFromEquipment'),
+          view: (r) => <StatusTag name={r.status} color={r.status_color} /> },
         { key: 'equipment_link', label: t('cal.equipmentRecord'), readOnly: true,
           view: (r) => <Link className="link" href={`/equipment?id=${r.equipment_id}`}>{t('cal.openEquipment')}</Link> },
       ],
     },
     {
       key: 'calibration', title: t('cal.groupCalibration'), fields: [
-        { key: 'status_id', label: t('fields.status'), kind: 'select', view: (r) => <StatusTag name={r.status} color={r.status_color} />,
-          options: () => statusSelect(options?.statuses, 'calibration') },
         { key: 'vendor_id', label: t('fields.vendor'), kind: 'select', view: (r) => r.vendor,
           options: (_d, r) => toSelect(options?.calibration_vendors, r?.vendor_id, hidden) },
         { key: 'calibration_date', label: t('fields.calibration_date'), kind: 'date', view: (r) => (r.calibration_date ? formatDate(r.calibration_date) : null) },
@@ -69,8 +55,7 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
     },
     {
       key: 'notes', title: t('eq.groupNotes'), fields: [
-        { key: 'remark', label: t('fields.remark'), kind: 'textarea', wide: true, maxLength: 1000,
-          required: (d) => statusRequiresRemark(options?.statuses, d.status_id) },
+        { key: 'remark', label: t('fields.remark'), kind: 'textarea', wide: true, maxLength: 1000 },
       ],
     },
   ];
@@ -79,11 +64,10 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
     <RecordDetail<CalibrationRow>
       layout={layout}
       record={ctx.row}
-      creating={ctx.creating}
       loading={ctx.loading}
       error={ctx.error}
+      onRetry={ctx.onRetry}
       icon={<Gauge size={18} />}
-      createTitle={t('cal.addTitle')}
       heading={(r) => ({
         title: r.serial_number,
         tags: <StatusTag name={r.status} color={r.status_color} />,
@@ -101,21 +85,13 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
       historyLabels={{ status: t('fields.status'), vendor: t('fields.vendor'), part_number: t('fields.part_number') }}
       canEdit={can.edit}
       onSave={async (payload, record) => {
-        if (!record) {
-          const res = await api.post<CalibrationRow>('/api/calibration', { equipment_id: payload.equipment_id });
-          return { row: res.data, message: t('cal.added') };
-        }
-        const res = await api.put<CalibrationRow>(`/api/calibration/${record.id}`, payload);
+        const res = await api.put<CalibrationRow>(`/api/calibration/${record!.id}`, payload);
         return { row: res.data };
       }}
       actions={[{
         key: 'record', label: t('cal.record'), primary: true, icon: <ClipboardCheck size={14} aria-hidden="true" />,
         screen: (a) => <RecordCalibrationScreen ctx={a} />,
       }]}
-      canDelete={can.remove}
-      deleteLabel={t('cal.remove')}
-      onDelete={async (r) => { await api.delete(`/api/calibration/${r.id}`); }}
-      deleteWarning={(r) => t('cal.removeConfirm', { serial: r.serial_number })}
       nav={ctx.nav}
       onClose={ctx.onClose}
       onExpand={ctx.onExpand}
@@ -126,52 +102,35 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
   );
 }
 
-/** Vừa hiệu chuẩn xong: ngày, trạng thái, vendor, ghi chú → xem trước hạn mới. Ghi lịch sử CALIBRATE. */
+/** Vừa hiệu chuẩn xong: ngày, vendor, ghi chú → xem trước hạn mới. Ghi lịch sử CALIBRATE. */
 function RecordCalibrationScreen({ ctx }: { ctx: ActionCtx<CalibrationRow> }) {
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
+  const { t } = useTranslation();
   const options = useOptions();
   const r = ctx.record;
   const [date, setDate] = useState(todayVN());
-  const [status, setStatus] = useState(r.status_id ?? '');
   const [vendor, setVendor] = useState(r.vendor_id ?? '');
   const [remark, setRemark] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const remarkRequired = statusRequiresRemark(options?.statuses, status);
   const preview = date && r.interval_months ? addMonths(date, r.interval_months) : null;
 
   async function confirm() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await api.put<CalibrationRow>(`/api/calibration/${r.id}`, {
-        calibration_date: date, status_id: status || null, vendor_id: vendor || null, remark: remark.trim() || null,
-      });
-      ctx.done(res.data, t('cal.recorded'));
-    } catch (e) {
-      if (e instanceof ApiError) setError(translateError(e.code, language, e.message));
-    } finally {
-      setBusy(false);
-    }
+    const res = await api.put<CalibrationRow>(`/api/calibration/${r.id}`, {
+      calibration_date: date, vendor_id: vendor || null, remark: remark.trim() || null,
+    });
+    ctx.done(res.data, t('cal.recorded'));
   }
 
   return (
     <ActionScreen title={t('cal.record')} description={t('cal.recordDesc', { serial: r.serial_number })}
-      onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error}
-      confirmDisabled={!date || !status || (remarkRequired && !remark.trim())}>
+      onCancel={ctx.cancel} onConfirm={confirm}
+      confirmDisabled={!date}>
       <ActionField label={t('fields.calibration_date')} required>
         <input type="date" value={date} max={todayVN()} onChange={(e) => setDate(e.target.value)} />
-      </ActionField>
-      <ActionField label={t('fields.status')} required>
-        <SearchableSelect value={status} onChange={setStatus} options={statusSelect(options?.statuses, 'calibration')}
-          placeholder={t('dp.selectPlaceholder')} ariaLabel={t('fields.status')} />
       </ActionField>
       <ActionField label={t('fields.vendor')}>
         <SearchableSelect value={vendor} onChange={setVendor} options={toSelect(options?.calibration_vendors)} clearable
           placeholder={t('dp.selectPlaceholder')} ariaLabel={t('fields.vendor')} />
       </ActionField>
-      <ActionField label={t('fields.remark')} required={remarkRequired}>
+      <ActionField label={t('fields.remark')}>
         <textarea rows={3} maxLength={1000} value={remark} onChange={(e) => setRemark(e.target.value)} />
       </ActionField>
       <ActionField label={t('cal.newDueDate')}>

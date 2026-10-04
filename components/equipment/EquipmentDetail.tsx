@@ -4,10 +4,11 @@
  * Chi tiết thiết bị (docs/DETAIL_MODEL.md 4.1). Module khác gắn nhóm chỉ đọc
  * qua `extensions` (ví dụ nhóm Hiệu chuẩn) — Equipment không đọc bảng của họ.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowRightLeft, Cpu, GitBranch, Link2, MapPin, Plus, Trash2, Unlink } from 'lucide-react';
 import { api, formatRelativeTime } from '@/lib/client/api';
+import { useFetch } from '@/lib/client/useFetch';
 import { statusRequiresRemark, statusSelect, toSelect, useOptions } from '@/lib/client/options';
 import { useCan } from '@/components/ViewerContext';
 import { StatusTag } from '@/components/ui/tags';
@@ -15,7 +16,7 @@ import { RecordDetail, type ActionDef, type Draft, type SectionDef } from '@/com
 import type { PanelLayout } from '@/components/ui/detail/DetailPanel';
 import type { DetailCtx } from '@/components/ui/workspace/ModuleWorkspace';
 import { EquipmentTree } from './EquipmentTree';
-import { ChangeLocationScreen, DeleteScreen, DetachScreen, MoveScreen, SwapScreen } from './EquipmentActions';
+import { ChangeLocationScreen, DeleteScreen, DetachScreen, MoveScreen, SwapScreen, equipmentFamily } from './EquipmentActions';
 import type { EquipmentRow } from '@/lib/types';
 
 /** Thiết bị cha / con trong nhóm Vị trí & quan hệ: SN · PN, bấm để mở. */
@@ -30,20 +31,12 @@ function EquipmentChip({ serial, part, onOpen }: { serial: string; part?: string
 
 /**
  * Tất cả thiết bị — để chọn thiết bị cha và liệt kê thiết bị con. Workspace
- * truyền danh sách đang có (luôn mới sau khi lưu); trang riêng tự tải.
+ * truyền danh sách đang có (luôn mới sau khi lưu); trang riêng tự tải, và tải
+ * lại sau mỗi lần lưu (`savedAt` đổi → URL đổi; API bỏ qua tham số này).
  */
-function useAllEquipment(given: EquipmentRow[] | undefined, refreshKey: string | undefined) {
-  const [loaded, setLoaded] = useState<EquipmentRow[] | null>(null);
-  const missing = given === undefined;
-  useEffect(() => {
-    if (!missing) return;
-    let alive = true;
-    api.get<EquipmentRow[]>('/api/equipment')
-      .then((r) => { if (alive) setLoaded(r.data); })
-      .catch(() => { if (alive) setLoaded([]); });
-    return () => { alive = false; };
-  }, [missing, refreshKey]);
-  return given ?? loaded;
+function useAllEquipment(given: EquipmentRow[] | undefined, savedAt: string | undefined) {
+  const own = useFetch<EquipmentRow[]>(given ? null : `/api/equipment?saved=${encodeURIComponent(savedAt ?? '')}`);
+  return { all: given ?? own.data, allError: given ? null : own.error };
 }
 
 export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
@@ -60,18 +53,10 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
   const hidden = ` (${t('cfg.hidden')})`;
 
   // Quan hệ cha – con: chọn cha khi thêm / sửa (vị trí theo cha), liệt kê con.
-  const all = useAllEquipment(rows, ctx.row?.updated_at);
+  const { all, allError } = useAllEquipment(rows, ctx.row?.updated_at);
   const record = ctx.creating ? null : ctx.row;
-  const { childrenOf, subtree } = useMemo(() => {
-    const map = new Map<string, EquipmentRow[]>();
-    (all ?? []).forEach((e) => { if (e.parent_id) map.set(e.parent_id, [...(map.get(e.parent_id) ?? []), e]); });
-    map.forEach((list) => list.sort((a, b) => a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true })));
-    // Thiết bị đang xem + con cháu: không chọn làm cha được (tạo vòng lặp).
-    const ids = new Set<string>();
-    const stack = record ? [record.id] : [];
-    while (stack.length) { const id = stack.pop()!; ids.add(id); stack.push(...(map.get(id) ?? []).map((c) => c.id)); }
-    return { childrenOf: map, subtree: ids };
-  }, [all, record]);
+  // Thiết bị đang xem + con cháu (subtree): không chọn làm cha được (tạo vòng lặp).
+  const { childrenOf, subtree } = useMemo(() => equipmentFamily(all, record?.id), [all, record?.id]);
   const parentOf = (d: Draft) => (d.parent_id ? all?.find((e) => e.id === d.parent_id) : undefined);
   const parentLocation = (d: Draft) =>
     parentOf(d)?.location ?? (record && d.parent_id === record.parent_id ? record.location : null);
@@ -97,7 +82,7 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
         { key: 'level_id', label: t('fields.level'), kind: 'select', view: (r) => r.level,
           options: (_d, r) => toSelect(options?.levels, r?.level_id, hidden) },
         { key: 'status_id', label: t('fields.status'), kind: 'select', view: (r) => <StatusTag name={r.status} color={r.status_color} />,
-          options: () => statusSelect(options?.statuses, 'equipment') },
+          options: () => statusSelect(options?.statuses), required: true },
       ],
     },
     {
@@ -116,6 +101,8 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
           editHint: ctx.creating ? t('eq.parentCreateHint') : t('eq.parentHint') },
         { key: 'children', label: t('fields.children'), readOnly: true, hideInCreate: true, wide: true,
           view: (r) => {
+            // Chưa tải xong / tải lỗi: nói đúng như vậy, không báo "không có thiết bị con".
+            if (!all) return <span className="dp-empty">{allError ?? t('common.loadingEllipsis')}</span>;
             const kids = childrenOf.get(r.id) ?? [];
             return kids.length ? (
               <div className="eq-rel">
@@ -148,18 +135,18 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
   const actions: ActionDef<EquipmentRow>[] = [
     ...(addChild ? [{ key: 'add-child', label: t('eq.addChild'), icon: <Plus size={14} aria-hidden="true" />, onClick: addChild }] : []),
     { key: 'location', label: t('eq.changeLocation'), icon: <MapPin size={14} aria-hidden="true" />,
-      visible: (r) => !r.parent_id, screen: (a) => <ChangeLocationScreen ctx={a} /> },
+      visible: (r) => !r.parent_id, screen: (a) => <ChangeLocationScreen ctx={a} rows={all} /> },
     // Chưa có cha: "Gắn vào thiết bị cha"; đã có cha: "Đổi cha" — cùng màn hình chọn thiết bị có sẵn.
     { key: 'attach', label: t('eq.attachParent'), icon: <Link2 size={14} aria-hidden="true" />,
-      visible: (r) => !r.parent_id, screen: (a) => <MoveScreen ctx={a} /> },
+      visible: (r) => !r.parent_id, screen: (a) => <MoveScreen ctx={a} rows={all} /> },
     { key: 'move', label: t('eq.move'), icon: <GitBranch size={14} aria-hidden="true" />,
-      visible: (r) => !!r.parent_id, screen: (a) => <MoveScreen ctx={a} /> },
-    { key: 'swap', label: t('eq.swap'), icon: <ArrowRightLeft size={14} aria-hidden="true" />, screen: (a) => <SwapScreen ctx={a} /> },
+      visible: (r) => !!r.parent_id, screen: (a) => <MoveScreen ctx={a} rows={all} /> },
+    { key: 'swap', label: t('eq.swap'), icon: <ArrowRightLeft size={14} aria-hidden="true" />, screen: (a) => <SwapScreen ctx={a} rows={all} /> },
     { key: 'detach', label: t('eq.detach'), icon: <Unlink size={14} aria-hidden="true" />,
-      visible: (r) => !!r.parent_id, screen: (a) => <DetachScreen ctx={a} /> },
+      visible: (r) => !!r.parent_id, screen: (a) => <DetachScreen ctx={a} rows={all} /> },
     // Thiết bị có con: Xóa mở màn hình hỏi xóa cả nhánh hay giữ con; không có con thì xác nhận ở footer như mọi module.
     { key: 'delete-tree', label: t('common.delete'), icon: <Trash2 size={14} aria-hidden="true" />, danger: true,
-      visible: (r) => can.remove && r.has_children, screen: (a) => <DeleteScreen ctx={a} /> },
+      visible: (r) => can.remove && r.has_children, screen: (a) => <DeleteScreen ctx={a} rows={all} /> },
   ];
 
   // Thao tác cây đổi cả các dòng khác (thiết bị đổi chỗ, con, cờ "có con") → tải lại masterlist.
@@ -173,6 +160,7 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
       creating={ctx.creating}
       loading={ctx.loading}
       error={ctx.error}
+      onRetry={ctx.onRetry}
       icon={<Cpu size={18} />}
       createTitle={ctx.defaults?.parent_id ? t('eq.addChildTitle', { serial: parentOf(ctx.defaults)?.serial_number ?? '' }) : t('eq.addTitle')}
       defaults={ctx.defaults}

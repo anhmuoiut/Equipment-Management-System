@@ -32,10 +32,12 @@ function countByStatus(rows: { status_id: string | null }[], lookups: Lookups): 
 }
 
 export async function getDashboard(role: Role): Promise<DashboardData> {
+  // Dữ liệu gốc đọc một lần, dùng chung với danh sách hiệu chuẩn.
+  const sharedLookups = loadLookups();
   const [equipment, calibration, lookups, golden, pending] = await Promise.all([
     selectAll<{ status_id: string | null; location_id: string; type_id: string | null }>('equipments', 'id, status_id, location_id, type_id'),
-    listCalibration(),
-    loadLookups(),
+    listCalibration(sharedLookups),
+    sharedLookups,
     selectAll<{ status_id: string | null }>('golden_samples', 'id, status_id'),
     role === 'admin'
       ? db().from('user_profiles').select('id', { count: 'exact', head: true }).eq('account_status', 'pending')
@@ -58,25 +60,26 @@ export async function getDashboard(role: Role): Promise<DashboardData> {
     by_type: countBy(equipment.map((e) => ({ key: e.type_id })), (id) => nameOf(lookups.types, id)),
     overdue: calibration.filter((c) => c.due_state === 'overdue').sort(byDue),
     due_soon: calibration.filter((c) => c.due_state === 'due_soon').sort(byDue),
-    no_date: calibration.filter((c) => c.due_state === 'none' || c.due_state === 'no_interval').length,
   };
 }
 
-export type ActivityFilter = { module?: HistoryModule; userId?: string; from?: string; to?: string; limit?: number };
+export type ActivityFilter = { module?: HistoryModule; userId?: string; search?: string; from?: string; to?: string; limit?: number };
 
-/** Thay đổi gần đây (view recent_activities). Configuration / User chỉ Admin thấy. */
+/** Thay đổi gần đây (view recent_activities; một lần import = một dòng). Configuration / User chỉ Admin thấy. */
 export async function recentActivities(role: Role, filter: ActivityFilter): Promise<RecentActivity[]> {
   let query = db().from('recent_activities')
-    .select('module, object_id, label, action, changes, created_by, created_at')
+    .select('module, object_id, label, action, changes, created_by, created_at, note, source, item_count')
     .order('created_at', { ascending: false })
-    .limit(Math.min(filter.limit ?? 50, 500));
+    .limit(Math.min(Math.max(filter.limit ?? 50, 1), 500));
   if (role !== 'admin') query = query.in('module', ['equipment', 'calibration', 'golden_sample']);
   if (filter.module) query = query.eq('module', filter.module);
   if (filter.userId) query = query.eq('created_by', filter.userId);
+  // Tìm theo tên / serial (label), không phân biệt hoa thường; % _ trong chữ gõ vào là ký tự thường.
+  if (filter.search) query = query.ilike('label', `%${filter.search.replace(/[\\%_]/g, '\\$&')}%`);
   if (filter.from) query = query.gte('created_at', filter.from);
   if (filter.to) query = query.lte('created_at', filter.to);
   const { data, error } = await query;
   if (error) throw mapRpcError(error);
-  const rows = await withActorNames((data ?? []) as Omit<RecentActivity, 'created_by_name' | 'id' | 'note' | 'source'>[]);
-  return rows.map((r, i) => ({ ...r, id: `${r.object_id}-${r.created_at}-${i}`, note: null, source: 'ui' }));
+  const rows = await withActorNames((data ?? []) as Omit<RecentActivity, 'created_by_name' | 'id'>[]);
+  return rows.map((r, i) => ({ ...r, id: `${r.object_id}-${r.created_at}-${i}` }));
 }

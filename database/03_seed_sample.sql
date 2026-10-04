@@ -23,13 +23,12 @@ insert into public.levels (display_name, sort_order) values
   ('Function Test', 5)
 on conflict do nothing;
 
-insert into public.statuses (display_name, sort_order, applies_to, requires_remark, color) values
-  ('Active',            1, array['equipment', 'calibration', 'golden_sample'], false, 'green'),
-  ('Inactive',          2, array['equipment', 'calibration', 'golden_sample'], false, 'gray'),
-  ('Repair',            3, array['equipment'],                                 true,  'yellow'),
-  ('Wait Registration', 4, array['equipment'],                                 false, 'blue'),
-  ('Pass',              5, array['calibration'],                               false, 'green'),
-  ('Fail',              6, array['calibration'],                               false, 'red')
+insert into public.statuses (display_name, sort_order, requires_remark, color) values
+  ('Active',            1, false, 'green'),
+  ('Inactive',          2, false, 'gray'),
+  ('Repair',            3, true,  'yellow'),
+  ('Wait Registration', 4, false, 'blue'),
+  ('Wait Calibration',  5, false, 'blue')
 on conflict do nothing;
 
 insert into public.calibration_vendors (display_name, sort_order) values

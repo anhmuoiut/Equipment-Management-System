@@ -2,7 +2,7 @@
 
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Menu, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, Menu } from 'lucide-react';
 import { PreferenceControls } from '@/components/Preferences';
 import { JabilLogo } from '@/components/JabilLogo';
 import { UserMenu } from '@/components/UserMenu';
@@ -35,22 +35,10 @@ export function TopBar({ username, fullName, sidebarOpen, onToggleSidebar, toggl
         </div>
       </div>
       {/* The current page's own name lives in its PageHeading (the <h1> in
-          the page body), so the header doesn't repeat it — a breadcrumb
-          here used to duplicate that title, and at medium widths it
-          collapsed down to literally just the page name a second time. */}
+          the page body), so the header doesn't repeat it. */}
       <div className="topbar-actions">
+        {/* Phones: language and theme live in the account menu instead (UserMenu). */}
         <div className="topbar-preferences"><PreferenceControls /></div>
-        <details className="topbar-preferences-menu" onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.currentTarget.open = false;
-            event.currentTarget.querySelector('summary')?.focus();
-          }
-        }}>
-          <summary aria-label={t('theme.preferences')} title={t('theme.preferences')}>
-            <SlidersHorizontal size={18} aria-hidden="true" />
-          </summary>
-          <div className="topbar-preferences-popover"><PreferenceControls /></div>
-        </details>
         <NotificationBell />
         <UserMenu username={username} fullName={fullName} />
       </div>

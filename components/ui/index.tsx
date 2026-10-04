@@ -18,10 +18,8 @@ export function Button({
   loading?: boolean;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const pad = size === 'sm' ? 'px-2.5 py-1 text-[12px]' : 'px-3.5 py-1.5 text-[13px]';
-  // Explicit per-variant hover/pressed state (ui-requirements.md 2.4) —
-  // replaces the removed global `button:hover { filter: brightness(.97) }`,
-  // which applied a uniform darken to every button regardless of variant
-  // and didn't distinguish hover from pressed.
+  // Explicit per-variant hover/pressed state (CSS .ui-button--primary /
+  // --danger / --quiet) instead of one global darken for every button.
   const stateClass =
     variant === 'primary' ? 'ui-button--primary'
       : variant === 'danger' ? 'ui-button--danger'
@@ -39,23 +37,6 @@ export function Button({
       {variant === 'danger' && !loading && <TriangleAlert size={14} aria-hidden="true" />}
       {children}
     </button>
-  );
-}
-
-/** Trạng thái không bao giờ chỉ bằng màu — sàn xưởng, ánh sáng mạnh, in đen trắng. */
-export function Tag({ text, tone = 'neutral' }: { text: string; tone?: 'neutral' | 'warn' | 'ok' }) {
-  const c =
-    tone === 'warn'
-      ? { background: 'var(--warn-tint)', color: 'var(--warn)', borderColor: 'var(--warn)' }
-      : tone === 'ok'
-        ? { background: 'var(--success-tint)', color: 'var(--success)', borderColor: 'var(--success)' }
-        : { background: 'transparent', color: 'var(--ink-2)', borderColor: 'var(--rule)' };
-  return (
-    <span className="ui-tag border px-1.5 py-[1px] text-[11px] font-medium" data-tone={tone} style={c}>
-      {tone === 'warn' && <TriangleAlert size={12} aria-hidden="true" />}
-      {tone === 'ok' && <CheckCircle2 size={12} aria-hidden="true" />}
-      {text}
-    </span>
   );
 }
 
@@ -82,10 +63,16 @@ export function Notice({
   );
 }
 
+/** Open dialogs, oldest first — Escape and Tab only act on the newest (a picker sheet over a dialog). */
+const openModals: object[] = [];
+
+/** Hộp thoại — mount khi mở, unmount khi đóng (trả focus về chỗ cũ). */
 export function Modal({
-  open, title, onClose, children, wide, footer,
+  title, onClose, children, wide, sheet, footer,
 }: {
-  open: boolean; title: string; onClose: () => void; children: ReactNode; wide?: boolean;
+  title: string; onClose: () => void; children: ReactNode; wide?: boolean;
+  /** Phones: slides up from the bottom as a sheet (filters, pickers); elsewhere the same centred dialog. */
+  sheet?: boolean;
   /** Action buttons pinned below the scrolling body — so Save/Cancel stay
    *  reachable on a long form instead of scrolling away with the content. */
   footer?: ReactNode;
@@ -101,9 +88,11 @@ export function Modal({
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (!open) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const self = {};
+    openModals.push(self);
     const onKey = (e: KeyboardEvent) => {
+      if (openModals[openModals.length - 1] !== self) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -128,22 +117,21 @@ export function Modal({
     ref.current?.focus();
     return () => {
       window.removeEventListener('keydown', onKey);
+      openModals.splice(openModals.indexOf(self), 1);
       previousFocus?.focus();
     };
-    // Intentionally just `open` — see onCloseRef above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    // Chạy một lần khi mở — onClose đọc qua onCloseRef ở trên.
+  }, []);
 
-  if (!open) return null;
   return (
-    <div className="modal-overlay"
+    <div className={`modal-overlay${sheet ? ' modal-overlay--sheet' : ''}`}
          data-action-dialog="true"
          style={{ background: 'var(--overlay)' }}
          onClick={(e) => { e.stopPropagation(); onClose(); }}>
       <div
         ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`modal-dialog ${wide ? 'modal-dialog--wide' : ''}`}
+        className={`modal-dialog ${wide ? 'modal-dialog--wide' : ''}${sheet ? ' modal-dialog--sheet' : ''}`}
         style={{ background: 'var(--panel)', borderColor: 'var(--rule)', color: 'var(--ink)' }}
       >
         <div className="modal-header"><h2>{title}</h2><button type="button" className="modal-close" onClick={onClose} aria-label={t('common.close')}><X size={20} aria-hidden="true" /></button></div>
@@ -171,14 +159,6 @@ export function Spinner({ label, size = 'md' }: { label: string; size?: 'sm' | '
   );
 }
 
-/** Full-page initial load — same visual weight everywhere a page has
- *  nothing to show yet (no stale/cached content to keep displaying). Keep
- *  the app shell (header/sidebar) mounted around this; never replace the
- *  whole screen with it. */
-export function PageLoader({ label }: { label: string }) {
-  return <Spinner label={label} size="lg" />;
-}
-
 /** A single placeholder block — compose a few into a shape that roughly
  *  matches the real content (a KPI card, a table row) so nothing jumps
  *  when the real content swaps in. Shimmer respects prefers-reduced-motion
@@ -191,8 +171,7 @@ export function Skeleton({ className, style }: { className?: string; style?: Rea
  *  (search/filter/sort/page) where the table shouldn't collapse to a bare
  *  spinner and lose its shape. Only for genuinely empty-so-far tables; a
  *  table that already has rows should just keep showing them while a
- *  background refetch runs (see the `loading && rows.length===0` pattern
- *  used across the admin/equipment list pages). */
+ *  background refetch runs (Masterlist: `loading && rows.length === 0`). */
 export function TableSkeleton({ columns, rows = 6 }: { columns: number; rows?: number }) {
   return (
     <>
@@ -208,10 +187,10 @@ export function TableSkeleton({ columns, rows = 6 }: { columns: number; rows?: n
 }
 
 /** Covers just its positioned parent (not the whole viewport) while a
- *  critical, must-not-be-interrupted operation runs — Swap, Archive,
- *  bulk import commit. The dialog/panel stays visible underneath, dimmed
- *  and unclickable, with a short reason so a multi-second wait doesn't
- *  read as a freeze. Parent needs `position: relative`. */
+ *  must-not-be-interrupted operation runs — an action screen's confirm
+ *  (Swap, Move, Delete…), the bulk import commit. The panel stays visible
+ *  underneath, dimmed and unclickable, with a short reason so a
+ *  multi-second wait doesn't read as a freeze. Parent needs `position: relative`. */
 export function LoadingOverlay({ label }: { label: string }) {
   return (
     <div className="ui-loading-overlay" role="status" aria-live="polite">
@@ -237,8 +216,8 @@ export function EmptyState({ title, subtitle, action }: { title: string; subtitl
 
 /** Standard "a GET failed" block — never leaves a blank page/panel behind
  *  a failed fetch. `message` should already be the translated, user-safe
- *  text (translateError's job, not this component's); the raw error goes
- *  to error_log server-side, never here. */
+ *  text (errorMessage() / useFetch's job, not this component's); the raw
+ *  error goes to error_log server-side, never here. */
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   const { t } = useTranslation();
   return (
@@ -256,7 +235,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 // ---------------------------------------------------------------------------
 // TOAST — a global, imperative notification queue instead of a React
 // Context, since a toast is fired from event handlers scattered across the
-// whole app (every save/delete/archive), not read from component state.
+// whole app (every save / delete / action), not read from component state.
 // `toast.success(...)` etc. work from anywhere; `<ToastViewport />` (mounted
 // once, in AppShell) is the only thing that actually renders them. Auto-
 // dismiss keeps the queue from growing unbounded even if nobody clicks the
@@ -331,45 +310,10 @@ export function ToastViewport() {
   );
 }
 
-/** The one visual marker for "this field is required" — matches
- *  DynamicForm's equipment-field asterisk, so every hand-written admin form
- *  uses the same convention instead of relying on the browser's native
- *  validation popup to be the only sign a field wasn't optional. */
+/** The one visual marker for "this field is required" — Detail Panel
+ *  fields, action screens and the account forms all use it, instead of
+ *  relying on the browser's native validation popup to be the only sign a
+ *  field wasn't optional. */
 export function RequiredMark() {
   return <span style={{ color: 'var(--alert)' }} aria-hidden="true"> *</span>;
-}
-
-/** Styled confirmation dialog for a destructive/consequential action — the
- *  one place in the app that should ever ask "are you sure", instead of
- *  each call site choosing between this and the browser's own
- *  `window.confirm()` (unstyled, blocks the whole tab, can't show rich
- *  copy). `tone` picks the confirm button's variant: 'danger' for anything
- *  that deletes or archives, 'primary' for anything reversible. */
-export function ConfirmDialog({
-  open, title, description, confirmLabel, cancelLabel, tone = 'danger', busy, onConfirm, onCancel,
-}: {
-  open: boolean;
-  title: string;
-  description: ReactNode;
-  confirmLabel: string;
-  cancelLabel?: string;
-  tone?: 'danger' | 'primary';
-  busy?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Modal
-      open={open} title={title} onClose={onCancel}
-      footer={
-        <>
-          <Button type="button" disabled={busy} onClick={onCancel}>{cancelLabel ?? t('common.cancel')}</Button>
-          <Button type="button" variant={tone} loading={busy} onClick={onConfirm}>{confirmLabel}</Button>
-        </>
-      }
-    >
-      <p className="text-[13px]" style={{ color: 'var(--ink-2)' }}>{description}</p>
-    </Modal>
-  );
 }

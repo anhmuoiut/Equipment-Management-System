@@ -35,12 +35,9 @@ export const ERROR_CODES = {
   SWAP_INVALID:                   { status: 400, message: 'Cannot swap.' },
   SWAP_INVALID_ANCESTOR_RELATION: { status: 409, message: 'Cannot swap parent and child.' },
   SWAP_NO_CHANGE:                 { status: 409, message: 'Swap would change nothing.' },
-  STATUS_NOT_ALLOWED:             { status: 400, message: 'Status not enabled for this page.' },
-  STATUS_IN_USE:                  { status: 409, message: 'Status is in use on that page.' },
+  STATUS_IN_USE:                  { status: 409, message: 'Status is in use.' },
   INACTIVE_OPTION:                { status: 400, message: 'Selected value is hidden.' },
-  ALREADY_IN_CALIBRATION:         { status: 409, message: 'Equipment already on the calibration dashboard.' },
   CALIBRATION_INTERVAL_MISSING:   { status: 400, message: 'Part number has no calibration interval.' },
-  CALIBRATION_INTERVAL_IN_USE:    { status: 409, message: 'Interval in use.' },
   LOCK_TIMEOUT:                   { status: 409, message: 'Busy, try again.' },
   SERVER_ERROR:                   { status: 500, message: 'Server error.' },
 } as const;
@@ -49,13 +46,17 @@ export type ErrorCode = keyof typeof ERROR_CODES;
 
 export class AppError extends Error {
   readonly code: ErrorCode;
+  /** Gửi cho client (lỗi 4xx) — chỉ thông tin an toàn, ví dụ lỗi theo trường. */
   readonly details: Record<string, unknown>;
+  /** Chỉ cho developer (terminal / error_log) — message gốc của Postgres, gợi ý sửa. */
+  readonly diagnostic: Record<string, unknown>;
 
-  constructor(code: ErrorCode, details: Record<string, unknown> = {}) {
+  constructor(code: ErrorCode, details: Record<string, unknown> = {}, diagnostic: Record<string, unknown> = {}) {
     super(ERROR_CODES[code].message);
     this.name = 'AppError';
     this.code = code;
     this.details = details;
+    this.diagnostic = diagnostic;
   }
 
   get status(): number {
@@ -78,18 +79,22 @@ const PG_STATE: Record<string, ErrorCode> = {
 
 type PgLikeError = { message?: string; code?: string; details?: string | null };
 
-/** `raise exception '<ERROR_CODE>'` → chính mã đó; còn lại theo SQLSTATE; không nhận ra → SERVER_ERROR. */
+/**
+ * `raise exception '<ERROR_CODE>'` → chính mã đó; còn lại theo SQLSTATE; không nhận ra → SERVER_ERROR.
+ * Message / detail gốc của Postgres (tên bảng, câu lệnh…) chỉ vào `diagnostic`, không tới client.
+ */
 export function mapRpcError(error: PgLikeError | null): AppError {
   if (!error) return new AppError('SERVER_ERROR');
   const raw = (error.message ?? '').trim();
-  if (raw in ERROR_CODES) return new AppError(raw as ErrorCode, error.details ? { detail: error.details } : {});
-  if (error.code && PG_STATE[error.code]) return new AppError(PG_STATE[error.code]!);
+  const diagnostic = { pg: raw.slice(0, 200), pg_code: error.code, ...(error.details ? { pg_detail: error.details } : {}) };
+  if (raw in ERROR_CODES) return new AppError(raw as ErrorCode, {}, diagnostic);
+  if (error.code && PG_STATE[error.code]) return new AppError(PG_STATE[error.code]!, {}, diagnostic);
   // PostgREST không tìm thấy hàm / bảng: database chưa chạy đủ file trong database/.
   if (error.code === 'PGRST202' || error.code === 'PGRST205' || error.code === '42883' || error.code === '42P01') {
-    return new AppError('SERVER_ERROR', {
-      pg: raw.slice(0, 200),
+    return new AppError('SERVER_ERROR', {}, {
+      ...diagnostic,
       hint: 'Database is missing functions or tables — run database/02_schema.sql and database/04_functions.sql (see database/README.md).',
     });
   }
-  return new AppError('SERVER_ERROR', { pg: raw.slice(0, 200) });
+  return new AppError('SERVER_ERROR', {}, diagnostic);
 }

@@ -4,7 +4,7 @@
 import { useTranslation } from 'react-i18next';
 import { AccountStatusTag, ToneTag } from '@/components/ui/tags';
 import { ModuleWorkspace, useList } from '@/components/ui/workspace/ModuleWorkspace';
-import type { Column } from '@/components/ui/masterlist/Masterlist';
+import { RowCard, type Column } from '@/components/ui/masterlist/Masterlist';
 import { UserDetail } from './UserDetail';
 import type { UserRow } from '@/lib/types';
 
@@ -28,6 +28,13 @@ export function UsersWorkspace() {
       title={t('nav.users')}
       list={list}
       columns={columns}
+      mobileCard={(r) => (
+        <RowCard
+          title={r.full_name}
+          tag={<AccountStatusTag status={r.account_status} />}
+          lines={[[r.username, t(`values.${r.role}`)].join(' · '), [r.department, r.email].filter(Boolean).join(' · ')]}
+        />
+      )}
       storageKey="users"
       exportName="users"
       canAdd

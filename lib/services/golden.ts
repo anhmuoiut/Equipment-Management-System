@@ -32,16 +32,16 @@ export async function listGolden(): Promise<GoldenRow[]> {
 }
 
 export async function getGolden(id: string): Promise<GoldenRow> {
-  const row = await selectOne<DbGolden>('golden_samples', id);
+  const [row, lookups] = await Promise.all([selectOne<DbGolden>('golden_samples', id), loadLookups()]);
   if (!row) throw new AppError('NOT_FOUND');
-  return toRow(row, await loadLookups());
+  return toRow(row, lookups);
 }
 
 function validate(input: GoldenInput, lookups: Lookups, before?: DbGolden) {
   assertActive(lookups.locations, input.location_id, 'location_id', before?.location_id);
   const statusId = input.status_id !== undefined ? input.status_id : before?.status_id;
   const remark = input.remark !== undefined ? input.remark : before?.remark;
-  if (statusId !== before?.status_id || input.remark !== undefined) assertStatus(lookups, statusId, 'golden_sample', remark);
+  if (!before || statusId !== before.status_id || input.remark !== undefined) assertStatus(lookups, statusId, remark);
 }
 
 async function duplicateSerial(serial: string, exceptId?: string): Promise<boolean> {
@@ -58,9 +58,9 @@ export async function createGolden(input: GoldenInput, actor: string) {
 }
 
 export async function updateGolden(id: string, input: GoldenInput, actor: string) {
-  const before = await selectOne<DbGolden>('golden_samples', id);
+  const [before, lookups] = await Promise.all([selectOne<DbGolden>('golden_samples', id), loadLookups()]);
   if (!before) throw new AppError('NOT_FOUND');
-  validate(input, await loadLookups(), before);
+  validate(input, lookups, before);
   const duplicate = input.serial_number && input.serial_number !== before.serial_number
     ? await duplicateSerial(input.serial_number, id) : false;
   if (Object.keys(input).length) await appWrite('golden_samples', 'update', id, input, actor);

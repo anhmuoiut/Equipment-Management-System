@@ -14,9 +14,9 @@ vi.mock('react-i18next', () => ({
 const rows = vi.hoisted(() => [
   { id: 'a', serial: 'SN-3' }, { id: 'b', serial: 'SN-1' }, { id: 'c', serial: 'SN-2' },
 ]);
-vi.mock('@/lib/client/api', () => ({
+vi.mock('@/lib/client/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/client/api')>()),
   api: { get: vi.fn(async () => ({ data: rows, meta: {} })) },
-  ApiError: class extends Error {},
 }));
 class IO { observe() {} disconnect() {} }
 vi.stubGlobal('IntersectionObserver', IO);
@@ -25,11 +25,11 @@ import { ModuleWorkspace, useList } from './ModuleWorkspace';
 
 type Row = { id: string; serial: string };
 
-function Harness() {
+function Harness({ canAdd = true }: { canAdd?: boolean }) {
   const list = useList<Row>('/api/test');
   return (
     <ModuleWorkspace<Row>
-      title="Golden" list={list} storageKey={`ws-${Math.random()}`} exportName="t" canAdd
+      title="Golden" list={list} storageKey={`ws-${Math.random()}`} exportName="t" canAdd={canAdd}
       columns={[{ key: 'serial', label: 'Serial', value: (r) => r.serial }]}
       tools={[{
         key: 'import', label: 'Import',
@@ -47,8 +47,8 @@ function Harness() {
   );
 }
 
-async function mount() {
-  await act(async () => { render(<Harness />); });
+async function mount(canAdd = true) {
+  await act(async () => { render(<Harness canAdd={canAdd} />); });
 }
 const bodyRows = () => within(screen.getByRole('table')).getAllByRole('row').slice(1);
 
@@ -96,9 +96,27 @@ describe('ModuleWorkspace — Masterlist + Detail Panel', () => {
 
   it('+ Add opens the same panel in create mode (?new=1)', async () => {
     await mount();
-    fireEvent.click(screen.getByRole('button', { name: /ml.add/ }));
+    fireEvent.click(within(document.querySelector('.ml') as HTMLElement).getByRole('button', { name: /ml.add/ }));
     expect(screen.getByTestId('current').textContent).toBe('NEW');
     expect(router.replace).toHaveBeenLastCalledWith('/golden?new=1', { scroll: false });
+  });
+
+  it('the floating add shortcut opens create mode and returns when the panel closes', async () => {
+    await mount();
+    const fab = document.querySelector('.ws-add-fab') as HTMLButtonElement;
+    expect(fab.getAttribute('aria-label')).toBe('ml.add');
+    fireEvent.click(fab);
+    expect(screen.getByTestId('current').textContent).toBe('NEW');
+    expect(router.replace).toHaveBeenLastCalledWith('/golden?new=1', { scroll: false });
+    expect(document.querySelector('.ws-add-fab')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'close' }));
+    expect(document.querySelector('.ws-add-fab')).toBeTruthy();
+  });
+
+  it('does not expose the floating add shortcut to viewers without add permission', async () => {
+    await mount(false);
+    expect(document.querySelector('.ws-add-fab')).toBeNull();
+    expect(screen.queryByRole('button', { name: /ml.add/ })).toBeNull();
   });
 
   it('a tool (Import) opens in the same panel (?tool=) and gives way to a clicked row', async () => {

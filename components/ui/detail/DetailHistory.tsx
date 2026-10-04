@@ -4,17 +4,17 @@
  * Tab Lịch sử — dòng thời gian từ bảng <module>_histories, dạng
  * "Trường: cũ → mới". Dùng chung cho mọi module (docs/DETAIL_MODEL.md 3.4).
  */
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError, formatDate, formatTime } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
+import { formatDate, formatTime } from '@/lib/client/api';
+import { useFetch } from '@/lib/client/useFetch';
 import { ErrorState, Spinner } from '@/components/ui';
 import type { HistoryEntry } from '@/lib/types';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{4}-\d{2}-\d{2}T/;
 
-export function useFormatHistoryValue() {
+function useFormatHistoryValue() {
   const { t } = useTranslation();
   return (value: unknown): string => {
     if (value === null || value === undefined || value === '') return '—';
@@ -68,32 +68,19 @@ export function DetailHistory({ url, fieldLabel, filter }: {
   /** Bộ lọc nhanh, ví dụ "Chỉ lần hiệu chuẩn" (thêm ?only=…). */
   filter?: { label: string; param: string };
 }) {
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
+  const { t } = useTranslation();
   const formatNote = useFormatNote();
-  const [rows, setRows] = useState<HistoryEntry[] | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
   const [filtered, setFiltered] = useState(false);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const res = await api.get<HistoryEntry[]>(filtered && filter ? `${url}?${filter.param}` : url);
-      setRows(res.data);
-    } catch (e) {
-      if (e instanceof ApiError) setError(e);
-    }
-  }, [url, filtered, filter]);
-
-  useEffect(() => { setRows(null); void load(); }, [load]);
+  const { data: rows, loading, error, reload } = useFetch<HistoryEntry[]>(filtered && filter ? `${url}?${filter.param}` : url);
 
   let body: ReactNode;
-  if (error) body = <ErrorState message={translateError(error.code, language, error.message)} onRetry={load} />;
+  if (error) body = <ErrorState message={error} onRetry={reload} />;
   else if (!rows) body = <Spinner label={t('common.loadingEllipsis')} />;
   else if (rows.length === 0) body = <p className="hist-empty">{t('hist.empty')}</p>;
   else {
     body = (
-      <ol className="hist-list">
+      // Đổi bộ lọc: giữ danh sách cũ (mờ đi) tới khi danh sách mới về.
+      <ol className="hist-list" aria-busy={loading || undefined}>
         {rows.map((row) => (
           <li key={row.id} className="hist-item" data-action={row.action}>
             <div className="hist-head">

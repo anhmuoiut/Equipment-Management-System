@@ -1,6 +1,6 @@
 # UI requirements: SolarEdge Equipment Management
 
-Updated: 2 October 2026. Status: accepted design baseline.
+Updated: 4 October 2026 (phone layout reworked: cards, bottom bars, account-menu preferences). Status: accepted design baseline.
 
 ## Read this before changing UI
 
@@ -52,7 +52,7 @@ Use Prussian text on Picton backgrounds and white text on Prussian backgrounds. 
 - Keep preferences, notifications and user actions on the right. The page's own title belongs in its content heading, not a second header row.
 - Use the existing `AppShell`, `TopBar`, sidebar and logo components. A new workspace route must participate in the shared shell rather than create its own header/navigation.
 - The sidebar remains Prussian with a Picton selected item and readable labels. Preserve expanded, collapsed and mobile navigation behavior.
-- On narrow screens, keep the brand left-aligned; truncate the app name with its full title available rather than wrapping or pushing actions off screen. Appearance controls use the existing mobile disclosure menu.
+- On narrow screens, keep the brand left-aligned; truncate the app name with its full title available rather than wrapping or pushing actions off screen. On a phone the header holds only menu · brand · notifications · account: **language and theme move into the account menu** (radio items for the language, one item for the theme) instead of a separate disclosure button.
 
 ### Sidebar navigation structure
 
@@ -78,7 +78,8 @@ These are the baseline for shared workspace UI. Reuse the existing classes; do n
 | Body type | 14px | Keep readable; do not shrink the entire UI |
 | Table cells | 13px type; 9px vertical / 12px horizontal padding | 12px vertical padding on mobile |
 | Table headings | 11px; 10px vertical / 12px horizontal padding | Preserve column readability |
-| Shared buttons | 34px standard / 30px small minimum height | 44px minimum height on mobile |
+| Shared buttons | 34px standard / 30px small minimum height | 44px minimum height on mobile (48px for the Detail Panel bottom bar) |
+| Form controls | 14px / 13px type | **16px and 44px high on phones** — below 16px iOS zooms the page when a field is focused |
 | Toolbar | 10px vertical / 12px horizontal padding | Wrap controls into usable rows |
 | Dialog body | 16px padding | Scroll without clipping required fields/actions |
 
@@ -88,18 +89,18 @@ Compact means removing duplication, excess margins and unnecessary containers. I
 
 Login is intentionally different from the authenticated shell; do not add the workspace header to it.
 
-- Use the existing landscape asset [`TEguy.png`](../public/Image/TEguy.png) and Solar icon. Display the photo at its native **3:2 ratio**, showing the technician and surrounding workcell equipment. Do not zoom/crop it back into a large portrait.
-- Desktop has the photo on the left and a separate open form on the right. Keep the subtle technical grid, Picton corner accents and restrained shadow.
-- At 900px and below, stack the full-ratio photo above the form. Keep the form readable and the page scrollable on short screens.
-- Do not restore the removed bottom-left Jabil/text block, large empty navy panel, repeated slogans, hard diagonal overlays, or an opaque boxed card behind the form.
-- Keep text and inputs clear of busy photographic content. Do not fade the photograph through the input area.
-- Preserve the current IBM Plex Sans typography, product/icon identity, 50px inputs and sign-in button, password visibility control, help, account-request flow and language/theme controls.
+- One full-page background photo, [`login-signup-background.webp`](../public/login-signup/login-signup-background.webp), anchored top-left over the light blue page background. It is the only image on the page.
+- Desktop: the product title on the left — "Equipment / Management" (second line blue), the workcell name, a short cyan accent bar and four capability icons — on a soft white glow so it stays readable over the photo; the form on the right in a white card with rounded corners and a light shadow (440px wide, 460px from 1600px).
+- At 1100px and below everything stacks: a 440px photo band at the top, then the centred title, then the form card. The page scrolls on short screens.
+- The same card holds sign-in, the account request (sign-up) form and its success message. `/change-password` reuses these form styles in a single column.
+- Keep text and inputs clear of busy photographic content.
+- Preserve IBM Plex Sans typography, 49px inputs and sign-in button, the password visibility control, the "Forgot your password?" help, the disabled SSO button ("Coming soon"), the account-request flow and the language/theme controls under the card.
 - Autofill must use the normal input surface and readable text. Keep visible focus and semantic red errors in both themes.
 - Preserve actual authentication and redirect behavior. A visual change must not modify access checks, credentials, session handling or API contracts.
 
 ## 4. Feature components and interaction
 
-Reuse shared controls from [`components/ui/index.tsx`](../components/ui/index.tsx): `Button`, `Tag`, `Notice`, `Modal`, `ConfirmDialog`, loading/skeleton controls, `EmptyState`, `ErrorState` and the existing toast system. Check the actual exported props before use. Extend a shared component for a reusable requirement rather than copy it into a feature with different styling.
+Reuse shared controls from [`components/ui/index.tsx`](../components/ui/index.tsx): `Button`, `Notice`, `Modal`, loading controls (`Spinner`, `Skeleton`, `TableSkeleton`, `LoadingOverlay`), `EmptyState`, `ErrorState` and the existing toast system. Turn API errors into user text with `errorMessage()` (`lib/client/api.ts`) and load data with `useFetch()` (`lib/client/useFetch.ts`) — never show raw error messages. Check the actual exported props before use. Extend a shared component for a reusable requirement rather than copy it into a feature with different styling.
 
 Every module page uses the same list and detail components ([DETAIL_MODEL.md](DETAIL_MODEL.md)). A module only declares its columns, field groups, tabs and actions:
 
@@ -115,6 +116,7 @@ Use the existing `lucide-react` icon style and established sizing. Decorative ic
 
 - Module lists use `Masterlist` (`.ml-*` in [`app/workspace.css`](../app/workspace.css)). Other tables reuse `.page-heading` and `.grid-table`.
 - Keep search, filters, counts and actions compact and clearly grouped. Preserve sorting, filtering, pagination and permission-based actions.
+- **Phones do not squeeze the table.** The Masterlist becomes a list of cards (serial + status, then location / part number / type; Calibration adds the coloured due date). The toolbar is search + Filter & sort (a bottom sheet) + a ⋮ menu (Export, Import); a floating + adds a record. Details: [DETAIL_MODEL.md](DETAIL_MODEL.md) §3.11.
 - Tables use subtle dividers, restrained alternating row tint, and readable hover/focus states. Wide tables scroll inside their panel; they must not widen the whole page or silently lose columns.
 - Let the equipment table use the available workspace height. Do not add arbitrary minimum heights that push content beyond the viewport.
 - Dashboard cards use compact spacing, small corner icons, tabular values, restrained Picton charts and semantic highlights. Do not invent metrics or status data to decorate a screen.
@@ -160,6 +162,8 @@ Keep visible status text on desktop and mobile. Supplement color with text, icon
 
 - Record forms are the Detail Panel itself: fields switch to inputs in place. Labels stay above values, required fields carry a red `*`, and errors appear under the field. Other forms reuse the existing input, validation and modal patterns.
 - Dialog headers/close controls remain accessible while long bodies scroll. Stack fields on narrow screens and keep actions reachable, including the mobile safe area.
+- On phones, pickers and filters are **bottom sheets** (`Modal` with `sheet`; `SearchableSelect` uses it too) and action menus open from the bottom with 48px rows. Escape closes only the newest dialog. Primary actions of a record sit in the Detail Panel's bottom bar, in thumb reach.
+- Toasts appear below the header; the stack is portaled to `<body>`, so it must not depend on CSS variables defined on `.app-shell` (use a fallback).
 - Preserve keyboard navigation, focus trapping/restoration and Escape handling. Dropdowns/popovers stay inside the viewport and use the established layering tokens.
 - Keep disabled and loading states meaningful; prevent duplicate submissions through the existing behavior.
 - Use subtle borders and existing radii/shadows rather than a new visual style for each dialog.
@@ -182,6 +186,8 @@ Keep visible keyboard focus, semantic labels and readable contrast. Respect redu
 | [`components/AppShell.tsx`](../components/AppShell.tsx) | Shared authenticated workspace |
 | [`components/TopBar.tsx`](../components/TopBar.tsx) | Left-aligned brand row and right-side controls |
 | [`components/layout/AppSidebar.tsx`](../components/layout/AppSidebar.tsx) | Six-item menu, collapsed/mobile sidebar |
+| [`lib/client/usePhone.ts`](../lib/client/usePhone.ts) | The one `(max-width: 800px)` check for JS — keep equal to the CSS media queries |
+| [`components/ui/ActionMenu.tsx`](../components/ui/ActionMenu.tsx) | `Actions ▾` / ⋮ menu (dropdown; bottom sheet on phones) |
 | [`lib/permissions/index.ts`](../lib/permissions/index.ts), [`components/ViewerContext.tsx`](../components/ViewerContext.tsx) | Role groups (Admin / User / Readonly) and which buttons a viewer sees |
 | [`app/workspace.css`](../app/workspace.css) | Masterlist, Detail Panel, history, equipment tree, Configuration sub-list, Dashboard |
 | [`components/ui/masterlist/`](../components/ui/masterlist) | `Masterlist`, `ColumnSettings`, Excel export |
@@ -209,7 +215,7 @@ Before delivering:
 - Confirm the Jabil/app-name group is still on one line at the left, with actions on the right.
 - Confirm the font, three primary brand colors and semantic feedback match this document.
 - Check light/dark themes, EN/VI, long content, loading, empty, error and disabled states affected by the change.
-- Inspect desktop (for example 1440x900), laptop (1366x768) and phone (390x844), plus affected breakpoints. Ensure no page overflow, clipped actions or photo/form overlap.
+- Inspect desktop (for example 1440x900), laptop (1366x768) and phone (390x844, and 320x568 for the smallest), plus affected breakpoints. Ensure no page overflow, clipped actions or photo/form overlap, and touch targets of at least 44px on phones.
 - Check keyboard focus, dialog/menu navigation and touch usability for changed controls.
 - For code changes, run `npm run typecheck`, `npm run lint` and relevant existing tests; add behavior tests when the new functionality warrants them. Documentation-only edits need link/content checks, not a full application test run.
 - Perform browser visual verification when available. Report any unavailable checks honestly; passing lint/tests is not proof of visual correctness. Historical screenshots are not current verification evidence.

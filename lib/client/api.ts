@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * API client. Mọi lỗi từ server có { code, message, request_id } — giữ
- * request_id để người dùng đọc cho Admin khi báo lỗi.
+ * API client. Mọi thất bại đều thành ApiError { code, status, requestId }:
+ * lỗi server ({ code, message, request_id }), phản hồi lạ (theo HTTP status),
+ * mất mạng (NETWORK_ERROR), quá thời gian (TIMEOUT) — nên mọi màn hình chỉ
+ * cần một cách hiện lỗi: errorMessage().
  */
-
 export class ApiError extends Error {
   constructor(
     readonly code: string,
@@ -30,37 +31,58 @@ type Envelope<T> =
 
 export type Result<T> = { data: T; meta: Record<string, unknown> };
 
-async function readEnvelope<T>(res: Response): Promise<Envelope<T>> {
+const TIMEOUT_MS = 30_000;
+/** Import Excel kiểm tra / ghi cả file — cho phép lâu hơn. */
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+/** Phản hồi không theo chuẩn (proxy, nền tảng host…) → mã lỗi theo HTTP status. */
+const STATUS_CODES: Record<number, string> = {
+  400: 'VALIDATION_ERROR', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 408: 'TIMEOUT',
+  409: 'CONFLICT', 413: 'PAYLOAD_TOO_LARGE', 422: 'VALIDATION_ERROR', 504: 'TIMEOUT',
+};
+
+function codeForStatus(status: number): string {
+  return STATUS_CODES[status] ?? (status >= 500 ? 'SERVER_ERROR' : 'UNKNOWN_ERROR');
+}
+
+let sessionEnding = false;
+
+/** Phiên hết hạn / tài khoản bị khóa giữa chừng → xóa phiên và về trang đăng nhập (một lần). */
+function endSessionIfNeeded(path: string, code: string) {
+  if (sessionEnding || path.startsWith('/api/auth/') || (code !== 'UNAUTHORIZED' && code !== 'USER_INACTIVE')) return;
+  sessionEnding = true;
+  window.location.assign('/api/auth/session-ended');
+}
+
+async function send(path: string, init: RequestInit, timeout: number): Promise<Response> {
   try {
-    return (await res.json()) as Envelope<T>;
-  } catch {
-    throw new ApiError('SERVER_ERROR', 'Unreadable server response.', {}, '-', res.status);
+    return await fetch(path, { ...init, signal: AbortSignal.timeout(timeout) });
+  } catch (e) {
+    const timedOut = e instanceof DOMException && e.name === 'TimeoutError';
+    throw new ApiError(timedOut ? 'TIMEOUT' : 'NETWORK_ERROR', String(e), {}, '-', 0);
   }
 }
 
-function toApiError(body: Extract<Envelope<unknown>, { success: false }>, status: number): ApiError {
-  return new ApiError(body.error.code, body.error.message, body.error.details ?? {}, body.error.request_id, status);
+function toApiError(path: string, res: Response, body: Envelope<unknown> | null): ApiError {
+  const error = body && !body.success ? body.error : null;
+  const err = error
+    ? new ApiError(error.code, error.message, error.details ?? {}, error.request_id, res.status)
+    : new ApiError(res.ok ? 'SERVER_ERROR' : codeForStatus(res.status), `HTTP ${res.status}`, {}, '-', res.status);
+  endSessionIfNeeded(path, err.code);
+  return err;
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<Result<T>> {
+async function call<T>(path: string, init: RequestInit = {}, timeout = TIMEOUT_MS): Promise<Result<T>> {
   // FormData: để trình duyệt tự đặt Content-Type (multipart + boundary).
-  const json = !(init?.body instanceof FormData);
-  const res = await fetch(path, { ...init, headers: { ...(json ? { 'Content-Type': 'application/json' } : {}), ...(init?.headers ?? {}) } });
-  const body = await readEnvelope<T>(res);
-  if (!body.success) throw toApiError(body, res.status);
-  return { data: body.data, meta: body.meta };
+  const headers = init.body instanceof FormData ? undefined : { 'Content-Type': 'application/json' };
+  const res = await send(path, { ...init, headers }, timeout);
+  const body = (await res.json().catch(() => null)) as Envelope<T> | null;
+  if (res.ok && body?.success) return { data: body.data, meta: body.meta };
+  throw toApiError(path, res, body);
 }
 
-/** Tải file server sinh ra (xlsx…) về máy; lỗi vẫn theo chuẩn { code, message }. */
-async function download(path: string): Promise<void> {
-  const res = await fetch(path);
-  if (!res.ok) {
-    const body = await readEnvelope<unknown>(res);
-    if (!body.success) throw toApiError(body, res.status);
-    throw new ApiError('SERVER_ERROR', 'Download failed.', {}, '-', res.status);
-  }
-  const blob = await res.blob();
-  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'download';
+/** Lưu Blob thành file tải về. */
+export function saveBlob(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -69,15 +91,41 @@ async function download(path: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Tải file server sinh ra (xlsx…) về máy; lỗi vẫn theo chuẩn { code, message }. */
+async function download(path: string): Promise<void> {
+  const res = await send(path, {}, TIMEOUT_MS);
+  if (!res.ok) throw toApiError(path, res, await res.json().catch(() => null));
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'download';
+  saveBlob(await res.blob(), name);
+}
+
 export const api = {
-  get: <T>(path: string, init?: RequestInit) => call<T>(path, init),
+  get: <T>(path: string) => call<T>(path),
   post: <T>(path: string, body?: unknown) => call<T>(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   put: <T>(path: string, body: unknown) => call<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) => call<T>(path, { method: 'DELETE' }),
   /** Gửi file (multipart/form-data). */
-  upload: <T>(path: string, form: FormData) => call<T>(path, { method: 'POST', body: form }),
+  upload: <T>(path: string, form: FormData) => call<T>(path, { method: 'POST', body: form }, UPLOAD_TIMEOUT_MS),
   download,
 };
+
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+/**
+ * Lỗi → câu cho người dùng, theo ngôn ngữ đang chọn (src/i18n/locales › errors).
+ * Mã lạ → câu chung theo HTTP status. Lỗi server (5xx) kèm request id để báo
+ * Admin; chi tiết kỹ thuật chỉ nằm ở error_log / terminal, không bao giờ ở đây.
+ */
+export function errorMessage(error: unknown, t: Translate): string {
+  if (!(error instanceof ApiError)) {
+    // Không tải được phần code tải-khi-cần (thư viện Excel…) = mất mạng.
+    if (error instanceof Error && error.name === 'ChunkLoadError') return t('errors.NETWORK_ERROR');
+    console.error(error);
+    return t('errors.UNKNOWN_ERROR');
+  }
+  const text = t(`errors.${error.code}`, { defaultValue: t(`errors.${codeForStatus(error.status)}`) });
+  return error.status >= 500 && error.requestId !== '-' ? `${text} (${error.requestId})` : text;
+}
 
 /** Ngày giờ theo giờ Việt Nam. Dữ liệu lưu timestamptz. */
 export function formatTime(iso: string | null | undefined): string {

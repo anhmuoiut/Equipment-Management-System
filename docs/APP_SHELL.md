@@ -1,8 +1,8 @@
 # Khung sườn ứng dụng (App Shell)
 
-Cập nhật: 01/10/2026. **Đã làm xong** — menu: [components/layout/AppSidebar.tsx](../components/layout/AppSidebar.tsx); danh sách con Configuration: [components/configuration/ConfigNav.tsx](../components/configuration/ConfigNav.tsx); route: `app/(app)/…`.
+Cập nhật: 03/10/2026. Code — menu: [components/layout/AppSidebar.tsx](../components/layout/AppSidebar.tsx); danh sách con Configuration: [components/configuration/ConfigNav.tsx](../components/configuration/ConfigNav.tsx); route: `app/(app)/…`.
 
-**Giữ khung sườn hiện tại** (top bar, sidebar, cách thu gọn, điện thoại, sáng / tối, ngôn ngữ) — chỉ thay danh sách menu và các trang bên trong. Nội dung trong từng trang theo [DETAIL_MODEL.md](DETAIL_MODEL.md) (Masterlist + Detail Panel); dữ liệu theo [DATABASE_MODIFIED.md](DATABASE_MODIFIED.md); màu, font, kích thước theo [JABIL_UI.md](JABIL_UI.md).
+Khung gồm top bar, sidebar (thu gọn được, thành ngăn kéo trên điện thoại), sáng / tối và ngôn ngữ. Nội dung trong từng trang theo [DETAIL_MODEL.md](DETAIL_MODEL.md) (Masterlist + Detail Panel); dữ liệu theo [DATABASE_MODIFIED.md](DATABASE_MODIFIED.md); màu, font, kích thước theo [JABIL_UI.md](JABIL_UI.md).
 
 ## 1. Menu
 
@@ -13,7 +13,7 @@ Sáu mục, **một cấp duy nhất**, đúng thứ tự:
 | 1 | Dashboard | `LayoutDashboard` | `/` | Mọi nhóm | Số liệu tổng hợp, thiết bị quá hạn / sắp đến hạn hiệu chuẩn, thay đổi gần đây |
 | 2 | Equipment | `LayoutList` | `/equipment` | Mọi nhóm | Masterlist thiết bị |
 | 3 | Calibration | `Gauge` | `/calibration` | Mọi nhóm | Masterlist (Dashboard) hiệu chuẩn |
-| 4 | Golden | `Medal` | `/golden` | Mọi nhóm | Masterlist golden sample |
+| 4 | Golden | `CircuitBoard` | `/golden` | Mọi nhóm | Masterlist golden sample |
 | — | *(đường kẻ ngăn)* | | | | |
 | 5 | Configuration | `SlidersHorizontal` | `/configuration/…` | **Chỉ Admin** | Danh sách cấu hình + Error log |
 | 6 | User Management | `Users` | `/users` | **Chỉ Admin** | Masterlist tài khoản |
@@ -23,24 +23,15 @@ Sáu mục, **một cấp duy nhất**, đúng thứ tự:
 
 ---
 
-## 2. Giữ nguyên từ khung hiện tại
+## 2. Top bar, sidebar, điện thoại
 
-| Phần | Giữ như hiện tại |
+| Phần | Quy tắc |
 | --- | --- |
-| Top bar | Logo Jabil + **SolarEdge Equipment Management** bên trái (một dòng); bên phải: ngôn ngữ + sáng / tối (màn hẹp gom vào nút `⚙` thả xuống) · chuông thông báo · menu tài khoản |
+| Top bar | Logo Jabil + **SolarEdge Equipment Management** bên trái (một dòng); bên phải: ngôn ngữ + sáng / tối · chuông thông báo · menu tài khoản. Điện thoại: chỉ còn `☰` · thương hiệu · chuông · tài khoản (nút tròn, không mũi tên); **ngôn ngữ và sáng / tối nằm trong menu tài khoản** (English ✓ / Tiếng Việt, Chuyển sang chế độ tối) |
 | Sidebar | Nền Prussian, mục đang chọn màu Picton; nút thu gọn ở đầu sidebar (còn icon, rê chuột hiện tên, ghi nhớ lựa chọn); dòng ghi chú cuối sidebar |
-| Điện thoại / màn hẹp (≤ 800px) | Sidebar ẩn, nút `☰` trên top bar mở sidebar phủ lên nội dung, chọn menu xong tự đóng |
+| Điện thoại / màn hẹp (≤ 800px) | Sidebar ẩn, nút `☰` trên top bar mở sidebar phủ lên nội dung, chọn menu xong tự đóng. Ngăn kéo chỉ có sáu mục (không có chữ "Workspace" và dòng ghi chú cuối). Bảng thông báo phủ ngang màn hình ngay dưới top bar |
 | Tiêu đề trang | Nằm trong nội dung trang, không lặp lại trên top bar |
 | Kích thước | Theo bảng "Current compact dimensions" trong [JABIL_UI.md](JABIL_UI.md) |
-
-**Thay đổi trong sidebar** so với hiện tại:
-
-| Hiện tại | Mới |
-| --- | --- |
-| Equipment masterlist · Archived equipment | Equipment (bỏ Archived) |
-| Golden master list (nhãn "Soon") | Golden |
-| Calibration chỉ hiện khi có quyền `calibration.view` | Calibration hiện cho mọi nhóm |
-| Nhóm **Administration** thu gọn được, bên trong: User management · Configuration · Field management · System logs | Hai mục ngang hàng: **Configuration** · **User Management**. Bỏ nhóm Administration, bỏ Field management; Error log chuyển vào trong Configuration |
 
 Không có cấp menu thứ hai trong sidebar.
 
@@ -72,8 +63,8 @@ Các danh sách cấu hình được chọn bằng **danh sách con bên trái t
 | | Status | `/configuration/statuses` |
 | | Level | `/configuration/levels` |
 | | Department | `/configuration/departments` |
-| HIỆU CHUẨN | Calibration Interval | `/configuration/calibration-intervals` |
-| | Calibration Vendor | `/configuration/calibration-vendors` |
+| HIỆU CHUẨN | Setup — part number phải hiệu chuẩn (trong các PN đang có thiết bị), chu kỳ, số ngày báo trước | `/configuration/calibration-setup` |
+| | Vendor | `/configuration/calibration-vendors` |
 | HỆ THỐNG | Error log | `/configuration/error-log` |
 
 | Mục | Quy tắc |
@@ -91,17 +82,17 @@ Các danh sách cấu hình được chọn bằng **danh sách con bên trái t
 
 | Trang | Đường dẫn | Ghi chú |
 | --- | --- | --- |
-| Đăng nhập | `/login` | Giữ thiết kế hiện tại (review sau) |
+| Đăng nhập | `/login` | Thiết kế: [JABIL_UI.md](JABIL_UI.md) mục 3 |
 | Dashboard | `/` | |
 | Equipment | `/equipment`, `/equipment/{id}` | `/{id}` mở Detail Page toàn trang — dùng cho QR và nút `⤢` |
+| Nhãn QR | `/equipment/{id}/label` | Trang in nhãn, không có khung ứng dụng; mã QR trỏ tới `/equipment/{id}` |
 | Calibration | `/calibration`, `/calibration/{id}` | |
 | Golden | `/golden`, `/golden/{id}` | |
 | Configuration | `/configuration/{danh sách}` | Chỉ Admin |
 | User Management | `/users`, `/users/{id}` | Chỉ Admin |
+| Đổi mật khẩu bắt buộc | `/change-password` | Tài khoản có mật khẩu do admin đặt; không có khung ứng dụng |
 
 Mở một đường dẫn không có quyền → chuyển về Dashboard (`/?denied=1`) và báo "Bạn không có quyền xem trang này". API vẫn tự kiểm tra quyền (trả 403), không dựa vào việc ẩn menu.
-
-**Bỏ / đổi so với hiện tại:** `/archived`, `/equipment/archived` bỏ (không còn Archive) · `/golden-master` → `/golden` · `/admin/*` → `/configuration/*` và `/users` · trang Field management, Audit log bỏ (database không còn cấu hình trường và nhật ký chung).
 
 ---
 
@@ -109,7 +100,7 @@ Mở một đường dẫn không có quyền → chuyển về Dashboard (`/?de
 
 | Phần | Quy tắc |
 | --- | --- |
-| Tiêu đề trang | Tên trang + số bản ghi bên phải |
+| Tiêu đề trang | Tên trang, số bản ghi ngay bên dưới |
 | Thân trang | Dashboard: các khối số liệu. Các trang còn lại: Masterlist + Detail Panel ([DETAIL_MODEL.md](DETAIL_MODEL.md)) |
 | Đang tải / trống / lỗi | Dùng chung một kiểu khung xương, thông báo trống, thông báo lỗi |
-| Thông báo kết quả | Lưu / xóa thành công hiện thông báo nhỏ góc màn hình rồi tự tắt |
+| Thông báo kết quả | Lưu / xóa thành công hiện thông báo nhỏ góc màn hình rồi tự tắt. Lỗi hiện ngay tại chỗ thao tác, theo mã lỗi và ngôn ngữ đang chọn (`errorMessage()` — `lib/client/api.ts`); lỗi hệ thống kèm mã yêu cầu để báo Admin |

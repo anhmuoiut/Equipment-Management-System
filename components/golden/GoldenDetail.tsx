@@ -32,7 +32,7 @@ export function GoldenDetail({ ctx, layout }: { ctx: DetailCtx<GoldenRow>; layou
         { key: 'location_id', label: t('fields.location'), kind: 'select', required: true, view: (r) => r.location,
           options: (_d, r) => toSelect(options?.locations, r?.location_id, hidden) },
         { key: 'status_id', label: t('fields.status'), kind: 'select', view: (r) => <StatusTag name={r.status} color={r.status_color} />,
-          options: () => statusSelect(options?.statuses, 'golden_sample') },
+          options: () => statusSelect(options?.statuses), required: true },
       ],
     },
     {
@@ -56,6 +56,7 @@ export function GoldenDetail({ ctx, layout }: { ctx: DetailCtx<GoldenRow>; layou
       creating={ctx.creating}
       loading={ctx.loading}
       error={ctx.error}
+      onRetry={ctx.onRetry}
       icon={<CircuitBoard size={18} />}
       createTitle={t('gs.addTitle')}
       heading={(r) => ({

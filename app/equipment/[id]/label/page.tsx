@@ -8,42 +8,38 @@
  * app; this page adds no auth logic of its own.
  *
  * The QR code is generated client-side from the equipment's deep link
- * (/equipment/{uuid}) at render/print time and never stored anywhere — see
- * the QR/label requirement in the V2 spec. The immutable equipment UUID is
+ * (/equipment/{uuid}) at render/print time and never stored anywhere. The
+ * immutable equipment UUID is
  * the encoded identifier, not the Serial Number, so the link keeps working
  * even if the serial is ever corrected.
  */
 import { useEffect, useState, use as usePromise } from 'react';
 import QRCode from 'qrcode';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError } from '@/lib/client/api';
+import { errorMessage } from '@/lib/client/api';
+import { useFetch } from '@/lib/client/useFetch';
+import { ErrorState, Spinner } from '@/components/ui';
 import type { EquipmentRow } from '@/lib/types';
-import { translateError } from '@/lib/i18n/errors';
 
 export default function EquipmentLabelPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
-  const [eq, setEq] = useState<EquipmentRow | null>(null);
+  const { t } = useTranslation();
+  const { data: eq, error, reload } = useFetch<EquipmentRow>(`/api/equipment/${id}`);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
-
-  useEffect(() => {
-    void api.get<EquipmentRow>(`/api/equipment/${id}`)
-      .then((r) => setEq(r.data))
-      .catch((e) => { if (e instanceof ApiError) setError(e); });
-  }, [id]);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   useEffect(() => {
     const url = `${window.location.origin}/equipment/${id}`;
-    void QRCode.toDataURL(url, { width: 240, margin: 1, color: { dark: '#002B49', light: '#FFFFFF' } }).then(setQrDataUrl);
-  }, [id]);
+    QRCode.toDataURL(url, { width: 240, margin: 1, color: { dark: '#002B49', light: '#FFFFFF' } })
+      .then(setQrDataUrl, (e: unknown) => setQrError(errorMessage(e, t)));
+  }, [id, t]);
 
-  if (error) {
-    return <main className="label-page"><p className="label-error">{translateError(error.code, language, error.message)}</p></main>;
+  const failure = error ?? qrError;
+  if (failure) {
+    return <main className="label-page"><ErrorState message={failure} onRetry={error ? reload : undefined} /></main>;
   }
   if (!eq || !qrDataUrl) {
-    return <main className="label-page"><p>{t('common.loadingEllipsis')}</p></main>;
+    return <main className="label-page"><Spinner label={t('common.loadingEllipsis')} size="lg" /></main>;
   }
 
   return (

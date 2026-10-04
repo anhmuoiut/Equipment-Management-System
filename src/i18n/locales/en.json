@@ -5,26 +5,16 @@
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
-    "create": "Create",
-    "view": "View",
-    "apply": "Apply",
-    "refresh": "Refresh",
     "retry": "Retry",
-    "remove": "Remove",
-    "done": "Done",
     "loadingEllipsis": "Loading…",
-    "code": "Code",
-    "name": "Name",
-    "status": "Status",
-    "actions": "Actions",
     "search": "Search",
     "searchPlaceholder": "Search…",
     "noOptionsFound": "No options found.",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "processing": "Processing…"
   },
   "theme": {
-    "preferences": "Appearance preferences",
     "language": "Language",
     "english": "English",
     "vietnamese": "Tiếng Việt",
@@ -34,6 +24,8 @@
     "switchToLight": "Switch to light mode"
   },
   "login": {
+    "errorUsernameRequired": "Enter your username.",
+    "errorPasswordRequired": "Enter your password.",
     "yourWorkspace": "YOUR EQUIPMENT WORKSPACE",
     "welcomeBack": "Welcome back",
     "description": "Log in to your account to continue",
@@ -43,15 +35,10 @@
     "enterPassword": "Enter your password",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
-    "errorCredentials": "Username or password is incorrect.",
-    "errorLimit": "Too many attempts. Please try again shortly.",
-    "errorNetwork": "Unable to connect. Please try again.",
     "signingIn": "Signing in…",
     "signIn": "Sign in",
     "forgotPassword": "Forgot your password?",
     "contactAdmin": "Contact your system administrator.",
-    "requestAccountLink": "Need access? Request an account",
-    "authorizedOnly": "Authorized personnel only",
     "noAccount": "Don't have an account?",
     "signUp": "Sign up",
     "or": "or",
@@ -62,35 +49,27 @@
     "requestSubmitted": "REQUEST SUBMITTED",
     "almostThere": "Almost there",
     "submittedDescription": "Your account request has been sent. An administrator needs to approve it before you can sign in — check back once they have.",
+    "needHelp": "Need help? Contact:",
     "backToSignIn": "Back to sign in",
-    "requestAccess": "REQUEST ACCESS",
     "requestAnAccount": "Request an account",
     "description": "Submit your details below. An administrator will review and approve your request before you can sign in.",
     "fullName": "Full name",
     "yourFullName": "Your full name",
     "desiredUsername": "Desired username",
-    "usernameHint": "e.g. man.tran — lowercase, no accents or spaces",
-    "passwordHint": "At least 10 characters",
+    "usernameHint": "e.g. man.tran (lowercase, no spaces)",
+    "passwordHint": "Min. 10 characters",
     "confirmPassword": "Confirm password",
-    "reenterPassword": "Re-enter your password",
+    "reenterPassword": "Repeat password",
     "email": "Email (optional)",
-    "emailHint": "For an admin to contact you",
+    "emailHint": "For admin contact",
     "employeeId": "Employee ID (optional)",
-    "department": "Department (optional)",
     "errorPasswordMismatch": "Passwords do not match.",
     "errorPasswordTooShort": "Password must be at least 10 characters.",
-    "errorUsernameTaken": "This username is already taken.",
-    "errorEmailTaken": "This email is already in use.",
-    "errorRateLimited": "Too many attempts. Please try again shortly.",
-    "errorGeneric": "Could not submit your request. Check the fields and try again.",
-    "errorNetwork": "Unable to connect. Please try again.",
     "submitting": "Submitting…",
     "submitRequest": "Submit request",
-    "alreadyHaveAccount": "Already have an account? Sign in",
     "errorUsernameFormat": "Username may only contain lowercase letters without accents, digits and . _ + -, must start with a letter or digit, and be at most 64 characters (e.g. man.tran).",
     "errorEmailFormat": "This email address is not valid.",
-    "errorFullName": "Enter your full name (at most 200 characters).",
-    "errorServer": "System error (request {{id}}). Please try again or contact an admin."
+    "errorFullName": "Enter your full name (at most 200 characters)."
   },
   "loginBrand": {
     "photoAlt": "Test engineer with a laptop in the SolarEdge workcell, surrounded by testing equipment.",
@@ -126,8 +105,7 @@
     "profileSaved": "Your information was saved.",
     "changePassword": "Change password",
     "currentPassword": "Current password",
-    "updatePassword": "Update password",
-    "signedInAs": "Signed in as"
+    "updatePassword": "Update password"
   },
   "forcedPassword": {
     "overline": "ACCOUNT SECURITY",
@@ -140,7 +118,6 @@
   "label": {
     "equipment": "Equipment",
     "print": "Print label",
-    "printLabel": "Print label",
     "serialShort": "SN",
     "partShort": "PN",
     "qrAlt": "QR code linking to equipment {{serial}}"
@@ -162,10 +139,16 @@
     "unpinMenu": "Unpin menu (auto-hide)",
     "openMenu": "Open menu",
     "skipToContent": "Skip to main content",
-    "signOut": "Sign out",
-    "equipmentManagement": "SolarEdge Equipment Management"
+    "signOut": "Sign out"
   },
   "ml": {
+    "moreActions": "More actions",
+    "filtersAndSort": "Filter & sort",
+    "sortBy": "Sort by",
+    "sortNone": "Default order",
+    "sortAsc": "A → Z",
+    "sortDesc": "Z → A",
+    "showResults": "Show {{count}} results",
     "searchPlaceholder": "Search…",
     "filters": "Filters",
     "all": "All",
@@ -187,7 +170,6 @@
     "prev": "Previous record",
     "next": "Next record",
     "expand": "Open full page",
-    "more": "More actions",
     "tabInfo": "Information",
     "tabHistory": "History",
     "systemInfo": "System information",
@@ -211,7 +193,6 @@
       "invalid": "Invalid value",
       "not_found": "No longer exists",
       "inactive": "This value is hidden",
-      "not_allowed": "Not allowed on this page",
       "too_long": "Too long",
       "supabase_email_locked": "Email of a Supabase account cannot be changed here",
       "same_as_current": "Must differ from the current password"
@@ -320,16 +301,12 @@
     "isChild": "Child of {{serial}}",
     "groupIdentity": "Identification",
     "groupClassification": "Classification",
-    "groupLocation": "Location",
     "groupNotes": "Notes",
-    "locationFollowsParent": "Location follows the parent equipment.",
     "parentHint": "A new parent moves this equipment (and its children) to the parent's location. Clear it to detach, keeping the current location.",
     "parentShort": "Parent",
     "tabTree": "Equipment tree",
     "duplicateSerial": "Saved. Note: another record already has this serial number.",
-    "deleteWithChildren": "Delete {{serial}} and all its child equipment? This cannot be undone.",
     "changeLocation": "Change location",
-    "changeLocationChildren": "All child equipment moves with it.",
     "currentLocation": "Current location",
     "newLocation": "New location",
     "locationChanged": "Location changed.",
@@ -397,7 +374,7 @@
     "step1Desc": "The template has drop-down lists for Part number, Type, Level, Status and Location, taken from Configuration at download time. Its first row says what each column accepts. Download it again after Configuration changes.",
     "download": "Download template (.xlsx)",
     "step2": "2. Choose the filled-in file",
-    "step2Desc": ".xlsx only, up to {{max}} equipment per import. The file is checked first — nothing is added until you press Import.",
+    "step2Desc": ".xlsx only, up to {{max}} rows per import. The file is checked first — nothing is added until you press Import.",
     "choose": "Choose file…",
     "change": "Choose another file…",
     "checking": "Checking file…",
@@ -421,7 +398,6 @@
       "too_long": "{{column}}: longer than {{max}} characters.",
       "not_found": "{{column}}: \"{{value}}\" is not in Configuration.",
       "inactive": "{{column}}: \"{{value}}\" is hidden in Configuration.",
-      "status_not_allowed": "{{column}}: \"{{value}}\" is not used for Equipment.",
       "remark_required": "{{column}}: required when Status is \"{{value}}\".",
       "parent_not_found": "{{column}}: parent \"{{value}}\" not found (in the system or in this file).",
       "parent_ambiguous": "{{column}}: \"{{value}}\" matches {{count}} equipment — also fill in Parent part number, or leave blank and attach later with Move.",
@@ -433,9 +409,10 @@
       "too_large": "File is too large (max {{max}} MB).",
       "not_xlsx": "Only Excel .xlsx files are accepted — use the template.",
       "unreadable": "Cannot read the file. Open it in Excel, save as .xlsx and try again.",
-      "empty": "The file has no equipment rows (start right below the header row).",
+      "empty": "The file has no data rows (start right below the header row).",
       "too_many_rows": "The file has {{count}} rows — at most {{max}} per import. Split the file.",
-      "missing_columns": "Missing required columns: {{columns}}. Do not rename the header row — download the template again."
+      "missing_columns": "Missing required columns: {{columns}}. Do not rename the header row — download the template again.",
+      "sendFailed": "Could not send the file. If you edited it after choosing it, choose it again; otherwise check your network connection."
     },
     "tpl": {
       "sheetGuide": "Guide",
@@ -456,7 +433,7 @@
       "text": "Text, max {{max}} characters",
       "serialDuplicate": "duplicate serials are allowed (warning only)",
       "pick": "Pick from the list (Configuration › {{page}})",
-      "pickStatus": "Pick from the list (Configuration › Status — only statuses used for Equipment)",
+      "pickStatus": "Pick from the list (Configuration › Status)",
       "pickShort": "Pick: {{values}}",
       "pickMany": "Pick from the list ({{count}} values — see sheet \"{{sheet}}\")",
       "noValues": "No values yet — leave blank, or ask an admin to add them in Configuration",
@@ -471,15 +448,10 @@
       "parentPart": "Only needed when the parent serial is used by more than one equipment",
       "locationParent": "leave blank when a parent is given: location follows the parent",
       "stepParent": "Child equipment: fill in Parent serial number (existing equipment, or another row in this file). Leave Location blank — a child is always at its parent's location."
-    }
+    },
+    "importing": "Importing…"
   },
   "cal": {
-    "add": "Add equipment",
-    "addTitle": "Add to calibration dashboard",
-    "added": "Added to the calibration dashboard.",
-    "pickEquipment": "Equipment",
-    "pickEquipmentHint": "Only equipment whose part number has a calibration interval.",
-    "noCandidates": "No equipment available — set an interval for the part number in Configuration › Calibration Interval.",
     "groupEquipment": "Equipment",
     "groupCalibration": "Calibration",
     "groupInterval": "Interval",
@@ -506,13 +478,24 @@
     "recorded": "Calibration recorded.",
     "newDueDate": "New due date",
     "onlyCalibrations": "Calibrations only",
-    "remove": "Remove from dashboard",
-    "removeConfirm": "Remove {{serial}} from the calibration dashboard? History is kept.",
     "tracking": "Calibration tracking",
     "notTracked": "Not tracked for calibration.",
-    "addToDashboard": "Add to calibration dashboard",
     "calibrationRecord": "Calibration record",
-    "openCalibration": "Open calibration details"
+    "openCalibration": "Open calibration details",
+    "needsPartNumber": "This equipment has no part number — set one before tracking its calibration.",
+    "needsSetup": "Not tracked: this part number is not in Configuration › Calibration › Setup.",
+    "statusFromEquipment": "Equipment status — change it in Equipment."
+  },
+  "gimp": {
+    "title": "Import golden samples from Excel",
+    "step1Desc": "The template has drop-down lists for Location and Status, taken from Configuration at download time. Its first row says what each column accepts. Download it again after Configuration changes.",
+    "import": "Import {{count}} golden samples",
+    "done": "Imported {{count}} golden samples.",
+    "tpl": {
+      "guideTitle": "Golden sample import template",
+      "step1": "Enter one golden sample per row on sheet \"{{sheet}}\", starting at row 3. Row 1 is notes, row 2 is the header — do not rename or delete them.",
+      "step4": "Save as .xlsx → Golden › Import Excel → choose the file. It is checked first; if any row has an error nothing is added. Up to {{max}} golden samples per import."
+    }
   },
   "gs": {
     "add": "Add golden sample",
@@ -533,9 +516,9 @@
       "statuses": "Status",
       "levels": "Level",
       "departments": "Department",
-      "calibration-intervals": "Calibration Interval",
-      "calibration-vendors": "Calibration Vendor",
-      "error-log": "Error log"
+      "calibration-vendors": "Vendor",
+      "error-log": "Error log",
+      "calibration-setup": "Setup"
     },
     "groupInfo": "Information",
     "addTitle": "New {{list}}",
@@ -546,9 +529,12 @@
     "show": "Show again",
     "hiddenDone": "Hidden.",
     "shownDone": "Shown again.",
-    "appliesToHint": "Each page can only pick statuses ticked here.",
     "warningHint": "Equipment within this many days of the due date shows as \"Due soon\".",
-    "colorHint": "Used for this status on every page and on the Dashboard. Green = normal / passed · Yellow = needs attention · Red = failed / act now · Blue = waiting / info · Gray = inactive / neutral."
+    "colorHint": "Used for this status on every page and on the Dashboard. Green = normal / passed · Yellow = needs attention · Red = failed / act now · Blue = waiting / info · Gray = inactive / neutral.",
+    "optionsStale": "The change was saved, but the dropdown lists could not be refreshed. Reload the page so forms use the new lists.",
+    "calibrationPartHint": "Only part numbers used by equipment in Equipment and not set up yet. Their equipment joins the calibration dashboard automatically.",
+    "partNumberFixed": "The part number cannot be changed — delete this setup and add a new one.",
+    "calibrationDeleteWarning": "Delete the setup for {{name}}? Its equipment leaves the calibration dashboard (history is kept)."
   },
   "err": {
     "group": "Error",
@@ -612,9 +598,16 @@
     "recent": "Recent changes",
     "module": "Module",
     "allModules": "All modules",
-    "from": "From date",
-    "to": "To date",
+    "dates": "Dates",
+    "from": "From",
+    "to": "To",
     "loadMore": "Show more",
+    "fromImport": "Excel import",
+    "searchPlaceholder": "Search serial or name…",
+    "noMatch": "No changes match these filters.",
+    "importedBatch": "Imported {{count}} records",
+    "importedBatch_one": "Imported {{count}} record",
+    "importedBatch_other": "Imported {{count}} records",
     "moduleName": {
       "equipment": "Equipment",
       "calibration": "Calibration",
@@ -646,9 +639,6 @@
     "errorPasswordTooShort": "Password must be at least 10 characters.",
     "passwordChanged": "Password changed."
   },
-  "dynamicForm": {
-    "selectPlaceholder": "Select…"
-  },
   "errors": {
     "INVALID_CREDENTIALS": "Username or password is incorrect.",
     "CURRENT_PASSWORD_INCORRECT": "Current password is incorrect.",
@@ -676,14 +666,16 @@
     "REMARK_REQUIRED_FOR_STATUS": "This status requires a remark.",
     "SWAP_INVALID": "These two cannot be swapped.",
     "SWAP_INVALID_ANCESTOR_RELATION": "Cannot swap equipment that are parent and child of each other.",
-    "STATUS_NOT_ALLOWED": "This status is not enabled for this page.",
-    "STATUS_IN_USE": "This status is still used on that page.",
+    "STATUS_IN_USE": "This status is still in use and cannot be deleted.",
     "INACTIVE_OPTION": "The selected value is hidden.",
-    "ALREADY_IN_CALIBRATION": "This equipment is already on the calibration dashboard.",
     "CALIBRATION_INTERVAL_MISSING": "The part number has no calibration interval.",
-    "CALIBRATION_INTERVAL_IN_USE": "Equipment with this part number is on the calibration dashboard.",
     "LOCK_TIMEOUT": "Someone else is changing this right now. Try again in a few seconds.",
     "SERVER_ERROR": "System error. Please try again, or contact an admin with the request ID.",
-    "SWAP_NO_CHANGE": "Both have the same parent and location, so the swap would change nothing."
+    "SWAP_NO_CHANGE": "Both have the same parent and location, so the swap would change nothing.",
+    "NETWORK_ERROR": "Cannot connect to the server. Check your network connection and try again.",
+    "TIMEOUT": "The server is taking too long to respond. Please try again.",
+    "CONFLICT": "This conflicts with the current data. Reload and try again.",
+    "PAYLOAD_TOO_LARGE": "The data or file sent is too large.",
+    "UNKNOWN_ERROR": "Something went wrong. Please try again."
   }
 }

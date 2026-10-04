@@ -12,11 +12,12 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Pencil } from 'lucide-react';
-import { ApiError, formatTime } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
-import { Button, ErrorState, Notice, RequiredMark, Skeleton, toast } from '@/components/ui';
+import { ApiError, errorMessage, formatTime } from '@/lib/client/api';
+import { usePhone } from '@/lib/client/usePhone';
+import { Button, ErrorState, LoadingOverlay, Notice, RequiredMark, Skeleton, toast } from '@/components/ui';
 import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect';
-import { DetailPanel, DetailSection, DetailValue, type MoreItem, type PanelLayout } from './DetailPanel';
+import { ActionMenu, type MoreItem } from '@/components/ui/ActionMenu';
+import { DetailPanel, DetailSection, DetailValue, type PanelLayout } from './DetailPanel';
 import { DetailHistory } from './DetailHistory';
 import type { Audit } from '@/lib/types';
 
@@ -99,7 +100,8 @@ export type RecordDetailProps<R extends { id: string } & Audit> = {
   onRetry?: () => void;
   icon?: ReactNode;
   heading: (record: R) => Heading;
-  createTitle: string;
+  /** Tiêu đề form thêm mới (module có thêm mới). */
+  createTitle?: string;
   sections: SectionDef<R>[];
   extraTabs?: { key: string; label: string; render: (record: R) => ReactNode }[];
   historyUrl?: (record: R) => string;
@@ -134,8 +136,8 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
     historyFilter, historyLabels, canEdit, defaults, validate, onSave, actions = [], canDelete, deleteLabel, onDelete, deleteWarning,
     nav, onClose, onExpand, onSaved, onDeleted, leaveRef,
   } = props;
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
+  const { t } = useTranslation();
+  const phone = usePhone();
   const [mode, setMode] = useState<Mode>(creating ? { kind: 'create' } : { kind: 'view' });
   const [tab, setTab] = useState('info');
   const [draft, setDraft] = useState<Draft>({});
@@ -143,6 +145,8 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** Thao tác chạy ngay (ActionDef.run) đang gửi — khóa nút Thao tác, chống bấm lặp. */
+  const [running, setRunning] = useState(false);
   const [leavePrompt, setLeavePrompt] = useState<(() => void) | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -254,12 +258,11 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
       after?.();
     } catch (e) {
       if (e instanceof ApiError) {
-        const fe = e.fieldErrors;
         const mapped: Record<string, string> = {};
-        Object.entries(fe).forEach(([k, v]) => { mapped[k] = t(`dp.fieldError.${v}`, { defaultValue: v }); });
+        Object.entries(e.fieldErrors).forEach(([k, v]) => { mapped[k] = t(`dp.fieldError.${v}`, { defaultValue: v }); });
         setErrors(mapped);
-        setFormError(`${translateError(e.code, language, e.message)}${e.code === 'SERVER_ERROR' ? ` (${e.requestId})` : ''}`);
       }
+      setFormError(errorMessage(e, t));
     } finally {
       setSaving(false);
     }
@@ -273,7 +276,7 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
       toast.success(t('dp.deleted'));
       onDeleted?.(record);
     } catch (e) {
-      if (e instanceof ApiError) setFormError(translateError(e.code, language, e.message));
+      setFormError(errorMessage(e, t));
       setMode({ kind: 'view' });
     } finally {
       setSaving(false);
@@ -281,13 +284,16 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
   }
 
   async function runAction(action: ActionDef<R>) {
-    if (!record || !action.run) return;
+    if (!record || !action.run || running) return;
+    setRunning(true);
     try {
       const updated = await action.run(record);
       toast.success(action.runMessage ?? t('dp.saved'));
       if (updated) onSaved(updated, false);
     } catch (e) {
-      if (e instanceof ApiError) toast.error(translateError(e.code, language, e.message));
+      toast.error(errorMessage(e, t));
+    } finally {
+      setRunning(false);
     }
   }
 
@@ -326,7 +332,7 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
     ...(canDelete && onDelete ? [{ key: 'delete', label: deleteLabel ?? t('common.delete'), danger: true, onClick: () => setMode({ kind: 'delete' }) }] : []),
   ] : [];
 
-  const head = record && mode.kind !== 'create' ? heading(record) : { title: createTitle } as Heading;
+  const head = record && mode.kind !== 'create' ? heading(record) : { title: createTitle ?? '' } as Heading;
   const tabs = mode.kind === 'view' && record ? [
     { key: 'info', label: t('dp.tabInfo') },
     ...(extraTabs ?? []).map((x) => ({ key: x.key, label: x.label })),
@@ -368,15 +374,25 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
     );
   }
 
-  const mobileBar = mode.kind === 'view' && record ? (
+  // Điện thoại, khi xem: nút chính + Sửa + Thao tác ▾ ở đáy (vùng ngón cái); ‹ › nằm ở header.
+  // Nút chính thứ hai trở đi (ví dụ Từ chối) không có chỗ ở thanh đáy → vào menu Thao tác.
+  const phoneMore: MoreItem[] = [
+    ...primary.slice(1).map((a) => ({ key: a.key, label: a.label, icon: a.icon, danger: a.danger, onClick: () => trigger(a) })),
+    ...moreItems,
+  ];
+  const mobileBar = phone && mode.kind === 'view' && record && (canEdit || phoneMore.length > 0) ? (
     <div className="dp-mobilebar-row">
-      <button type="button" className="dp-icon-btn" onClick={nav?.onPrev} disabled={!nav?.onPrev} aria-label={t('dp.prev')}>‹</button>
-      {primary[0] ? (
-        <Button variant="primary" onClick={() => trigger(primary[0]!)}>{primary[0].label}</Button>
-      ) : canEdit ? (
-        <Button variant="primary" onClick={startEdit}><Pencil size={14} aria-hidden="true" />{t('common.edit')}</Button>
-      ) : <span />}
-      <button type="button" className="dp-icon-btn" onClick={nav?.onNext} disabled={!nav?.onNext} aria-label={t('dp.next')}>›</button>
+      <div className="dp-mobilebar-actions">
+        {primary[0] && (
+          <Button variant="primary" onClick={() => trigger(primary[0]!)}>{primary[0].icon}{primary[0].label}</Button>
+        )}
+        {canEdit && (
+          <Button variant={primary[0] ? 'quiet' : 'primary'} onClick={startEdit}>
+            <Pencil size={14} aria-hidden="true" />{t('common.edit')}
+          </Button>
+        )}
+      </div>
+      {phoneMore.length > 0 && <ActionMenu items={phoneMore} busy={running} />}
     </div>
   ) : undefined;
 
@@ -453,13 +469,13 @@ export function RecordDetail<R extends { id: string } & Audit>(props: RecordDeta
       layout={layout} icon={icon} title={head.title} tags={mode.kind === 'create' ? undefined : head.tags}
       subtitle={mode.kind === 'create' ? undefined : head.subtitle} meta={mode.kind === 'view' ? head.meta : undefined}
       nav={mode.kind === 'create' ? undefined : { onPrev: nav?.onPrev && (() => guard(nav.onPrev!)), onNext: nav?.onNext && (() => guard(nav.onNext!)) }}
-      actions={headerActions} more={moreItems}
+      actions={headerActions} more={phone ? undefined : moreItems} moreBusy={running}
       onExpand={mode.kind === 'view' ? onExpand : undefined}
       onClose={onClose && (() => guard(onClose))}
       tabs={tabs} activeTab={tab} onTab={setTab}
       footer={footer} mobileBar={mobileBar}
     >
-      <div ref={bodyRef} className="dp-body-inner">{body}</div>
+      <div ref={bodyRef} className="dp-body-inner" data-mode={mode.kind}>{body}</div>
     </DetailPanel>
   );
 }
@@ -562,32 +578,53 @@ function FieldEditor<R>({ field, record, draft, required, error, onChange }: {
   );
 }
 
-/** Khung màn hình thao tác: ← Quay lại · tiêu đề · nội dung · [Hủy] [Xác nhận]. */
-export function ActionScreen({ title, description, children, onCancel, onConfirm, confirmLabel, busy, error, confirmDisabled, danger }: {
+/**
+ * Khung màn hình thao tác: ← Quay lại · tiêu đề · nội dung · [Hủy] [Xác nhận].
+ * Khung lo trạng thái gửi: đang chạy thì khóa màn hình (không bấm lặp, không
+ * rời đi giữa chừng); lỗi (kể cả mất mạng) hiện ngay trên màn hình.
+ */
+export function ActionScreen({ title, description, children, onCancel, onConfirm, confirmLabel, confirmDisabled, danger }: {
   title: string;
   description?: ReactNode;
   children?: ReactNode;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void>;
   confirmLabel?: string;
-  busy?: boolean;
-  error?: string | null;
   confirmDisabled?: boolean;
   danger?: boolean;
 }) {
   const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (e) {
+      setError(errorMessage(e, t));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="dp-action">
-      <button type="button" className="dp-action-back" onClick={onCancel}>
+      <button type="button" className="dp-action-back" onClick={onCancel} disabled={busy}>
         <ArrowLeft size={15} aria-hidden="true" />{t('dp.backToDetail')}
       </button>
       <h3 className="dp-action-title">{title}</h3>
       {description && <p className="dp-action-desc">{description}</p>}
       {error && <Notice tone="alert">{error}</Notice>}
-      <div className="dp-action-body">{children}</div>
+      <div className="dp-action-body">
+        {children}
+        {busy && children && <LoadingOverlay label={t('common.processing')} />}
+      </div>
       <div className="dp-action-footer">
         <Button onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button>
-        <Button variant={danger ? 'danger' : 'primary'} loading={busy} disabled={confirmDisabled} onClick={onConfirm}>
+        <Button variant={danger ? 'danger' : 'primary'} loading={busy} disabled={confirmDisabled} onClick={() => void confirm()}>
           {confirmLabel ?? t('dp.confirm')}
         </Button>
       </div>

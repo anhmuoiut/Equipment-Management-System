@@ -1,6 +1,6 @@
-# Database v2
+# Database
 
-Thiết kế: [docs/DATABASE_MODIFIED.md](../docs/DATABASE_MODIFIED.md). Thư mục này chỉ chứa các file SQL của database v2. Toàn bộ schema cũ đã bị xóa.
+Thiết kế: [docs/DATABASE_MODIFIED.md](../docs/DATABASE_MODIFIED.md). Thư mục này chứa các file SQL dựng database.
 
 ## Chạy theo thứ tự
 
@@ -9,15 +9,14 @@ Mở Supabase → **SQL Editor**, dán từng file vào rồi bấm **Run**:
 | # | File | Làm gì | Bắt buộc |
 | --- | --- | --- | --- |
 | 1 | `01_reset_blank.sql` | Xóa sạch schema `public` (mọi bảng, view, function và **toàn bộ dữ liệu**). Không hoàn tác được. Kết quả kiểm tra cuối file phải ra 0 dòng | Có |
-| 2 | `02_schema.sql` | Tạo 19 bảng và 1 view theo DATABASE_MODIFIED.md, bật RLS. Kết quả kiểm tra cuối file phải ra 19 `BASE TABLE` + 1 `VIEW` | Có |
+| 2 | `02_schema.sql` | Tạo 19 bảng theo DATABASE_MODIFIED.md, bật RLS. Kết quả kiểm tra cuối file phải ra 19 `BASE TABLE` | Có |
 | 3 | `03_seed_sample.sql` | Dữ liệu mẫu cho Configuration: Type, Level, Status, vendor "Internal". Sửa trước khi chạy nếu cần | Không |
-| 4 | `04_functions.sql` | Nghiệp vụ: tự ghi lịch sử, `app_write`, Đổi vị trí / Move / Swap / Detach / Xóa (thiết bị con đi theo hoặc ở lại chỗ cũ), Import Excel, tự tính `due_date`. Kết quả kiểm tra cuối file: `history_triggers = 12`, `app_write = 1`, `equipment_import = 1`, `equipment_swap_args = 4`. Chạy lại được nhiều lần — file này đổi thì chạy lại (database đang có dữ liệu cũng không sao) | Có |
-| 5 | `05_status_color.sql` | Thêm cột màu `statuses.color` cho database đã chạy `02_schema.sql` bản cũ (chưa có cột này), gán màu gợi ý cho trạng thái mẫu. Database cài mới chạy cũng không sao. Kết quả cuối file: danh sách trạng thái kèm màu. Chạy lại được nhiều lần | Có, nếu database tạo trước khi có cột màu |
-| 6 | Tạo admin đầu tiên | Xem [Tạo admin đầu tiên](#tạo-admin-đầu-tiên) (cần bước 4) | Có |
+| 4 | `04_functions.sql` | Nghiệp vụ: tự ghi lịch sử, `app_write`, Đổi vị trí / Move / Swap / Detach / Xóa (thiết bị con đi theo hoặc ở lại chỗ cũ), Import Excel (Equipment, Golden), tự tính `due_date`, view `recent_activities` (Dashboard — import gộp một dòng). Kết quả kiểm tra cuối file: `history_triggers = 13`, `app_write = 1`, `equipment_import = 1`, `golden_import = 1`, `equipment_swap_args = 4`. Chạy lại được nhiều lần — file này đổi thì chạy lại (database đang có dữ liệu cũng không sao) | Có |
+| 5 | Tạo admin đầu tiên | Xem [Tạo admin đầu tiên](#tạo-admin-đầu-tiên) (cần bước 4) | Có |
 
-Tài khoản Supabase Auth cũ (email + mật khẩu) **không** bị xóa ở bước 1. Nếu Supabase project này chỉ dùng cho Equipment Management, bỏ comment dòng `delete from auth.users;` trong `01_reset_blank.sql` trước khi chạy.
+Tài khoản Supabase Auth đã có (email + mật khẩu) **không** bị xóa ở bước 1. Nếu Supabase project này chỉ dùng cho Equipment Management, bỏ comment dòng `delete from auth.users;` trong `01_reset_blank.sql` trước khi chạy.
 
-App mới chỉ chạy được khi đã có đủ bước 1, 2, 4 và một admin.
+App chỉ chạy được khi đã có đủ bước 1, 2, 4 và một admin.
 
 ## Tạo admin đầu tiên
 
@@ -30,7 +29,7 @@ npm run seed:admin -- email@jabil.com "Họ Tên" ten.dang.nhap
 ```
 
 - Tự đọc `.env.local` và tự dùng chứng chỉ của Windows (qua được proxy SSL của công ty).
-- Email đã có trong Supabase Auth (tài khoản cũ còn giữ sau bước 1): dùng lại tài khoản đó, đặt mật khẩu mới.
+- Email đã có trong Supabase Auth (tài khoản còn giữ sau bước 1): dùng lại tài khoản đó, đặt mật khẩu mới.
 - Script in ra mật khẩu tạm một lần duy nhất — đăng nhập bằng **username** rồi đổi mật khẩu.
 
 **Cách B — tự đăng ký rồi nâng quyền bằng SQL** (không cần chạy script):
@@ -52,7 +51,7 @@ where username = 'man.tran';
 **Cách C — thêm thẳng trong database** (không cần script, không cần đăng ký):
 
 1. Cần một tài khoản trong Supabase Auth:
-   - Tài khoản cũ (bước 1 không xóa): xem danh sách bằng `select id, email, last_sign_in_at from auth.users;` — dùng được nếu còn nhớ mật khẩu.
+   - Tài khoản đã có (bước 1 không xóa): xem danh sách bằng `select id, email, last_sign_in_at from auth.users;` — dùng được nếu còn nhớ mật khẩu.
    - Hoặc tạo mới: Supabase Dashboard → **Authentication → Users → Add user → Create new user**, nhập email + mật khẩu, tích **Auto Confirm User**.
 2. Trong SQL Editor, đổi email / username / họ tên rồi chạy:
 
@@ -80,13 +79,13 @@ where lower(u.email) = lower('email-cua-ban@jabil.com');
 - **Lịch sử tự động**: mọi thêm / sửa / xóa trên bảng chính tự ghi vào `<module>_histories` trong cùng giao dịch, kèm người thao tác. Server không tự thêm dòng lịch sử.
 - **`app_write`**: một cửa thêm / sửa / xóa cho server (bảng được phép ghi nằm trong danh sách cố định; không xóa được tài khoản).
 - **Equipment**: `equipment_change_location`, `equipment_move`, `equipment_detach`, `equipment_swap`, `equipment_delete` — tham số `p_children`: `follow` (mặc định, cả cây con đi theo / bị xóa theo) hoặc `stay` (con ở lại chỗ cũ, gắn vào thiết bị đến thay hoặc cha cũ); chặn vòng lặp cha – con và swap không thay đổi gì (`SWAP_NO_CHANGE`).
-- **Import Excel**: `equipment_import` thêm mọi dòng của file trong **một** giao dịch (một dòng lỗi → không dòng nào được thêm); lịch sử `CREATE` với nguồn `import`. Server kiểm tra từng dòng trước khi gọi.
-- **Calibration**: `due_date = calibration_date + interval_months`; tính lại khi đổi chu kỳ hoặc thiết bị đổi part number; không xóa được chu kỳ khi part number đang có thiết bị trên Dashboard hiệu chuẩn.
+- **Import Excel**: `equipment_import` / `golden_import` thêm mọi dòng của file trong **một** giao dịch (một dòng lỗi → không dòng nào được thêm); lịch sử `CREATE` với nguồn `import`. Server kiểm tra từng dòng trước khi gọi.
+- **Calibration**: `due_date = calibration_date + interval_months`; tính lại khi đổi chu kỳ hoặc thiết bị đổi part number. Dashboard hiệu chuẩn tự đồng bộ: thiết bị có part number trong `calibration_configurations` luôn có một dòng (status ban đầu = `default_status_id`), không còn thì dòng bị bỏ.
 
 ## Database tự chặn sẵn (trong `02_schema.sql`)
 
-- Chọn trạng thái không dành cho trang đó → lỗi `STATUS_NOT_ALLOWED`. Ví dụ: thiết bị không chọn được Pass.
-- Bỏ một trang khỏi `statuses.applies_to` trong khi trang đó đang dùng trạng thái này → lỗi `STATUS_IN_USE`.
+- Thiết bị và golden sample bắt buộc có trạng thái (`status_id not null`); một danh sách trạng thái chung. Trạng thái trên trang Calibration là trạng thái của thiết bị.
+- Xóa trạng thái đang được dùng → lỗi khóa ngoại (`STATUS_IN_USE`).
 - Sửa hoặc xóa dòng trong bảng lịch sử → lỗi `HISTORY_IS_APPEND_ONLY`.
 - Xóa trạng thái, hoặc part number đã có chu kỳ hiệu chuẩn, khi đang được dùng → lỗi khóa ngoại.
 - Xóa thiết bị cha (khóa ngoại `on delete cascade`) thì cả cây con bị xóa theo, kèm dòng hiệu chuẩn của từng thiết bị — trừ khi `equipment_delete` được gọi với `p_children = 'stay'` (con được chuyển sang cha cũ trước khi xóa).

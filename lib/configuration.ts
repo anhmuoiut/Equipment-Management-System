@@ -16,7 +16,8 @@ export type ConfigListDef = {
   deletable: boolean;
   hasDescription?: boolean;
   isStatus?: boolean;
-  isInterval?: boolean;
+  /** Hiệu chuẩn › Setup: part number (trong các PN đang có thiết bị), chu kỳ, báo trước, status mặc định. */
+  isCalibration?: boolean;
 };
 
 export const CONFIG_LISTS: readonly ConfigListDef[] = [
@@ -26,7 +27,7 @@ export const CONFIG_LISTS: readonly ConfigListDef[] = [
   { key: 'statuses', table: 'statuses', group: 'master', hideable: false, deletable: true, isStatus: true },
   { key: 'levels', table: 'levels', group: 'master', hideable: true, deletable: false },
   { key: 'departments', table: 'departments', group: 'master', hideable: true, deletable: false },
-  { key: 'calibration-intervals', table: 'calibration_configurations', group: 'calibration', hideable: false, deletable: true, isInterval: true },
+  { key: 'calibration-setup', table: 'calibration_configurations', group: 'calibration', hideable: false, deletable: true, isCalibration: true },
   { key: 'calibration-vendors', table: 'calibration_vendors', group: 'calibration', hideable: true, deletable: false },
 ];
 

@@ -8,8 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Crosshair, Search } from 'lucide-react';
-import { api, ApiError } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
+import { useFetch } from '@/lib/client/useFetch';
 import { Button, ErrorState, Spinner } from '@/components/ui';
 import type { EquipmentTreeNode } from '@/lib/types';
 
@@ -17,20 +16,12 @@ type Tree = { root_id: string; nodes: EquipmentTreeNode[] };
 const OPEN_ALL_LIMIT = 30;
 
 export function EquipmentTree({ equipmentId, onOpen }: { equipmentId: string; onOpen: (id: string) => void }) {
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
-  const [tree, setTree] = useState<Tree | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
+  const { t } = useTranslation();
+  const { data: tree, error, reload } = useFetch<Tree>(`/api/equipment/${equipmentId}/tree`);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
-
-  const load = useCallback(() => {
-    setError(null);
-    api.get<Tree>(`/api/equipment/${equipmentId}/tree`).then((r) => setTree(r.data)).catch((e) => { if (e instanceof ApiError) setError(e); });
-  }, [equipmentId]);
-  useEffect(() => { setTree(null); load(); }, [load]);
 
   const { byId, children } = useMemo(() => {
     const byId = new Map<string, EquipmentTreeNode>();
@@ -114,7 +105,7 @@ export function EquipmentTree({ equipmentId, onOpen }: { equipmentId: string; on
     } else if (e.key === 'Enter') { e.preventDefault(); onOpen(current.id); }
   }
 
-  if (error) return <ErrorState message={translateError(error.code, language, error.message)} onRetry={load} />;
+  if (error) return <ErrorState message={error} onRetry={reload} />;
   if (!tree) return <Spinner label={t('common.loadingEllipsis')} />;
 
   return (

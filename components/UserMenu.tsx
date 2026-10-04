@@ -1,10 +1,8 @@
 'use client';
 
 /**
- * The header's user chip and the standalone logout button used to sit side
- * by side — two separate controls for what is really one concept ("acting
- * as this person"). This combines them into a single trigger (avatar + full
- * name) that opens a small menu: account settings, then sign out.
+ * One trigger (avatar + full name) for "acting as this person": a small menu
+ * with account settings, then sign out.
  *
  * Account settings itself is two independent forms — updating your own
  * name/employee ID/department, and changing your own password — each with
@@ -15,12 +13,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Eye, EyeOff, LogOut, UserRound } from 'lucide-react';
-import { api, ApiError } from '@/lib/client/api';
-import type { OptionItem, Options } from '@/lib/types';
-import { Button, Modal, Notice, RequiredMark, Spinner, toast } from '@/components/ui';
+import { ChevronDown, Eye, EyeOff, Loader2, LogOut, UserRound } from 'lucide-react';
+import { api, errorMessage } from '@/lib/client/api';
+import { useFetch } from '@/lib/client/useFetch';
+import { toSelect, useOptions } from '@/lib/client/options';
+import { Button, ErrorState, Modal, Notice, RequiredMark, Spinner, toast } from '@/components/ui';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { translateError } from '@/lib/i18n/errors';
+import { PreferenceMenuItems } from '@/components/Preferences';
 
 type OwnAccount = {
   full_name: string;
@@ -36,6 +35,7 @@ export function UserMenu({ username, fullName }: { username: string; fullName: s
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,9 +48,17 @@ export function UserMenu({ username, fullName }: { username: string; fullName: s
   }, [open]);
 
   async function signOut() {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    router.push('/login');
-    router.refresh();
+    setSigningOut(true);
+    try {
+      await api.post('/api/auth/logout');
+      // Giữ trạng thái đang đăng xuất tới khi rời trang.
+      router.push('/login');
+      router.refresh();
+    } catch (e) {
+      // Phiên chưa xóa được: ở lại và báo, không chuyển sang /login (middleware sẽ đưa về lại).
+      toast.error(errorMessage(e, t));
+      setSigningOut(false);
+    }
   }
 
   const displayName = fullName || username;
@@ -73,60 +81,48 @@ export function UserMenu({ username, fullName }: { username: string; fullName: s
               <UserRound size={15} aria-hidden="true" />{t('userMenu.accountSettings')}
             </button>
           </li>
-          <li role="none">
-            <button type="button" role="menuitem" data-danger onClick={() => void signOut()}>
-              <LogOut size={15} aria-hidden="true" />{t('nav.signOut')}
+          <PreferenceMenuItems onDone={() => setOpen(false)} />
+          <li role="none" className="user-menu-signout">
+            <button type="button" role="menuitem" data-danger disabled={signingOut} aria-busy={signingOut || undefined}
+              onClick={() => void signOut()}>
+              {signingOut ? <Loader2 size={15} aria-hidden="true" className="ui-spin" /> : <LogOut size={15} aria-hidden="true" />}
+              {t('nav.signOut')}
             </button>
           </li>
         </ul>
       )}
-      <AccountSettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+      {showSettings && <AccountSettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
 
-function AccountSettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
+/** Mở mới mỗi lần (mount khi mở): luôn đọc thông tin mới nhất, form trống. */
+function AccountSettingsModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
+  const { data: account, error, reload } = useFetch<OwnAccount>('/api/me');
+  return (
+    <Modal wide title={t('userMenu.accountSettings')} onClose={onClose}>
+      {error ? <ErrorState message={error} onRetry={reload} />
+        : !account ? <Spinner label={t('common.loadingEllipsis')} />
+          : <AccountForms account={account} />}
+    </Modal>
+  );
+}
 
-  const [account, setAccount] = useState<OwnAccount | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<ApiError | null>(null);
-  const [departments, setDepartments] = useState<OptionItem[]>([]);
+function AccountForms({ account }: { account: OwnAccount }) {
+  const { t } = useTranslation();
+  const options = useOptions();
 
-  const [profileForm, setProfileForm] = useState({ full_name: '', employee_id: '', department_id: '' });
+  const [profileForm, setProfileForm] = useState({
+    full_name: account.full_name, employee_id: account.employee_id ?? '', department_id: account.department_id ?? '',
+  });
   const [profileBusy, setProfileBusy] = useState(false);
-  const [profileError, setProfileError] = useState<ApiError | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwVisible, setPwVisible] = useState(false);
   const [pwBusy, setPwBusy] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
-  const [pwApiError, setPwApiError] = useState<ApiError | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setProfileError(null);
-    setPwForm({ current: '', next: '', confirm: '' });
-    setPwVisible(false); setPwError(null); setPwApiError(null);
-    setLoading(true);
-    setLoadError(null);
-    void Promise.all([
-      api.get<OwnAccount>('/api/me'),
-      api.get<Options>('/api/options'),
-    ])
-      .then(([me, masterData]) => {
-        setAccount(me.data);
-        setDepartments(masterData.data.departments);
-        setProfileForm({
-          full_name: me.data.full_name,
-          employee_id: me.data.employee_id ?? '',
-          department_id: me.data.department_id ?? '',
-        });
-      })
-      .catch((e) => { if (e instanceof ApiError) setLoadError(e); })
-      .finally(() => setLoading(false));
-  }, [open]);
 
   async function saveProfile() {
     setProfileBusy(true);
@@ -139,14 +135,14 @@ function AccountSettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       });
       toast.success(t('userMenu.profileSaved'));
     } catch (e) {
-      if (e instanceof ApiError) setProfileError(e);
+      setProfileError(errorMessage(e, t));
     } finally {
       setProfileBusy(false);
     }
   }
 
   async function submitPassword() {
-    setPwError(null); setPwApiError(null);
+    setPwError(null);
     if (pwForm.next !== pwForm.confirm) { setPwError(t('adminUsers.errorPasswordMismatch')); return; }
     if (pwForm.next.length < 10) { setPwError(t('adminUsers.errorPasswordTooShort')); return; }
     if (pwForm.next === pwForm.current) { setPwError(t('forcedPassword.errorSameAsCurrent')); return; }
@@ -156,109 +152,100 @@ function AccountSettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       toast.success(t('adminUsers.passwordChanged'));
       setPwForm({ current: '', next: '', confirm: '' });
     } catch (e) {
-      if (e instanceof ApiError) setPwApiError(e);
+      setPwError(errorMessage(e, t));
     } finally {
       setPwBusy(false);
     }
   }
 
   return (
-    <Modal open={open} wide title={t('userMenu.accountSettings')} onClose={onClose}>
-      {loading ? (
-        <Spinner label={t('common.loadingEllipsis')} />
-      ) : loadError ? (
-        <Notice tone="alert">{translateError(loadError.code, language, loadError.message)}</Notice>
-      ) : account && (
-        <div className="grid gap-6">
-          <section className="grid gap-3">
-            <div>
-              <h3 className="text-[14px] font-semibold">{t('userMenu.yourInformation')}</h3>
-              <p className="ident mt-0.5 text-[12px]" style={{ color: 'var(--ink-3)' }}>
-                {account.username}{account.email ? ` · ${account.email}` : ''}
-              </p>
-            </div>
-
-            {profileError && <Notice tone="alert">{translateError(profileError.code, language, profileError.message)}</Notice>}
-
-            <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-              {t('adminUsers.fullName')}<RequiredMark />
-              <input required value={profileForm.full_name}
-                onChange={(e) => setProfileForm((f) => ({ ...f, full_name: e.target.value }))}
-                className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-                {t('adminUsers.employeeId')}
-                <input value={profileForm.employee_id}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, employee_id: e.target.value }))}
-                  className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-              </label>
-              <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-                {t('adminUsers.department')}
-                <SearchableSelect
-                  value={profileForm.department_id} clearable placeholder={t('dynamicForm.selectPlaceholder')}
-                  ariaLabel={t('adminUsers.department')}
-                  onChange={(v) => setProfileForm((f) => ({ ...f, department_id: v }))}
-                  options={departments.filter((d) => d.is_active || d.id === profileForm.department_id).map((d) => ({ value: d.id, label: d.display_name }))}
-                  className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }}
-                />
-              </label>
-            </div>
-            <div className="flex items-center justify-end gap-3">
-              <Button variant="primary" disabled={!profileForm.full_name.trim()} loading={profileBusy} onClick={() => void saveProfile()}>
-                {t('common.save')}
-              </Button>
-            </div>
-          </section>
-
-          <section className="grid gap-3 border-t pt-4" style={{ borderColor: 'var(--rule-soft)' }}>
-            <h3 className="text-[14px] font-semibold">{t('userMenu.changePassword')}</h3>
-
-            {pwError && <Notice tone="alert">{pwError}</Notice>}
-            {pwApiError && <Notice tone="alert">{translateError(pwApiError.code, language, pwApiError.message)}</Notice>}
-
-            <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-              {t('userMenu.currentPassword')}<RequiredMark />
-              <div className="login-input mt-1">
-                <input required minLength={1} maxLength={256} type={pwVisible ? 'text' : 'password'}
-                  autoComplete="current-password" value={pwForm.current}
-                  onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
-                  className="w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-              </div>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-                {t('adminUsers.newPassword')}<RequiredMark />
-                <div className="login-input mt-1">
-                  <input required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
-                    autoComplete="new-password" value={pwForm.next}
-                    onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
-                    className="w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-                  <button type="button" onClick={() => setPwVisible((v) => !v)}
-                    aria-label={pwVisible ? t('login.hidePassword') : t('login.showPassword')}>
-                    {pwVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </label>
-              <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
-                {t('adminUsers.confirmNewPassword')}<RequiredMark />
-                <input required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
-                  autoComplete="new-password" value={pwForm.confirm}
-                  onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
-                  className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
-              </label>
-            </div>
-            <div className="flex items-center justify-end gap-3">
-              <Button
-                variant="primary" disabled={!pwForm.current || !pwForm.next || !pwForm.confirm} loading={pwBusy}
-                onClick={() => void submitPassword()}
-              >
-                {t('userMenu.updatePassword')}
-              </Button>
-            </div>
-          </section>
+    <div className="grid gap-6">
+      <section className="grid gap-3">
+        <div>
+          <h3 className="text-[14px] font-semibold">{t('userMenu.yourInformation')}</h3>
+          <p className="ident mt-0.5 text-[12px]" style={{ color: 'var(--ink-3)' }}>
+            {account.username}{account.email ? ` · ${account.email}` : ''}
+          </p>
         </div>
-      )}
-    </Modal>
+
+        {profileError && <Notice tone="alert">{profileError}</Notice>}
+
+        <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
+          {t('adminUsers.fullName')}<RequiredMark />
+          <input required value={profileForm.full_name}
+            onChange={(e) => setProfileForm((f) => ({ ...f, full_name: e.target.value }))}
+            className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
+            {t('adminUsers.employeeId')}
+            <input value={profileForm.employee_id}
+              onChange={(e) => setProfileForm((f) => ({ ...f, employee_id: e.target.value }))}
+              className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
+          </label>
+          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
+            {t('adminUsers.department')}
+            <SearchableSelect
+              value={profileForm.department_id} clearable placeholder={t('dp.selectPlaceholder')}
+              ariaLabel={t('adminUsers.department')}
+              onChange={(v) => setProfileForm((f) => ({ ...f, department_id: v }))}
+              options={toSelect(options?.departments, profileForm.department_id)}
+              className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }}
+            />
+          </label>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="primary" disabled={!profileForm.full_name.trim()} loading={profileBusy} onClick={() => void saveProfile()}>
+            {t('common.save')}
+          </Button>
+        </div>
+      </section>
+
+      <section className="grid gap-3 border-t pt-4" style={{ borderColor: 'var(--rule-soft)' }}>
+        <h3 className="text-[14px] font-semibold">{t('userMenu.changePassword')}</h3>
+
+        {pwError && <Notice tone="alert">{pwError}</Notice>}
+
+        <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
+          {t('userMenu.currentPassword')}<RequiredMark />
+          <div className="login-input mt-1">
+            <input required minLength={1} maxLength={256} type={pwVisible ? 'text' : 'password'}
+              autoComplete="current-password" value={pwForm.current}
+              onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
+              className="w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
+          </div>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
+            {t('adminUsers.newPassword')}<RequiredMark />
+            <div className="login-input mt-1">
+              <input required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
+                autoComplete="new-password" value={pwForm.next}
+                onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
+                className="w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
+              <button type="button" onClick={() => setPwVisible((v) => !v)}
+                aria-label={pwVisible ? t('login.hidePassword') : t('login.showPassword')}>
+                {pwVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </label>
+          <label className="block text-[12px] font-medium" style={{ color: 'var(--ink-2)' }}>
+            {t('adminUsers.confirmNewPassword')}<RequiredMark />
+            <input required minLength={10} maxLength={256} type={pwVisible ? 'text' : 'password'}
+              autoComplete="new-password" value={pwForm.confirm}
+              onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
+              className="mt-1 w-full border px-2 py-1.5 text-[13px]" style={{ borderColor: 'var(--rule)' }} />
+          </label>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <Button
+            variant="primary" disabled={!pwForm.current || !pwForm.next || !pwForm.confirm} loading={pwBusy}
+            onClick={() => void submitPassword()}
+          >
+            {t('userMenu.updatePassword')}
+          </Button>
+        </div>
+      </section>
+    </div>
   );
 }

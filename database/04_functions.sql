@@ -1,5 +1,5 @@
 -- =============================================================================
--- 04_functions.sql — NGHIỆP VỤ của database v2 (chạy sau 02_schema.sql).
+-- 04_functions.sql — NGHIỆP VỤ của database (chạy sau 02_schema.sql).
 --
 -- 1. Lịch sử tự động: mọi thêm / sửa / xóa trên bảng chính tự ghi vào
 --    <module>_histories trong cùng giao dịch (trigger write_history).
@@ -8,6 +8,7 @@
 -- 3. Equipment: đổi vị trí, Move / Detach / Swap, xóa — thiết bị con đi theo
 --    hoặc ở lại chỗ cũ (p_children); import Excel.
 -- 4. Calibration: tự tính due_date; tính lại khi đổi chu kỳ / part number.
+-- 5. Dashboard: view recent_activities (thay đổi gần đây; import gộp một dòng).
 --
 -- Chạy lại nhiều lần được (create or replace).
 -- =============================================================================
@@ -314,13 +315,6 @@ $$;
 -- stayed:<SN> (Move / Detach / Đổi vị trí), stayed_swap:<SN>, parent_deleted:<SN>.
 -- =============================================================================
 
--- Chữ ký cũ (chưa có p_children) — bỏ để PostgREST không gặp hai hàm trùng tên.
-drop function if exists public.equipment_change_location(uuid, uuid, uuid);
-drop function if exists public.equipment_move(uuid, uuid, uuid);
-drop function if exists public.equipment_detach(uuid, uuid);
-drop function if exists public.equipment_swap(uuid, uuid, uuid);
-drop function if exists public.equipment_delete(uuid, uuid);
-
 -- Thiết bị và toàn bộ con cháu.
 create or replace function public.equipment_subtree_ids(p_id uuid) returns setof uuid
 language sql stable set search_path = '' as $$
@@ -558,6 +552,31 @@ begin
 end;
 $$;
 
+-- Import Excel cho Golden sample — thêm nhiều dòng trong MỘT giao dịch (một dòng
+-- lỗi thì không dòng nào được ghi). Server đã kiểm tra từng dòng trước khi gọi.
+-- Lịch sử: CREATE cho từng golden sample, source = import. Trả về số dòng đã thêm.
+create or replace function public.golden_import(p_rows jsonb, p_actor uuid) returns integer
+language plpgsql set search_path = '' as $$
+declare
+  v_count integer;
+begin
+  if jsonb_typeof(p_rows) is distinct from 'array' or jsonb_array_length(p_rows) = 0 then
+    raise exception 'VALIDATION_ERROR' using detail = 'no rows';
+  end if;
+  perform public.set_ctx('actor_id', p_actor::text);
+  perform public.set_ctx('source', 'import');
+  perform public.set_ctx('action', null);
+  perform public.set_ctx('note', null);
+  insert into public.golden_samples
+    (part_number, serial_number, utd_part_number, location_id, status_id, origin, purpose, remark, created_by, updated_by)
+  select r.part_number, r.serial_number, r.utd_part_number, r.location_id, r.status_id, r.origin, r.purpose, r.remark,
+         p_actor, p_actor
+  from jsonb_populate_recordset(null::public.golden_samples, p_rows) r;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
 -- =============================================================================
 -- 4. CALIBRATION — due_date = calibration_date + chu kỳ của part number
 -- =============================================================================
@@ -581,54 +600,115 @@ drop trigger if exists calibration_equipments_compute_due on public.calibration_
 create trigger calibration_equipments_compute_due before insert or update on public.calibration_equipments
   for each row execute function public.calibration_compute_due();
 
--- Đổi / thêm / xóa chu kỳ → tính lại due_date của mọi thiết bị cùng part number.
+-- Dashboard hiệu chuẩn tự đồng bộ với Configuration › Hiệu chuẩn › Setup:
+-- thiết bị có part number trong calibration_configurations luôn có đúng một dòng
+-- calibration_equipments; không còn thì dòng bị bỏ (lịch sử REMOVE vẫn giữ).
+-- Trạng thái là của thiết bị (equipments.status_id). Người ghi lịch sử = người thao tác gốc (ctx).
+
+-- Thêm part number vào Setup → mọi thiết bị của PN lên Dashboard; xóa → rời Dashboard.
+create or replace function public.calibration_sync_configuration() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  v_actor uuid := public.ctx('actor_id')::uuid;
+begin
+  if tg_op = 'INSERT' then
+    insert into public.calibration_equipments (equipment_id, created_by, updated_by)
+    select e.id, v_actor, v_actor
+    from public.equipments e
+    where e.part_number_id = new.part_number_id
+      and not exists (select 1 from public.calibration_equipments ce where ce.equipment_id = e.id);
+    return null;
+  end if;
+  delete from public.calibration_equipments ce
+  using public.equipments e
+  where e.id = ce.equipment_id and e.part_number_id = old.part_number_id;
+  return null;
+end;
+$$;
+drop trigger if exists calibration_configurations_sync on public.calibration_configurations;
+create trigger calibration_configurations_sync after insert or delete on public.calibration_configurations
+  for each row execute function public.calibration_sync_configuration();
+
+-- Đổi chu kỳ → tính lại due_date của mọi thiết bị cùng part number.
 create or replace function public.calibration_configuration_changed() returns trigger
 language plpgsql set search_path = '' as $$
 begin
   update public.calibration_equipments ce set updated_at = now()
   from public.equipments e
-  where e.id = ce.equipment_id
-    and e.part_number_id in (
-      (case when tg_op <> 'DELETE' then new.part_number_id end),
-      (case when tg_op <> 'INSERT' then old.part_number_id end));
+  where e.id = ce.equipment_id and e.part_number_id = new.part_number_id;
   return null;
 end;
 $$;
 drop trigger if exists calibration_configurations_changed on public.calibration_configurations;
 create trigger calibration_configurations_changed
-  after insert or update of interval_months, part_number_id or delete on public.calibration_configurations
+  after update of interval_months on public.calibration_configurations
   for each row execute function public.calibration_configuration_changed();
--- Part number đang có thiết bị trên Dashboard hiệu chuẩn thì không xóa được chu kỳ.
-create or replace function public.calibration_configuration_changed_guard() returns trigger
-language plpgsql set search_path = '' as $$
-begin
-  if exists (
-    select 1 from public.calibration_equipments ce join public.equipments e on e.id = ce.equipment_id
-    where e.part_number_id = old.part_number_id
-  ) then
-    raise exception 'CALIBRATION_INTERVAL_IN_USE';
-  end if;
-  return old;
-end;
-$$;
-drop trigger if exists calibration_configurations_guard_delete on public.calibration_configurations;
-create trigger calibration_configurations_guard_delete before delete on public.calibration_configurations
-  for each row execute function public.calibration_configuration_changed_guard();
 
--- Thiết bị đổi part number → tính lại due_date của dòng hiệu chuẩn.
+-- Thêm thiết bị / đổi part number: PN trong Setup → có dòng trên Dashboard (đổi PN
+-- thì tính lại due_date); PN không trong Setup → không có dòng.
 create or replace function public.calibration_equipment_part_changed() returns trigger
 language plpgsql set search_path = '' as $$
+declare
+  v_actor uuid := public.ctx('actor_id')::uuid;
 begin
-  update public.calibration_equipments set updated_at = now() where equipment_id = new.id;
+  if not exists (select 1 from public.calibration_configurations where part_number_id = new.part_number_id) then
+    delete from public.calibration_equipments where equipment_id = new.id;
+  elsif exists (select 1 from public.calibration_equipments where equipment_id = new.id) then
+    update public.calibration_equipments set updated_at = now() where equipment_id = new.id;
+  else
+    insert into public.calibration_equipments (equipment_id, created_by, updated_by)
+    values (new.id, v_actor, v_actor);
+  end if;
   return null;
 end;
 $$;
 drop trigger if exists equipments_calibration_part_changed on public.equipments;
-create trigger equipments_calibration_part_changed after update of part_number_id on public.equipments
+create trigger equipments_calibration_part_changed after insert or update of part_number_id on public.equipments
   for each row execute function public.calibration_equipment_part_changed();
 
 -- =============================================================================
--- 5. BẢO MẬT — chỉ server (service_role) gọi được
+-- 5. DASHBOARD — thay đổi gần đây (gộp các bảng lịch sử, không lưu dữ liệu)
+--    Dòng của configuration / user chỉ Admin thấy — app lọc theo nhóm quyền.
+--    Import Excel ghi mỗi dòng một bản ghi lịch sử cùng created_at (một giao dịch):
+--    gộp thành MỘT dòng cho mỗi (module, người import, lần import); item_count = số dòng.
+--    Dòng khác item_count = 1.
+-- =============================================================================
+create or replace view public.recent_activities with (security_invoker = true) as
+with activity as (
+  select 'equipment'::text as module, equipment_id as object_id, label, action, changes, created_by, created_at, note, source
+  from public.equipment_histories
+  union all
+  select 'calibration', equipment_id, label, action, changes, created_by, created_at, note, source
+  from public.calibration_histories
+  union all
+  select 'golden_sample', golden_sample_id, label, action, changes, created_by, created_at, note, source
+  from public.golden_sample_histories
+  union all
+  select 'configuration', record_id, label, action, changes, created_by, created_at, note, source
+  from public.configuration_histories
+  union all
+  select 'user', user_id, label, action, changes, created_by, created_at, note, source
+  from public.user_histories
+)
+select module, object_id, label, action, changes, created_by, created_at, note, source, 1 as item_count
+from activity
+where source <> 'import'
+union all
+select module, object_id, label, action, changes, created_by, created_at, note, source, item_count
+from (
+  select distinct on (module, created_by, created_at)
+         module, object_id, label, action, changes, created_by, created_at, note, source,
+         count(*) over (partition by module, created_by, created_at)::integer as item_count
+  from activity
+  where source = 'import'
+  order by module, created_by, created_at, label
+) imported;
+
+revoke all on public.recent_activities from public, anon, authenticated;
+grant select on public.recent_activities to service_role;
+
+-- =============================================================================
+-- 6. BẢO MẬT — chỉ server (service_role) gọi được
 -- =============================================================================
 revoke execute on all functions in schema public from public, anon, authenticated;
 grant  execute on all functions in schema public to service_role;
@@ -636,7 +716,7 @@ grant  execute on all functions in schema public to service_role;
 commit;
 
 -- -----------------------------------------------------------------------------
--- Kiểm tra: history_triggers phải là 12, app_write và equipment_import phải là 1,
+-- Kiểm tra: history_triggers phải là 12, app_write, equipment_import và golden_import phải là 1,
 -- equipment_swap_args phải là 4 (có p_children — con đi theo / ở lại).
 -- -----------------------------------------------------------------------------
 select
@@ -645,5 +725,7 @@ select
     where n.nspname = 'public' and p.proname = 'app_write') as app_write,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'equipment_import') as equipment_import,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'golden_import') as golden_import,
   (select string_agg(p.pronargs::text, ',') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'equipment_swap') as equipment_swap_args;

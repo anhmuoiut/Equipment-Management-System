@@ -1,4 +1,4 @@
-// Geometry from public/icons/jabil-com-brandmark.svg; lettering follows the surface color.
+// Jabil brandmark vẽ inline (không tải file ảnh); chữ theo màu nền (currentColor).
 export function JabilLogo() {
   return (
     <svg className="jabil-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 20"

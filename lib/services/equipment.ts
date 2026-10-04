@@ -58,12 +58,12 @@ export async function listEquipment(): Promise<EquipmentRow[]> {
 }
 
 export async function getEquipment(id: string): Promise<EquipmentRow> {
-  const row = await selectOne<DbEquipment>('equipments', id);
-  if (!row) throw new AppError('EQUIPMENT_NOT_FOUND');
-  const [lookups, related] = await Promise.all([
+  const [row, lookups, related] = await Promise.all([
+    selectOne<DbEquipment>('equipments', id),
     loadLookups(),
     selectAll<{ id: string; parent_id: string | null; serial_number: string }>('equipments', 'id, parent_id, serial_number'),
   ]);
+  if (!row) throw new AppError('EQUIPMENT_NOT_FOUND');
   const serials = new Map(related.map((r) => [r.id, r.serial_number]));
   const parents = new Set(related.map((r) => r.parent_id).filter((v): v is string => !!v));
   return toRow(row, lookups, serials, parents);
@@ -76,7 +76,7 @@ function validate(input: EquipmentInput, lookups: Lookups, before?: DbEquipment)
   assertActive(lookups.locations, input.location_id, 'location_id', before?.location_id);
   const statusId = input.status_id !== undefined ? input.status_id : before?.status_id;
   const remark = input.remark !== undefined ? input.remark : before?.remark;
-  if (statusId !== before?.status_id || input.remark !== undefined) assertStatus(lookups, statusId, 'equipment', remark);
+  if (!before || statusId !== before.status_id || input.remark !== undefined) assertStatus(lookups, statusId, remark);
 }
 
 async function duplicateSerial(serial: string, exceptId?: string): Promise<boolean> {
@@ -90,14 +90,17 @@ export async function createEquipment(input: EquipmentInput, actor: string) {
   if (!input.serial_number) throw new AppError('VALIDATION_ERROR', { fields: { serial_number: 'required' } });
   const { parent_id: parentId, children_mode: _unused, ...fields } = input;
   let data: EquipmentInput = fields;
+  const [lookups, parent] = await Promise.all([
+    loadLookups(),
+    parentId ? selectOne<DbEquipment>('equipments', parentId, 'id, location_id') : null,
+  ]);
   if (parentId) {
-    const parent = await selectOne<DbEquipment>('equipments', parentId, 'id, location_id');
     if (!parent) throw new AppError('PARENT_NOT_FOUND', { fields: { parent_id: 'not_found' } });
-    validate({ ...fields, location_id: undefined }, await loadLookups());
+    validate({ ...fields, location_id: undefined }, lookups);
     data = { ...fields, location_id: parent.location_id, parent_id: parent.id };
   } else {
     if (!input.location_id) throw new AppError('VALIDATION_ERROR', { fields: { location_id: 'required' } });
-    validate(fields, await loadLookups());
+    validate(fields, lookups);
   }
   const duplicate = await duplicateSerial(input.serial_number);
   const created = await appWrite<DbEquipment>('equipments', 'insert', null, data, actor);
@@ -126,7 +129,7 @@ async function assertParent(id: string, parentId: string) {
  * Kiểm tra hết (giá trị chọn, vòng lặp) trước khi ghi.
  */
 export async function updateEquipment(id: string, input: EquipmentInput, actor: string) {
-  const before = await selectOne<DbEquipment>('equipments', id);
+  const [before, lookups] = await Promise.all([selectOne<DbEquipment>('equipments', id), loadLookups()]);
   if (!before) throw new AppError('EQUIPMENT_NOT_FOUND');
 
   const { location_id, parent_id: parentInput, children_mode: children = 'follow', ...fields } = input;
@@ -137,7 +140,7 @@ export async function updateEquipment(id: string, input: EquipmentInput, actor: 
   if (locationChanged && parentAfter && !parentChanged) throw new AppError('LOCATION_INHERITED_READ_ONLY');
   const setLocation = locationChanged && !parentAfter;
 
-  validate({ ...fields, location_id: setLocation ? location_id : undefined }, await loadLookups(), before);
+  validate({ ...fields, location_id: setLocation ? location_id : undefined }, lookups, before);
   if (parentChanged && parentInput) await assertParent(id, parentInput);
 
   const duplicate = input.serial_number && input.serial_number !== before.serial_number
@@ -207,6 +210,12 @@ export async function equipmentTree(id: string): Promise<{ root_id: string; node
     stack.push(...(children.get(current.id) ?? []));
   }
   return { root_id: rootId, nodes };
+}
+
+/** Id các part number đang có thiết bị dùng (Configuration › Hiệu chuẩn › Setup chỉ chọn trong đó). */
+export async function equipmentPartNumberIds(): Promise<string[]> {
+  const rows = await selectAll<{ part_number_id: string | null }>('equipments', 'id, part_number_id');
+  return [...new Set(rows.map((r) => r.part_number_id).filter((id): id is string => !!id))];
 }
 
 export function equipmentHistory(id: string): Promise<HistoryEntry[]> {

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { Bell, CheckCheck } from 'lucide-react';
-import { api, ApiError, formatRelativeTime } from '@/lib/client/api';
+import { api, formatRelativeTime } from '@/lib/client/api';
 import type { NotificationRow } from '@/lib/types';
 
 const POLL_MS = 60_000;
@@ -32,17 +32,20 @@ export function NotificationBell() {
       setRows(res.data.items);
       setUnread(res.data.unread);
       setLoadFailed(false);
-    } catch (e) {
-      if (e instanceof ApiError) setLoadFailed(true);
+    } catch {
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Chỉ hỏi định kỳ khi tab đang hiện; quay lại tab thì cập nhật ngay.
   useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void load(); };
     void load();
-    const timer = setInterval(() => void load(), POLL_MS);
-    return () => clearInterval(timer);
+    const timer = setInterval(refresh, POLL_MS);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
   }, [load]);
 
   useEffect(() => {
@@ -58,6 +61,7 @@ export function NotificationBell() {
     const now = new Date().toISOString();
     setRows((prev) => prev.map((r) => (ids.length === 0 || ids.includes(r.id) ? { ...r, read_at: r.read_at ?? now } : r)));
     setUnread((n) => (ids.length === 0 ? 0 : Math.max(0, n - ids.filter((id) => rows.find((r) => r.id === id && !r.read_at)).length)));
+    // Không lưu được → tải lại để số chưa đọc khớp với server.
     try { await api.post('/api/notifications/read', { ids }); } catch { void load(); }
   }
 

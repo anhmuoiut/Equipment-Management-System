@@ -1,7 +1,7 @@
 import 'server-only';
 
 /**
- * Client dùng anon key + cookie, CHỈ để xác thực session (mục 3c).
+ * Client dùng anon key + cookie, CHỈ để xác thực session.
  * Không bao giờ dùng để đọc/ghi bảng nghiệp vụ — RLS deny-all sẽ chặn.
  */
 import { createServerClient, type CookieOptions } from '@supabase/ssr';

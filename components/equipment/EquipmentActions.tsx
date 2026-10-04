@@ -8,52 +8,40 @@
  * con giữ vị trí và gắn vào thiết bị đến thay (Swap) hoặc thiết bị cha cũ (không
  * có cha cũ thì đứng riêng). Cháu luôn đi cùng con của nó. database/04_functions.sql mục 3.
  */
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
+import { api } from '@/lib/client/api';
 import { toSelect, useOptions } from '@/lib/client/options';
 import { Notice } from '@/components/ui';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { ActionField, ActionScreen, type ActionCtx } from '@/components/ui/detail/RecordDetail';
-import type { ChildrenMode, EquipmentRow, EquipmentTreeNode } from '@/lib/types';
+import type { ChildrenMode, EquipmentRow } from '@/lib/types';
 
-function useErrorText() {
-  const { i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
-  return (e: unknown) => (e instanceof ApiError ? translateError(e.code, language, e.message) : String(e));
+/**
+ * Quan hệ cha – con tính từ danh sách thiết bị: con trực tiếp của mỗi thiết bị
+ * (theo serial), cây con (gồm chính nó) và tổ tiên của `id` — để loại khỏi
+ * lựa chọn (chọn làm cha / Swap sẽ tạo vòng lặp).
+ */
+export function equipmentFamily(rows: EquipmentRow[] | null, id: string | undefined) {
+  const childrenOf = new Map<string, EquipmentRow[]>();
+  const byId = new Map<string, EquipmentRow>();
+  (rows ?? []).forEach((r) => {
+    byId.set(r.id, r);
+    if (r.parent_id) childrenOf.set(r.parent_id, [...(childrenOf.get(r.parent_id) ?? []), r]);
+  });
+  childrenOf.forEach((list) => list.sort((a, b) => a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true })));
+  const subtree = new Set<string>();
+  const stack = id ? [id] : [];
+  while (stack.length) { const cur = stack.pop()!; subtree.add(cur); stack.push(...(childrenOf.get(cur) ?? []).map((c) => c.id)); }
+  const ancestors = new Set<string>();
+  for (let p = id ? byId.get(id)?.parent_id : null; p && !ancestors.has(p); p = byId.get(p)?.parent_id) ancestors.add(p);
+  return { childrenOf, subtree, ancestors };
 }
 
-/** Tất cả thiết bị + id cây con / tổ tiên của thiết bị đang xem (để loại khỏi lựa chọn). */
-function useCandidates(id: string) {
-  const [rows, setRows] = useState<EquipmentRow[] | null>(null);
-  const [subtree, setSubtree] = useState<Set<string>>(new Set([id]));
-  const [ancestors, setAncestors] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    void api.get<EquipmentRow[]>('/api/equipment').then((r) => setRows(r.data)).catch(() => setRows([]));
-    void api.get<{ nodes: EquipmentTreeNode[] }>(`/api/equipment/${id}/tree`).then((r) => {
-      const children = new Map<string, string[]>();
-      const parentOf = new Map<string, string | null>();
-      r.data.nodes.forEach((n) => {
-        parentOf.set(n.id, n.parent_id);
-        if (n.parent_id) children.set(n.parent_id, [...(children.get(n.parent_id) ?? []), n.id]);
-      });
-      const sub = new Set<string>();
-      const stack = [id];
-      while (stack.length) { const cur = stack.pop()!; sub.add(cur); stack.push(...(children.get(cur) ?? [])); }
-      const anc = new Set<string>();
-      for (let p = parentOf.get(id); p; p = parentOf.get(p) ?? null) anc.add(p);
-      setSubtree(sub);
-      setAncestors(anc);
-    }).catch(() => {});
-  }, [id]);
-  return { rows, subtree, ancestors };
-}
+/** Màn hình thao tác dùng danh sách thiết bị Detail đang có (masterlist / trang riêng) — không tải lại. */
+type ScreenProps = { ctx: ActionCtx<EquipmentRow>; rows: EquipmentRow[] | null };
 
 const label = (r: EquipmentRow) => `${r.serial_number}${r.part_number ? ` · ${r.part_number}` : ''}${r.location ? ` · ${r.location}` : ''}`;
-/** Con trực tiếp (theo số serial). */
-const childrenOf = (rows: EquipmentRow[] | null, id: string | undefined) =>
-  (rows ?? []).filter((r) => id && r.parent_id === id).sort((a, b) => a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true }));
 const serials = (list: EquipmentRow[]) => list.map((r) => r.serial_number).join(', ');
 
 /**
@@ -95,25 +83,18 @@ function ChildrenChoice({ groups, value, onChange, followLabel, stayLabel, follo
   );
 }
 
-export function ChangeLocationScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
+export function ChangeLocationScreen({ ctx, rows }: ScreenProps) {
   const { t } = useTranslation();
   const options = useOptions();
-  const errorText = useErrorText();
-  const { rows } = useCandidates(ctx.record.id);
-  const kids = childrenOf(rows, ctx.record.id);
+  const kids = equipmentFamily(rows, ctx.record.id).childrenOf.get(ctx.record.id) ?? [];
   const [location, setLocation] = useState('');
   const [mode, setMode] = useState<ChildrenMode | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   async function confirm() {
-    setBusy(true);
-    try {
-      const r = await api.post<EquipmentRow>(`/api/equipment/${ctx.record.id}/change-location`, { location_id: location, children: mode ?? 'follow' });
-      ctx.done(r.data, t('eq.locationChanged'));
-    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    const r = await api.post<EquipmentRow>(`/api/equipment/${ctx.record.id}/change-location`, { location_id: location, children: mode ?? 'follow' });
+    ctx.done(r.data, t('eq.locationChanged'));
   }
   return (
-    <ActionScreen title={t('eq.changeLocation')} onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error}
+    <ActionScreen title={t('eq.changeLocation')} onCancel={ctx.cancel} onConfirm={confirm}
       confirmDisabled={!location || location === ctx.record.location_id || !rows || (kids.length > 0 && !mode)}>
       <ActionField label={t('eq.currentLocation')}>{ctx.record.location ?? '—'}</ActionField>
       <ActionField label={t('eq.newLocation')} required>
@@ -130,31 +111,25 @@ export function ChangeLocationScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) 
 }
 
 /** Gắn vào thiết bị cha (chưa có cha) / Đổi cha — vị trí theo cha mới. */
-export function MoveScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
+export function MoveScreen({ ctx, rows }: ScreenProps) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
-  const { rows, subtree } = useCandidates(ctx.record.id);
-  const kids = childrenOf(rows, ctx.record.id);
+  const { childrenOf, subtree } = useMemo(() => equipmentFamily(rows, ctx.record.id), [rows, ctx.record.id]);
+  const kids = childrenOf.get(ctx.record.id) ?? [];
   const [parent, setParent] = useState('');
   const [mode, setMode] = useState<ChildrenMode | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const choices = useMemo(() => (rows ?? []).filter((r) => !subtree.has(r.id) && r.id !== ctx.record.parent_id)
     .map((r) => ({ value: r.id, label: label(r) })), [rows, subtree, ctx.record.parent_id]);
   const target = rows?.find((r) => r.id === parent);
   async function confirm() {
-    setBusy(true);
-    try {
-      const r = await api.post<EquipmentRow>(`/api/equipment/${ctx.record.id}/move`, { parent_id: parent, children: mode ?? 'follow' });
-      ctx.done(r.data, t('eq.moved'));
-    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    const r = await api.post<EquipmentRow>(`/api/equipment/${ctx.record.id}/move`, { parent_id: parent, children: mode ?? 'follow' });
+    ctx.done(r.data, t('eq.moved'));
   }
   const stayHint = ctx.record.parent_id
     ? t('eq.stayUnder', { serial: ctx.record.parent_serial ?? '—', location: ctx.record.location ?? '—' })
     : t('eq.stayAlone', { location: ctx.record.location ?? '—' });
   return (
     <ActionScreen title={ctx.record.parent_id ? t('eq.move') : t('eq.attachParent')} description={t('eq.moveDesc')}
-      onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error} confirmDisabled={!parent || (kids.length > 0 && !mode)}>
+      onCancel={ctx.cancel} onConfirm={confirm} confirmDisabled={!parent || (kids.length > 0 && !mode)}>
       {ctx.record.parent_id && <ActionField label={t('eq.currentParent')}>{ctx.record.parent_serial}</ActionField>}
       <ActionField label={t('eq.newParent')} required>
         <SearchableSelect value={parent} onChange={setParent} options={choices} placeholder={rows ? t('dp.selectPlaceholder') : t('common.loadingEllipsis')}
@@ -180,31 +155,25 @@ export function MoveScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
   );
 }
 
-export function SwapScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
+export function SwapScreen({ ctx, rows }: ScreenProps) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
-  const { rows, subtree, ancestors } = useCandidates(ctx.record.id);
+  const { childrenOf, subtree, ancestors } = useMemo(() => equipmentFamily(rows, ctx.record.id), [rows, ctx.record.id]);
   const [other, setOther] = useState('');
   const [mode, setMode] = useState<ChildrenMode | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const choices = useMemo(() => (rows ?? []).filter((r) => !subtree.has(r.id) && !ancestors.has(r.id))
     .map((r) => ({ value: r.id, label: label(r) })), [rows, subtree, ancestors]);
   const target = rows?.find((r) => r.id === other);
   const a = ctx.record;
-  const aKids = childrenOf(rows, a.id);
-  const bKids = childrenOf(rows, target?.id);
+  const aKids = childrenOf.get(a.id) ?? [];
+  const bKids = (target && childrenOf.get(target.id)) || [];
   const groups = target ? [{ owner: a, kids: aKids }, { owner: target, kids: bKids }].filter((g) => g.kids.length > 0) : [];
   const hasKids = groups.length > 0;
   // Cùng cha + cùng vị trí: swap cả nhánh không đổi gì (chỉ swap "con ở lại" mới đổi con cho nhau).
   const samePlace = !!target && (a.parent_id ?? null) === (target.parent_id ?? null) && a.location_id === target.location_id;
   const noChange = samePlace && (!hasKids || mode === 'follow');
   async function confirm() {
-    setBusy(true);
-    try {
-      const r = await api.post<EquipmentRow>('/api/equipment/swap', { a: a.id, b: other, children: mode ?? 'follow' });
-      ctx.done(r.data, t('eq.swapped'));
-    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    const r = await api.post<EquipmentRow>('/api/equipment/swap', { a: a.id, b: other, children: mode ?? 'follow' });
+    ctx.done(r.data, t('eq.swapped'));
   }
   const place = (r: EquipmentRow) => `${r.parent_serial ? t('eq.underParent', { serial: r.parent_serial }) : t('eq.noParent')} · ${r.location ?? '—'}`;
   const stayMoves = target ? [
@@ -213,7 +182,7 @@ export function SwapScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
   ].join(', ') : '';
   return (
     <ActionScreen title={t('eq.swap')} description={t('eq.swapDesc')} onCancel={ctx.cancel} onConfirm={confirm}
-      busy={busy} error={error} confirmDisabled={!other || (hasKids && !mode) || noChange}>
+      confirmDisabled={!other || (hasKids && !mode) || noChange}>
       <ActionField label={t('eq.swapWith')} required>
         <SearchableSelect value={other} onChange={(v) => { setOther(v); setMode(null); }} options={choices}
           placeholder={rows ? t('dp.selectPlaceholder') : t('common.loadingEllipsis')} ariaLabel={t('eq.swapWith')} />
@@ -243,23 +212,16 @@ export function SwapScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
   );
 }
 
-export function DetachScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
+export function DetachScreen({ ctx, rows }: ScreenProps) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
-  const { rows } = useCandidates(ctx.record.id);
-  const kids = childrenOf(rows, ctx.record.id);
+  const kids = equipmentFamily(rows, ctx.record.id).childrenOf.get(ctx.record.id) ?? [];
   const [mode, setMode] = useState<ChildrenMode | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   async function confirm() {
-    setBusy(true);
-    try {
-      const r = await api.post<EquipmentRow>(`/api/equipment/${ctx.record.id}/detach`, { children: mode ?? 'follow' });
-      ctx.done(r.data, t('eq.detached'));
-    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    const r = await api.post<EquipmentRow>(`/api/equipment/${ctx.record.id}/detach`, { children: mode ?? 'follow' });
+    ctx.done(r.data, t('eq.detached'));
   }
   return (
-    <ActionScreen title={t('eq.detach')} onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error}
+    <ActionScreen title={t('eq.detach')} onCancel={ctx.cancel} onConfirm={confirm}
       confirmDisabled={!rows || (kids.length > 0 && !mode)}
       description={t('eq.detachDesc', { serial: ctx.record.parent_serial ?? '—', location: ctx.record.location ?? '—' })}>
       {kids.length > 0 && (
@@ -272,28 +234,22 @@ export function DetachScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
 }
 
 /** Xóa thiết bị có con: xóa cả nhánh hay chỉ thiết bị này (con gắn vào cha cũ / đứng riêng). */
-export function DeleteScreen({ ctx }: { ctx: ActionCtx<EquipmentRow> }) {
+export function DeleteScreen({ ctx, rows }: ScreenProps) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
-  const { rows, subtree } = useCandidates(ctx.record.id);
-  const kids = childrenOf(rows, ctx.record.id);
+  const { childrenOf, subtree } = equipmentFamily(rows, ctx.record.id);
+  const kids = childrenOf.get(ctx.record.id) ?? [];
   const below = Math.max(subtree.size - 1, kids.length);
   const [mode, setMode] = useState<ChildrenMode | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   async function confirm() {
-    setBusy(true);
-    try {
-      const r = await api.delete<{ deleted: number }>(`/api/equipment/${ctx.record.id}?children=${mode ?? 'follow'}`);
-      ctx.removed(t('eq.deletedCount', { count: r.data.deleted }));
-    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    const r = await api.delete<{ deleted: number }>(`/api/equipment/${ctx.record.id}?children=${mode ?? 'follow'}`);
+    ctx.removed(t('eq.deletedCount', { count: r.data.deleted }));
   }
   const stayHint = ctx.record.parent_id
     ? t('eq.stayUnder', { serial: ctx.record.parent_serial ?? '—', location: ctx.record.location ?? '—' })
     : t('eq.stayAlone', { location: ctx.record.location ?? '—' });
   return (
     <ActionScreen title={t('eq.deleteTitle', { serial: ctx.record.serial_number })} description={t('eq.deleteDesc')}
-      onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error} danger confirmLabel={t('common.delete')}
+      onCancel={ctx.cancel} onConfirm={confirm} danger confirmLabel={t('common.delete')}
       confirmDisabled={!rows || (kids.length > 0 && !mode)}>
       {kids.length > 0 && (
         <ChildrenChoice groups={[{ owner: ctx.record, kids }]} value={mode} onChange={setMode}

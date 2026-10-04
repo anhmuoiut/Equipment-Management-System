@@ -1,7 +1,7 @@
 import 'server-only';
 
 /**
- * Supabase admin client (service_role).  Spec v0.9 mục 3c.
+ * Supabase admin client (service_role).
  *
  * ĐÂY LÀ FILE DUY NHẤT trong toàn bộ repo được phép đọc
  * SUPABASE_SERVICE_ROLE_KEY.

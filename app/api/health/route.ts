@@ -1,9 +1,9 @@
 import { withAuth, ok } from '@/lib/auth/withAuth';
 
 /**
- * Endpoint KHÔNG xác thực duy nhất của hệ thống (mục 44).
+ * Endpoint KHÔNG xác thực duy nhất của hệ thống.
  * Không đụng bảng nghiệp vụ, không trả thông tin gì.
- * Dùng cho keepalive chống Supabase pause (mục 47f).
+ * Dùng cho keepalive chống Supabase pause (.github/workflows/keepalive.yml).
  */
 export const dynamic = 'force-dynamic';
 

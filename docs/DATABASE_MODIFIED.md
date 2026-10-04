@@ -1,4 +1,4 @@
-# Database v2 — bản thiết kế (nguồn chính)
+# Database — bản thiết kế (nguồn chính)
 
 Cập nhật: 02/10/2026. **Mọi quyết định thiết kế database mới đều ghi vào file này.** Database được xây lại từ đầu; file chỉ mô tả thiết kế mới.
 
@@ -152,10 +152,13 @@ Gộp các bảng lịch sử thành một danh sách, mới nhất lên đầu.
 | `changes` | `changes` | Giá trị cũ → mới, ví dụ Location `B3F1` → `B3F2` |
 | `created_by` | `created_by` | Người thay đổi |
 | `created_at` | `created_at` | Thời điểm |
+| `note` | `note` | Ghi chú của lịch sử (`via_parent:`, `swap_with:`…) |
+| `source` | `source` | `ui` / `import` / `script` |
+| `item_count` | tính | 1; Import Excel ghi mỗi dòng một bản ghi cùng `created_at` nên gộp thành **một** dòng cho mỗi (module, người import, lần import) và `item_count` = số dòng của lần import đó |
 
 Nguồn: `equipment_histories`, `calibration_histories`, `golden_sample_histories`, `configuration_histories`, `user_histories`.
 
-Trên Dashboard: mặc định hiện 50 thay đổi mới nhất; lọc được theo module, người thay đổi, khoảng thời gian.
+View nằm ở `04_functions.sql` (chạy lại được, không cần dựng lại bảng). Trên Dashboard: mặc định hiện 50 thay đổi mới nhất (một lần import tính là một); lọc được theo module, người thay đổi, khoảng thời gian.
 
 ---
 
@@ -171,7 +174,7 @@ Trên Dashboard: mặc định hiện 50 thay đổi mới nhất; lọc đượ
 | `serial_number` | text | ✔ | | index; **không** UQ — trùng chỉ cảnh báo | Số serial in trên thiết bị |
 | `asset` | text | | | index | Mã tài sản kiểm kê |
 | `type_id` | uuid | | | FK `types`; index | Loại thiết bị |
-| `status_id` | uuid | | | FK `statuses` (`on delete restrict`); chỉ chọn trạng thái có `equipment`; index | Trạng thái vận hành |
+| `status_id` | uuid | ✔ | | FK `statuses` (`on delete restrict`); index | Trạng thái vận hành — bắt buộc. Trang Calibration hiện trạng thái này (một nguồn) |
 | `level_id` | uuid | | | FK `levels` | Level trên dây chuyền |
 | `location_id` | uuid | ✔ | | FK `locations`; index | Vị trí hiện tại; có cha thì tự theo vị trí của cha |
 | `remark` | text | | | form giới hạn 1000 ký tự | Ghi chú; bắt buộc khi trạng thái có `requires_remark` |
@@ -214,23 +217,22 @@ Tab History của thiết bị đọc bảng này. Thiết bị đã xóa: tra c
 
 | Trang | Làm gì | Bảng |
 | --- | --- | --- |
-| Calibration (Dashboard hiệu chuẩn) | Setup: chỉ chọn thiết bị — chu kỳ tự lấy theo part number. Theo dõi: mỗi thiết bị một dòng; mỗi lần hiệu chuẩn, user cập nhật ngày / trạng thái / vendor / ghi chú ngay trên dòng đó | `calibration_equipments` |
+| Calibration (Dashboard hiệu chuẩn) | Không thêm tay: thiết bị có part number trong Configuration › Hiệu chuẩn › Setup tự có mặt. Theo dõi: mỗi thiết bị một dòng; mỗi lần hiệu chuẩn, user cập nhật ngày / trạng thái / vendor / ghi chú ngay trên dòng đó | `calibration_equipments` |
 
-Chu kỳ và vendor cấu hình ở [Configuration](#5-configuration). Trạng thái dùng `statuses` chung. Lần hiệu chuẩn trước không mất: mỗi lần cập nhật ghi giá trị cũ → mới vào `calibration_histories`. Xóa thiết bị thì dòng hiệu chuẩn xóa theo; lịch sử vẫn còn.
+Chu kỳ và vendor cấu hình ở [Configuration](#5-configuration). Trạng thái là của thiết bị (`equipments.status_id`) — trang Calibration chỉ hiện, sửa ở Equipment. Quá hạn / sắp đến hạn (Over Due / Due Soon) tự tính từ `due_date` và `warning_days`, không phải trạng thái nhập tay. Lần hiệu chuẩn trước không mất: mỗi lần cập nhật ghi giá trị cũ → mới vào `calibration_histories`. Xóa thiết bị thì dòng hiệu chuẩn xóa theo; lịch sử vẫn còn.
 
 ### `calibration_equipments` — Dashboard hiệu chuẩn
 
-Mỗi thiết bị cần hiệu chuẩn là một dòng, luôn giữ trạng thái **hiện tại**. Bỏ khỏi Dashboard = xóa dòng — chỉ Admin. User không xóa: nhập sai thì sửa lại, thiết bị tạm không hiệu chuẩn thì đổi `status_id` (ví dụ Inactive).
+Mỗi thiết bị có part number trong Setup hiệu chuẩn là một dòng, luôn giữ trạng thái **hiện tại**. Database tự thêm / bỏ dòng (04_functions.sql mục 4): thêm PN vào Setup, thêm thiết bị (kể cả import), đổi part number. Không ai thêm / xóa tay. User không xóa: nhập sai thì sửa lại, thiết bị tạm không hiệu chuẩn thì đổi `status_id` (ví dụ Inactive).
 
 | Trường | Kiểu | ✔ | Mặc định | Ràng buộc / liên kết | Ai nhập | Ý nghĩa |
 | --- | --- | --- | --- | --- | --- | --- |
 | `id` | uuid | ✔ | tự sinh | PK | | |
 | `equipment_id` | uuid | ✔ | | FK `equipments.id` (`on delete cascade`); **UQ** | Setup | `id` của thiết bị trong `equipments`; mỗi thiết bị tối đa một dòng |
-| `status_id` | uuid | | | FK `statuses` (`on delete restrict`); chỉ chọn trạng thái có `calibration` | User | Trạng thái hiệu chuẩn hiện tại |
 | `vendor_id` | uuid | | | FK `calibration_vendors` | User | Vendor thực hiện lần hiệu chuẩn gần nhất |
 | `calibration_date` | date | | | | User | Ngày hiệu chuẩn gần nhất; trống = chưa hiệu chuẩn |
 | `due_date` | date | | | check ≥ `calibration_date`; index | **Tự tính** | `calibration_date` + `interval_months` của part number thiết bị; tính lại khi `calibration_date` đổi, admin đổi chu kỳ, hoặc thiết bị đổi part number |
-| `remark` | text | | | | User | Ghi chú; bắt buộc khi trạng thái có `requires_remark` |
+| `remark` | text | | | | User | Ghi chú của lần hiệu chuẩn |
 | `created_by` | uuid | | | FK `user_profiles` | | |
 | `created_at` | timestamptz | ✔ | now() | | | |
 | `updated_by` | uuid | | | FK `user_profiles` | | |
@@ -247,8 +249,8 @@ Theo [khuôn bảng lịch sử](#khuôn-bảng-lịch-sử), cột trỏ về l
 
 | `action` | Khi nào | `changes` lưu |
 | --- | --- | --- |
-| `ADD` | Đưa thiết bị vào Dashboard | `equipment_id`, part number, `interval_months` lúc thêm |
-| `REMOVE` | Bỏ khỏi Dashboard (kể cả khi thiết bị bị xóa) | Toàn bộ dòng trước khi xóa |
+| `ADD` | Thiết bị lên Dashboard (PN vào Setup, thêm thiết bị, đổi PN) | `equipment_id`, part number, `interval_months` lúc thêm |
+| `REMOVE` | Rời Dashboard (PN bỏ khỏi Setup, đổi PN, xóa thiết bị) | Toàn bộ dòng trước khi xóa |
 | `UPDATE` | Sửa vendor, trạng thái, ghi chú (không phải lần hiệu chuẩn mới); `due_date` đổi do đổi chu kỳ / part number | Trường đổi: cũ → mới |
 | `CALIBRATE` | Nhập lần hiệu chuẩn mới (đổi `calibration_date`) | `calibration_date`, `due_date`, `status`, `vendor`, `remark`: cũ → mới |
 
@@ -274,7 +276,7 @@ Xóa golden sample là xóa thật; lịch sử vẫn còn trong `golden_sample_
 | `part_number` | text | ✔ | | index; gõ tự do | Part number của PCBA |
 | `serial_number` | text | ✔ | | index; gõ tự do; **không** UQ — trùng chỉ cảnh báo | Số serial của PCBA |
 | `location_id` | uuid | ✔ | | FK `locations.id`; index | Vị trí hiện tại |
-| `status_id` | uuid | | | FK `statuses` (`on delete restrict`); chỉ chọn trạng thái có `golden_sample`; index | Trạng thái, ví dụ Active / Inactive — User đánh dấu hỏng / ngừng dùng bằng trạng thái thay vì xóa |
+| `status_id` | uuid | ✔ | | FK `statuses` (`on delete restrict`); index | Trạng thái — bắt buộc, ví dụ Active / Inactive — User đánh dấu hỏng / ngừng dùng bằng trạng thái thay vì xóa |
 | `utd_part_number` | text | | | gõ tự do | UTD part number |
 | `origin` | text | | | gõ tự do | Nguồn gốc |
 | `purpose` | text | | | gõ tự do | Mục đích sử dụng |
@@ -309,11 +311,11 @@ Mọi trang cấu hình nằm ở menu **Configuration**, chỉ **Admin** vào �
 | Configuration › Status | `statuses` | `equipments`, `calibration_equipments`, `golden_samples` |
 | Configuration › Level | `levels` | `equipments` |
 | Configuration › Department | `departments` | `user_profiles` |
-| Configuration › Calibration Interval | `calibration_configurations` | `calibration_equipments` |
-| Configuration › Calibration Vendor | `calibration_vendors` | `calibration_equipments` |
+| Configuration › Hiệu chuẩn › Setup | `calibration_configurations` | `calibration_equipments` |
+| Configuration › Hiệu chuẩn › Vendor | `calibration_vendors` | `calibration_equipments` |
 
 Quy tắc:
-- **Xóa** = ẩn (`is_active = false`): dòng đang dùng giữ nguyên, nhưng không chọn được cho dữ liệu mới. Riêng `statuses` và `calibration_configurations` xóa thật, bị chặn khi đang được dùng.
+- **Xóa** = ẩn (`is_active = false`): dòng đang dùng giữ nguyên, nhưng không chọn được cho dữ liệu mới. Riêng `statuses` (bị chặn khi đang được dùng) và `calibration_configurations` (thiết bị của part number rời Dashboard hiệu chuẩn) xóa thật.
 - `display_name` không được trùng trong cùng bảng.
 - Import Excel: tìm theo `display_name` (không phân biệt hoa/thường). Giá trị chưa có (hoặc đã ẩn) → báo lỗi dòng đó là "chưa có", không tự tạo mới.
 
@@ -361,14 +363,13 @@ Dữ liệu mẫu: Tester, Base, Fixture, Equipment. *Bàn sau:* icon theo loạ
 
 ### `statuses` — trạng thái
 
-Admin tạo mọi trạng thái ở một chỗ và chọn trạng thái nào **dùng cho trang nào**. Mỗi trang chỉ được chọn trạng thái có tên trang đó trong `applies_to`.
+Một danh sách trạng thái chung cho cả project: thiết bị (cũng là trạng thái trên trang Calibration) và golden sample chọn trong cùng danh sách.
 
 | Trường | Kiểu | ✔ | Mặc định | Ràng buộc / liên kết | Ý nghĩa |
 | --- | --- | --- | --- | --- | --- |
 | `id` | uuid | ✔ | tự sinh | PK | |
 | `display_name` | text | ✔ | | UQ (không phân biệt hoa/thường) | Tên trạng thái |
 | `sort_order` | integer | ✔ | `0` | index (`sort_order`, `display_name`) | Thứ tự hiển thị |
-| `applies_to` | text[] | ✔ | | mỗi phần tử là `equipment` / `calibration` / `golden_sample`; ít nhất một phần tử | Trạng thái này dùng cho trang nào (admin tích chọn) |
 | `requires_remark` | boolean | ✔ | `false` | | Chọn trạng thái này thì Remark thành bắt buộc (ở mọi trang dùng trạng thái này) |
 | `color` | text | ✔ | `gray` | `green` / `yellow` / `red` / `blue` / `gray` | Màu hiển thị của trạng thái trên toàn hệ thống (tag, Dashboard). Admin bắt buộc chọn khi thêm |
 | `created_by` | uuid | | | FK `user_profiles` | |
@@ -377,15 +378,15 @@ Admin tạo mọi trạng thái ở một chỗ và chọn trạng thái nào **
 | `updated_at` | timestamptz | ✔ | now() | | |
 
 Quy tắc:
-- Form thiết bị chỉ hiện trạng thái có `equipment`; Dashboard hiệu chuẩn chỉ hiện trạng thái có `calibration`; form golden sample chỉ hiện trạng thái có `golden_sample`.
-- Bỏ tích một trang khỏi `applies_to` bị chặn nếu trang đó đang có dòng dùng trạng thái này.
+- Thiết bị và golden sample luôn có trạng thái (`status_id` bắt buộc). Trạng thái đang được dùng thì không xóa được.
+- Over Due / Due Soon không phải trạng thái: hệ thống tự tính trên trang Calibration và Dashboard.
 - `color` chỉ là một trong 5 màu hệ thống bên dưới, không nhập mã màu tự do. Database lưu tên màu; mã màu sáng / tối nằm ở giao diện (docs/JABIL_UI.md), nên đổi sắc độ một màu thì mọi trạng thái dùng màu đó đổi theo.
 
 5 màu hệ thống (đỏ, xanh lá, vàng là bắt buộc; thêm xanh dương và xám):
 
 | `color` | Màu | Dùng cho | Ví dụ |
 | --- | --- | --- | --- |
-| `green` | Xanh lá | Bình thường, đạt, đang chạy | Active, Pass |
+| `green` | Xanh lá | Bình thường, đạt, đang chạy | Active |
 | `yellow` | Vàng | Cần chú ý, đang xử lý | Repair |
 | `red` | Đỏ | Lỗi, không đạt, phải xử lý ngay | Fail |
 | `blue` | Xanh dương | Đang chờ, thông tin, chưa bắt đầu | Wait Registration |
@@ -393,14 +394,13 @@ Quy tắc:
 
 Dữ liệu mẫu (admin tự tạo):
 
-| `display_name` | `applies_to` | `color` |
-| --- | --- | --- |
-| Active | equipment, calibration, golden_sample | green |
-| Inactive | equipment, calibration, golden_sample | gray |
-| Repair (bắt buộc remark) | equipment | yellow |
-| Wait Registration | equipment | blue |
-| Pass | calibration | green |
-| Fail | calibration | red |
+| `display_name` | `color` |
+| --- | --- |
+| Active | green |
+| Inactive | gray |
+| Repair (bắt buộc remark) | yellow |
+| Wait Registration | blue |
+| Wait Calibration | blue |
 
 ### `levels` — level trên dây chuyền
 
@@ -430,14 +430,14 @@ Dữ liệu mẫu: Unified, EOL, Final Test, Programming, Function Test.
 | `updated_by` | uuid | | | FK `user_profiles` | |
 | `updated_at` | timestamptz | ✔ | now() | | |
 
-### `calibration_configurations` — chu kỳ hiệu chuẩn theo part number
+### `calibration_configurations` — Setup hiệu chuẩn theo part number
 
-Admin đặt một lần cho mỗi part number cần hiệu chuẩn. Mọi thiết bị cùng part number dùng chung chu kỳ và số ngày cảnh báo.
+Admin thêm một dòng cho mỗi part number phải hiệu chuẩn, chọn trong các part number đang có thiết bị. Mọi thiết bị cùng part number dùng chung chu kỳ, số ngày cảnh báo, và tự lên Dashboard hiệu chuẩn.
 
 | Trường | Kiểu | ✔ | Mặc định | Ràng buộc / liên kết | Ý nghĩa |
 | --- | --- | --- | --- | --- | --- |
 | `id` | uuid | ✔ | tự sinh | PK | |
-| `part_number_id` | uuid | ✔ | | FK `part_numbers.id` (`on delete restrict`); **UQ** | Part number cần hiệu chuẩn; mỗi part number tối đa một dòng |
+| `part_number_id` | uuid | ✔ | | FK `part_numbers.id` (`on delete restrict`); **UQ** | Part number phải hiệu chuẩn; mỗi part number tối đa một dòng; không đổi sau khi thêm |
 | `interval_months` | integer | ✔ | | > 0 | Bao lâu hiệu chuẩn lại (tháng); dùng để tự tính `due_date` |
 | `warning_days` | integer | ✔ | `30` | > 0 | Còn ≤ `warning_days` ngày đến `due_date` thì thiết bị vào danh sách "sắp đến hạn" trên Dashboard và tô vàng |
 | `created_by` | uuid | | | FK `user_profiles` | |
@@ -446,7 +446,7 @@ Admin đặt một lần cho mỗi part number cần hiệu chuẩn. Mọi thi�
 | `updated_at` | timestamptz | ✔ | now() | | |
 
 Quy tắc:
-- Admin sửa / xóa thật. Part number đang có thiết bị trên Dashboard hiệu chuẩn thì không xóa được.
+- Admin sửa / xóa thật. Xóa → thiết bị của part number đó rời Dashboard hiệu chuẩn (lịch sử `REMOVE` vẫn giữ).
 - Đổi `interval_months` → `due_date` của mọi thiết bị cùng part number được tính lại.
 
 ### `calibration_vendors` — vendor hiệu chuẩn

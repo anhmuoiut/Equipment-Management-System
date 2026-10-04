@@ -1,5 +1,5 @@
 -- =============================================================================
--- 02_schema.sql — TẠO database v2 theo docs/DATABASE_MODIFIED.md.
+-- 02_schema.sql — TẠO database theo docs/DATABASE_MODIFIED.md.
 --
 -- Chạy sau 01_reset_blank.sql, trong Supabase SQL Editor: dán cả file → Run.
 -- Cả file chạy trong một giao dịch: lỗi ở đâu thì không tạo gì cả.
@@ -36,22 +36,6 @@ language plpgsql set search_path = '' as $$
 begin
   raise exception 'HISTORY_IS_APPEND_ONLY'
     using detail = format('Rows in %I cannot be updated or deleted', tg_table_name);
-end;
-$$;
-
--- Trang nào chỉ được chọn trạng thái có tên trang đó trong statuses.applies_to.
--- Tham số trigger: 'equipment' / 'calibration' / 'golden_sample'.
-create function public.check_status_applies_to() returns trigger
-language plpgsql set search_path = '' as $$
-begin
-  if new.status_id is not null and not exists (
-    select 1 from public.statuses s
-    where s.id = new.status_id and tg_argv[0] = any (s.applies_to)
-  ) then
-    raise exception 'STATUS_NOT_ALLOWED'
-      using detail = format('Status %s is not enabled for %s', new.status_id, tg_argv[0]);
-  end if;
-  return new;
 end;
 $$;
 
@@ -183,7 +167,6 @@ create table public.statuses (
   id              uuid primary key default gen_random_uuid(),
   display_name    text not null,
   sort_order      integer not null default 0,
-  applies_to      text[] not null,
   requires_remark boolean not null default false,
   color           text not null default 'gray',
   created_by      uuid references public.user_profiles (id),
@@ -191,10 +174,6 @@ create table public.statuses (
   updated_by      uuid references public.user_profiles (id),
   updated_at      timestamptz not null default now(),
 
-  constraint statuses_applies_to_check check (
-    cardinality(applies_to) >= 1
-    and applies_to <@ array['equipment', 'calibration', 'golden_sample']::text[]
-  ),
   constraint statuses_color_check check (color in ('green', 'yellow', 'red', 'blue', 'gray'))
 );
 create unique index statuses_display_name_key on public.statuses (lower(display_name));
@@ -202,7 +181,6 @@ create index statuses_sort_idx on public.statuses (sort_order, display_name);
 create trigger statuses_set_updated_at before update on public.statuses
   for each row execute function public.set_updated_at();
 
-comment on column public.statuses.applies_to is 'Trang được dùng trạng thái này: equipment / calibration / golden_sample.';
 comment on column public.statuses.color is 'Màu hiển thị (5 màu hệ thống): green / yellow / red / blue / gray.';
 
 -- levels — level trên dây chuyền -------------------------------------------------
@@ -241,16 +219,18 @@ alter table public.user_profiles
   add constraint user_profiles_department_id_fkey
   foreign key (department_id) references public.departments (id);
 
--- calibration_configurations — chu kỳ hiệu chuẩn theo part number (xóa thật) -----
+-- calibration_configurations — Configuration › Hiệu chuẩn › Setup (xóa thật) -----
+-- Mỗi part number phải hiệu chuẩn một dòng. Thiết bị có part number này tự có mặt
+-- trên Dashboard hiệu chuẩn (04_functions.sql mục 4).
 create table public.calibration_configurations (
-  id              uuid primary key default gen_random_uuid(),
-  part_number_id  uuid not null references public.part_numbers (id) on delete restrict,
-  interval_months integer not null,
-  warning_days    integer not null default 30,
-  created_by      uuid references public.user_profiles (id),
-  created_at      timestamptz not null default now(),
-  updated_by      uuid references public.user_profiles (id),
-  updated_at      timestamptz not null default now(),
+  id                uuid primary key default gen_random_uuid(),
+  part_number_id    uuid not null references public.part_numbers (id) on delete restrict,
+  interval_months   integer not null,
+  warning_days      integer not null default 30,
+  created_by        uuid references public.user_profiles (id),
+  created_at        timestamptz not null default now(),
+  updated_by        uuid references public.user_profiles (id),
+  updated_at        timestamptz not null default now(),
 
   constraint calibration_configurations_part_number_id_key unique (part_number_id),
   constraint calibration_configurations_interval_check check (interval_months > 0),
@@ -311,7 +291,7 @@ create table public.equipments (
   serial_number  text not null,
   asset          text,
   type_id        uuid references public.types (id),
-  status_id      uuid references public.statuses (id) on delete restrict,
+  status_id      uuid not null references public.statuses (id) on delete restrict,
   level_id       uuid references public.levels (id),
   location_id    uuid not null references public.locations (id),
   remark         text,
@@ -332,8 +312,6 @@ create index equipments_location_idx      on public.equipments (location_id);
 create index equipments_parent_idx        on public.equipments (parent_id);
 create trigger equipments_set_updated_at before update on public.equipments
   for each row execute function public.set_updated_at();
-create trigger equipments_check_status before insert or update of status_id on public.equipments
-  for each row execute function public.check_status_applies_to('equipment');
 
 comment on table public.equipments is 'Thiết bị. Xóa thật; xóa cha thì xóa cả cây con.';
 comment on column public.equipments.serial_number is 'Không UQ — trùng chỉ cảnh báo.';
@@ -368,7 +346,6 @@ create trigger equipment_histories_append_only before update or delete on public
 create table public.calibration_equipments (
   id               uuid primary key default gen_random_uuid(),
   equipment_id     uuid not null references public.equipments (id) on delete cascade,
-  status_id        uuid references public.statuses (id) on delete restrict,
   vendor_id        uuid references public.calibration_vendors (id),
   calibration_date date,
   due_date         date,
@@ -381,12 +358,9 @@ create table public.calibration_equipments (
   constraint calibration_equipments_equipment_id_key unique (equipment_id),
   constraint calibration_equipments_due_after_calibration check (due_date >= calibration_date)
 );
-create index calibration_equipments_status_idx on public.calibration_equipments (status_id);
 create index calibration_equipments_due_idx    on public.calibration_equipments (due_date);
 create trigger calibration_equipments_set_updated_at before update on public.calibration_equipments
   for each row execute function public.set_updated_at();
-create trigger calibration_equipments_check_status before insert or update of status_id on public.calibration_equipments
-  for each row execute function public.check_status_applies_to('calibration');
 
 comment on column public.calibration_equipments.due_date is 'Tự tính: calibration_date + interval_months của part number thiết bị.';
 
@@ -420,7 +394,7 @@ create table public.golden_samples (
   part_number     text not null,
   serial_number   text not null,
   location_id     uuid not null references public.locations (id),
-  status_id       uuid references public.statuses (id) on delete restrict,
+  status_id       uuid not null references public.statuses (id) on delete restrict,
   utd_part_number text,
   origin          text,
   purpose         text,
@@ -436,8 +410,6 @@ create index golden_samples_location_idx      on public.golden_samples (location
 create index golden_samples_status_idx        on public.golden_samples (status_id);
 create trigger golden_samples_set_updated_at before update on public.golden_samples
   for each row execute function public.set_updated_at();
-create trigger golden_samples_check_status before insert or update of status_id on public.golden_samples
-  for each row execute function public.check_status_applies_to('golden_sample');
 
 -- golden_sample_histories — lịch sử golden sample -------------------------------------
 create table public.golden_sample_histories (
@@ -458,31 +430,6 @@ create index golden_sample_histories_object_idx  on public.golden_sample_histori
 create index golden_sample_histories_created_idx on public.golden_sample_histories (created_at desc);
 create trigger golden_sample_histories_append_only before update or delete on public.golden_sample_histories
   for each row execute function public.prevent_history_change();
-
--- =============================================================================
--- Trạng thái: bỏ tích một trang khỏi applies_to bị chặn nếu trang đó đang dùng.
--- (Đặt ở đây vì cần các bảng ở mục 3–5.)
--- =============================================================================
-create function public.statuses_guard_applies_to() returns trigger
-language plpgsql set search_path = '' as $$
-begin
-  if 'equipment' = any (old.applies_to) and not ('equipment' = any (new.applies_to))
-     and exists (select 1 from public.equipments where status_id = old.id) then
-    raise exception 'STATUS_IN_USE' using detail = 'equipment';
-  end if;
-  if 'calibration' = any (old.applies_to) and not ('calibration' = any (new.applies_to))
-     and exists (select 1 from public.calibration_equipments where status_id = old.id) then
-    raise exception 'STATUS_IN_USE' using detail = 'calibration';
-  end if;
-  if 'golden_sample' = any (old.applies_to) and not ('golden_sample' = any (new.applies_to))
-     and exists (select 1 from public.golden_samples where status_id = old.id) then
-    raise exception 'STATUS_IN_USE' using detail = 'golden_sample';
-  end if;
-  return new;
-end;
-$$;
-create trigger statuses_guard_applies_to before update of applies_to on public.statuses
-  for each row execute function public.statuses_guard_applies_to();
 
 -- =============================================================================
 -- 6. HỆ THỐNG
@@ -534,22 +481,7 @@ create trigger error_log_purge after insert on public.error_log
   for each statement execute function public.purge_old_error_log();
 
 -- =============================================================================
--- 7. DASHBOARD — thay đổi gần đây (gộp các bảng lịch sử, không lưu dữ liệu)
---    Dòng của configuration / user chỉ Admin thấy — app lọc theo nhóm quyền.
--- =============================================================================
-create view public.recent_activities with (security_invoker = true) as
-  select 'equipment'::text     as module, equipment_id     as object_id, label, action, changes, created_by, created_at from public.equipment_histories
-  union all
-  select 'calibration'::text,             equipment_id,                  label, action, changes, created_by, created_at from public.calibration_histories
-  union all
-  select 'golden_sample'::text,           golden_sample_id,              label, action, changes, created_by, created_at from public.golden_sample_histories
-  union all
-  select 'configuration'::text,           record_id,                     label, action, changes, created_by, created_at from public.configuration_histories
-  union all
-  select 'user'::text,                    user_id,                       label, action, changes, created_by, created_at from public.user_histories;
-
--- =============================================================================
--- 8. BẢO MẬT — RLS chặn hết; chỉ server (service_role) đọc / ghi
+-- 7. BẢO MẬT — RLS chặn hết; chỉ server (service_role) đọc / ghi
 -- =============================================================================
 do $$
 declare
@@ -570,7 +502,7 @@ grant  execute on all functions in schema public to service_role;
 commit;
 
 -- -----------------------------------------------------------------------------
--- Kiểm tra: phải ra 19 bảng (BASE TABLE) + 1 view (recent_activities).
+-- Kiểm tra: phải ra 19 bảng (BASE TABLE). View recent_activities nằm ở 04_functions.sql.
 -- -----------------------------------------------------------------------------
 select table_type, table_name
 from information_schema.tables

@@ -14,7 +14,6 @@ export type Role = 'admin' | 'user' | 'readonly';
 export const ROLES: readonly Role[] = ['admin', 'user', 'readonly'];
 
 export type AccountStatus = 'pending' | 'active' | 'rejected' | 'disabled';
-export const ACCOUNT_STATUSES: readonly AccountStatus[] = ['pending', 'active', 'rejected', 'disabled'];
 
 /** Nhóm được thêm / sửa / cập nhật dữ liệu nghiệp vụ. */
 export const EDITORS: readonly Role[] = ['admin', 'user'];

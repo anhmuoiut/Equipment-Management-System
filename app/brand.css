@@ -21,9 +21,9 @@ button, input, select, textarea { font-family: var(--font-ui); }
 .app-sidebar { background: var(--jabil-prussian); border-right: 1px solid color-mix(in srgb, var(--jabil-white) 10%, transparent); padding-top: 20px; }
 .sidebar-caption { color: color-mix(in srgb, var(--jabil-white) 70%, var(--jabil-prussian)); letter-spacing: .14em; font-size: 10px; }
 .sidebar-link { border-radius: 10px; font-weight: 400; color: color-mix(in srgb, var(--jabil-white) 85%, var(--jabil-prussian)); }
-.sidebar-link:is([aria-current='page'], [aria-current='true']) { background: var(--jabil-picton); color: var(--jabil-prussian); border-color: transparent; border-left-color: var(--jabil-white); font-weight: 600; }
-.sidebar-link:is([aria-current='page'], [aria-current='true']) .sidebar-link-icon { color: var(--jabil-prussian); }
-.sidebar-link:not([aria-current='page'], [aria-current='true']):hover { background: color-mix(in srgb, var(--jabil-picton) 15%, transparent); color: var(--jabil-white); }
+.sidebar-link[aria-current='page'] { background: var(--jabil-picton); color: var(--jabil-prussian); border-color: transparent; border-left-color: var(--jabil-white); font-weight: 600; }
+.sidebar-link[aria-current='page'] .sidebar-link-icon { color: var(--jabil-prussian); }
+.sidebar-link:not([aria-current='page']):hover { background: color-mix(in srgb, var(--jabil-picton) 15%, transparent); color: var(--jabil-white); }
 .sidebar-status { background: var(--jabil-picton); }
 .sidebar-note { color: color-mix(in srgb, var(--jabil-white) 75%, var(--jabil-prussian)); line-height: 1.6; }
 
@@ -33,66 +33,6 @@ button, input, select, textarea { font-family: var(--font-ui); }
 .page-heading h1 { font-size: 23px; line-height: 1.25; letter-spacing: -.04em; font-weight: 600; color: var(--ink); }
 .page-heading h1::before { content: none; }
 .page-heading p { color: var(--ink-2); font-size: 12px; line-height: 1.5; max-width: 660px; margin-top: 3px; }
-.page-heading-actions { padding-top: 0; flex-wrap: wrap; }
-.equipment-panel, .dashboard-card, .kpi-card { border-color: var(--rule-soft); border-radius: var(--radius-panel); box-shadow: none; }
-.dashboard-card { padding: 14px 16px; }
-.dashboard-card-head { margin-bottom: 10px; }
-.dashboard-card-head h2 { font-size: 14px; letter-spacing: -.02em; }
-.dashboard-kpi-grid { gap: 10px; }
-.kpi-card { position: relative; padding: 13px 14px; gap: 4px; overflow: hidden; }
-.kpi-card::after { content: ''; position: absolute; inset: auto 0 0; height: 3px; background: var(--jabil-picton); opacity: .65; }
-.kpi-card-icon { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--machine-tint); color: var(--ink); }
-.kpi-card-value { padding-right: 34px; font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.055em; }
-.kpi-card-label { font-size: 12px; line-height: 1.5; }
-.dashboard-kpi-grid .kpi-card:first-child { background: var(--jabil-prussian); border-color: var(--jabil-prussian); }
-.dashboard-kpi-grid .kpi-card:first-child .kpi-card-value { color: var(--jabil-white); }
-.dashboard-kpi-grid .kpi-card:first-child .kpi-card-label { color: color-mix(in srgb, var(--jabil-white) 85%, var(--jabil-prussian)); }
-.dashboard-kpi-grid .kpi-card:first-child .kpi-card-icon { background: color-mix(in srgb, var(--jabil-picton) 20%, var(--jabil-prussian)); color: var(--jabil-picton); }
-.kpi-card[data-tone='alert']::after { height: 3px; background: var(--alert); opacity: 1; }
-.kpi-card[data-tone='warn']::after { height: 4px; background: repeating-linear-gradient(90deg, var(--warn) 0 8px, transparent 8px 13px); opacity: 1; }
-.dashboard-bar-track { height: 7px; background: var(--rule-soft); }
-.dashboard-bar-fill { background: var(--jabil-picton); }
-.dashboard-bar-list { gap: 8px; }
-.dashboard-bar-count { font-variant-numeric: tabular-nums; }
-/* Keep recent logs inside the card; its heading stays outside the scroll area. */
-.dashboard-activity-list--scrollable {
-  max-height: min(360px, 50svh);
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  scrollbar-gutter: stable;
-  padding: 4px;
-  overflow-wrap: anywhere;
-}
-.dashboard-activity-list--scrollable > li { flex-shrink: 0; }
-.dashboard-activity-list--scrollable:focus-visible { outline: 2px solid var(--jabil-picton); outline-offset: -2px; border-radius: 6px; }
-.dashboard-activity-icon, .detail-history-icon { width: 30px; height: 30px; border-radius: 9px; background: var(--machine-tint); color: var(--ink); }
-.calibration-health-cell { border-radius: 8px; background: var(--surface); padding: 10px; }
-.calibration-health-cell[data-tone='alert'] { border-left: 3px solid var(--alert); }
-.calibration-health-cell[data-tone='warn'] { border-style: dashed; }
-
-/* Calm, legible data tables with clearly grouped tools and actions. */
-.grid-table th { background: var(--surface); color: var(--ink-2); font-size: 11px; font-weight: 600; letter-spacing: .035em; padding: 10px 12px; border-bottom-color: var(--rule); }
-.grid-table td { padding: 9px 12px; font-size: 13px; line-height: 1.55; }
-.grid-table tbody tr { transition: background-color 120ms ease; }
-.grid-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface) 35%, var(--panel)); }
-.grid-table tbody tr:hover { background: var(--machine-tint); }
-.grid-table tbody tr:focus-within { background: var(--machine-tint); }
-.equipment-toolbar, .list-toolbar { background: var(--panel); }
-.equipment-search-combined, .search-control { background: var(--surface); border-color: var(--rule); border-radius: 10px; }
-.search-control input { background: transparent; }
-.equipment-record-count, .list-count { font-variant-numeric: tabular-nums; color: var(--ink-2); }
-.dashboard-footer { background: var(--panel); border-color: var(--rule-soft); }
-.equipment-filter-chip { background: var(--machine-tint); color: var(--ink); border-color: var(--rule-soft); }
-.admin-tab[data-active='true'] { background: var(--machine-tint); border-color: var(--jabil-picton); color: var(--ink); }
-
-/* Status is conveyed by text and shape, never just a palette hue. */
-.equipment-status { border-radius: 6px; padding: 3px 8px; font-size: 11px; color: var(--ink-2); background: var(--surface); border-color: var(--rule); }
-.equipment-status[data-status='active'], .equipment-status[data-status='valid'] { background: var(--success-tint); border-color: var(--success); color: var(--success); }
-.equipment-status:is([data-status='inactive'], [data-status='overdue'], [data-status='not_calibrated']) { background: var(--alert-tint); color: var(--alert); border-color: var(--alert); }
-.equipment-status:is([data-status='wait_reg'], [data-status='under_registration'], [data-status='due_soon']) { border-style: dashed; border-color: var(--warn); color: var(--warn); background: var(--warn-tint); }
-.equipment-status:is([data-status='repair'], [data-status='under_repair']) { border-style: double; border-width: 3px; padding-block: 1px; border-color: var(--warn); color: var(--warn); background: var(--warn-tint); }
-.ui-tag { border-radius: 6px; gap: 5px; padding: 3px 7px; }
-.ui-tag[data-tone='warn'] { border-style: dashed; }
 .ui-notice { border-radius: 10px; padding: 13px 15px; line-height: 1.6; }
 .ui-notice[data-tone='alert'] { border-left-width: 4px; }
 .ui-notice[data-tone='warn'] { border-left-style: dashed; }
@@ -113,17 +53,14 @@ button, input, select, textarea { font-family: var(--font-ui); }
 .modal-body :is(input:not([type='checkbox']):not([type='radio']), select, textarea), [role='combobox'] { border-radius: 9px; }
 input[type='checkbox'], input[type='radio'] { accent-color: var(--machine); }
 [role='option'][aria-selected='true'] { font-weight: 600; }
-.modal-dialog, .equipment-detail-dialog { border-radius: 12px; border-color: var(--rule); box-shadow: 0 24px 80px color-mix(in srgb, var(--jabil-prussian) 24%, transparent); }
-.modal-header, .equipment-detail-header { background: var(--panel); border-bottom: 1px solid var(--rule-soft); }
+.modal-dialog { border-radius: 12px; border-color: var(--rule); box-shadow: 0 24px 80px color-mix(in srgb, var(--jabil-prussian) 24%, transparent); }
+.modal-header { background: var(--panel); border-bottom: 1px solid var(--rule-soft); }
 .modal-header h2 { font-size: 18px; letter-spacing: -.035em; }
 .modal-footer { background: var(--surface); }
 .modal-close { border-radius: 50%; }
-.equipment-detail-tabs { background: var(--surface); }
-.detail-header-icon { border: 0; background: var(--machine-tint); color: var(--ink); border-radius: 10px; }
-.hierarchy-card { border-radius: 12px; box-shadow: none; }
-.hierarchy-card[data-selected='true'] { border-color: var(--jabil-picton); }
-.hierarchy-card[data-selected='true'] .hierarchy-node-icon, .label-toolbar button { color: var(--action-ink); }
-.user-menu-list, .notification-panel, .equipment-filters-panel { border-radius: 14px; box-shadow: 0 12px 36px color-mix(in srgb, var(--jabil-prussian) 14%, transparent); }
+.label-toolbar button { color: var(--action-ink); }
+.user-menu-list,
+.notification-panel { border-radius: 14px; box-shadow: 0 12px 36px color-mix(in srgb, var(--jabil-prussian) 14%, transparent); }
 .label-card { border-radius: 16px; }
 
 /* Compact workspace: the app title shares the logo's row. */
@@ -134,59 +71,49 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--machine); }
 .app-brand .jabil-logo { width: 104px; }
 .app-brand-title { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; letter-spacing: -.015em; color: var(--ink); padding-left: 14px; border-left: 1px solid var(--rule); }
 .topbar-actions { gap: 10px; }
-.topbar-preferences-menu { display: none; position: relative; }
 .app-sidebar { padding: 12px 8px 16px; }
 .sidebar-collapse-toggle { margin: 0 4px 10px; }
 .sidebar-caption { margin-bottom: 6px; }
 .sidebar-link { min-height: 38px; padding-block: 7px; border-radius: 7px; }
 .sidebar-link-label { text-overflow: ellipsis; }
-.sidebar-link-nested { min-height: 34px; }
 .sidebar-note { padding: 16px 12px 0; }
 .app-content, .app-shell[data-page='masterlist'] .app-content { padding: 16px; }
 .app-shell[data-page='masterlist'] .app-body { min-height: 0; }
-.app-shell[data-page='masterlist'] .equipment-scroll { min-height: 0; max-height: none; }
-.dashboard-page { gap: 14px; }
-.dashboard-page > .page-heading { margin-bottom: 0; }
-.dashboard-grid-2 { gap: 12px; }
-.equipment-toolbar { padding: 10px 12px; gap: 10px; }
-.equipment-filter-chips { padding: 0 12px 10px; }
-.list-toolbar, .equipment-filters { padding: 10px 12px; gap: 10px; }
-.dashboard-footer { padding: 8px 12px; }
 .ui-button--md { min-height: 34px; }
 .ui-button--sm { min-height: 30px; }
-.user-row-actions .ui-button { width: 32px; }
 .modal-header { padding: 12px 16px; }
 .modal-body { padding: 16px; }
 .modal-footer { padding: 10px 16px; }
-.equipment-detail-header { padding: 10px 14px; }
-.equipment-detail-body { padding: 12px 14px; }
-.equipment-detail-tabs { padding-inline: 14px; }
 @media (max-width: 1100px) {
   .user-menu-name { display: none; }
   .app-brand-title { font-size: 13px; }
 }
 @media (max-width: 800px) {
   .app-shell { --header-height: 56px; --sidebar-width: min(260px, calc(100vw - 48px)); }
-  .app-topbar { gap: 4px; padding-right: 8px; }
-  .app-brand { padding: 8px; }
+  .app-topbar { gap: 4px; padding-right: 4px; }
+  .app-brand { padding: 8px 8px 8px 2px; }
   .app-brand-row { gap: 8px; }
   .app-brand .jabil-logo { width: 72px; }
   .app-brand-title { display: block; padding-left: 8px; font-size: 12px; }
-  .app-brand .sidebar-toggle { order: -1; width: 36px; min-height: 40px; border: 0; background: transparent; }
-  .topbar-actions { gap: 2px; }
+  .app-brand .sidebar-toggle { order: -1; width: 44px; min-height: 44px; border: 0; background: transparent; }
+  /* Header on a phone: menu · brand · bell · account. Language / theme live in the account menu. */
+  .topbar-actions { gap: 0; }
   .topbar-preferences { display: none; }
-  .topbar-preferences-menu { display: block; }
-  .topbar-preferences-menu > summary { display: grid; place-items: center; width: 40px; min-height: 44px; list-style: none; cursor: pointer; border-radius: 8px; color: var(--ink); }
-  .topbar-preferences-menu > summary::-webkit-details-marker { display: none; }
-  .topbar-preferences-menu[open] > summary { background: var(--machine-tint); }
-  .topbar-preferences-popover { position: absolute; right: 0; top: calc(100% + 6px); z-index: var(--z-header-popover); padding: 10px; border: 1px solid var(--rule); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow-panel); }
-  .topbar-preferences-popover .preference-controls { gap: 8px; }
-  .topbar-preferences-popover .theme-switch span { display: inline; }
-  .topbar-preferences-popover .language-switch > svg { display: block; }
+  .notification-trigger { width: 44px; height: 44px; }
+  .user-menu-trigger { justify-content: center; min-width: 44px; min-height: 44px; padding: 0; }
+  .user-menu-trigger > svg { display: none; }
+  .user-menu-list { min-width: 240px; }
+  .user-menu-list button { min-height: 44px; font-size: 14px; }
+  .user-menu-phone { display: block; }
+  .user-menu-phone[data-first], .user-menu-signout { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--rule-soft); }
+  /* The panel is fixed to the viewport, not to the bell — anchored to the bell it ran off the left edge. */
+  .notification-panel { position: fixed; top: calc(var(--header-height) + 4px); left: 8px; right: 8px; width: auto; max-width: none; max-height: calc(100dvh - var(--header-height) - 16px); }
+  .notification-item { min-height: 56px; padding: 12px; }
+  .notification-panel-head button { min-height: 44px; }
+  .sidebar-caption, .sidebar-note { display: none; }
   .app-content, .app-shell[data-page='masterlist'] .app-content { padding: 12px; }
   .ui-button--md, .ui-button--sm { min-height: 44px; }
   .sidebar-link { min-height: 44px; }
-  .user-row-actions .ui-button { width: 44px; }
   .modal-body { padding: 16px; }
   .modal-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }
@@ -194,26 +121,11 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--machine); }
   .app-brand-row { gap: 5px; }
   .app-brand .jabil-logo { width: 58px; }
   .app-brand-title { padding-left: 6px; font-size: 11px; }
-  .app-brand .sidebar-toggle { width: 30px; }
 }
 
 @media (max-width: 800px) {
   .page-heading h1 { font-size: 21px; }
-  .page-heading-actions { padding-top: 0; }
-  .dashboard-kpi-grid { gap: 10px; }
-  .kpi-card { padding: 12px; }
-  .kpi-card-value { font-size: 26px; }
-  .dashboard-card { padding: 12px; }
-  .grid-table th, .grid-table td { padding-block: 12px; }
-  /* Restore visible status text on phones; color-only dots are ambiguous
-     in factory lighting and dark mode. */
-  .equipment-table .equipment-status { padding: 3px 6px; border-width: 1px; border-style: solid; max-width: 110px; white-space: normal; }
-  .equipment-table .equipment-status-dot { display: none; }
-  .equipment-table .equipment-status-label { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; line-height: 1.4; }
-  .equipment-table .equipment-status:is([data-status='wait_reg'], [data-status='under_registration'], [data-status='due_soon']) { border-style: dashed; }
-  .equipment-table .equipment-status:is([data-status='repair'], [data-status='under_repair']) { border-style: double; border-width: 3px; }
 }
-@media (max-width: 640px) { .equipment-detail-dialog { border-radius: 0; } }
 @media (max-width: 420px) { .modal-dialog { border-radius: 0; } }
 @media print {
   .label-card { color: var(--jabil-prussian); background: var(--jabil-white); border-color: var(--jabil-prussian); }

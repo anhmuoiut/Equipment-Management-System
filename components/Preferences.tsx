@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe2, Moon, Sun } from 'lucide-react';
+import { Check, Globe2, Moon, Sun } from 'lucide-react';
 import { setLanguage as setI18nLanguage, type SupportedLanguage } from '@/src/i18n';
 
 type Theme = 'light' | 'dark';
@@ -32,6 +32,35 @@ export function usePreferences() {
   const value = useContext(Context);
   if (!value) throw new Error('PreferencesProvider is required');
   return value;
+}
+
+/**
+ * The same two preferences as items of the account menu (UserMenu) — phones only (CSS):
+ * the header has no room for the language / theme buttons. Language = radio items, theme = one item.
+ */
+export function PreferenceMenuItems({ onDone }: { onDone?: () => void }) {
+  const { theme, setTheme } = usePreferences();
+  const { t, i18n } = useTranslation();
+  const language = (i18n.language === 'vi' ? 'vi' : 'en') as SupportedLanguage;
+  return (
+    <>
+      {(['en', 'vi'] as const).map((code, i) => (
+        <li key={code} role="none" className="user-menu-phone" data-first={i === 0 || undefined}>
+          <button type="button" role="menuitemradio" aria-checked={language === code} lang={code}
+            onClick={() => { setI18nLanguage(code); onDone?.(); }}>
+            <Globe2 size={15} aria-hidden="true" />{t(code === 'en' ? 'theme.english' : 'theme.vietnamese')}
+            {language === code && <Check size={15} className="user-menu-check" aria-hidden="true" />}
+          </button>
+        </li>
+      ))}
+      <li role="none" className="user-menu-phone">
+        <button type="button" role="menuitem" onClick={() => { setTheme(theme === 'light' ? 'dark' : 'light'); onDone?.(); }}>
+          {theme === 'light' ? <Moon size={15} aria-hidden="true" /> : <Sun size={15} aria-hidden="true" />}
+          {theme === 'light' ? t('theme.switchToDark') : t('theme.switchToLight')}
+        </button>
+      </li>
+    </>
+  );
 }
 
 export function PreferenceControls() {

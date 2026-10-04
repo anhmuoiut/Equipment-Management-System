@@ -8,8 +8,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, KeyRound, Lock, LockOpen, UserRound, X } from 'lucide-react';
-import { api, ApiError, formatTime } from '@/lib/client/api';
-import { translateError } from '@/lib/i18n/errors';
+import { api, formatTime } from '@/lib/client/api';
 import { toSelect, useOptions } from '@/lib/client/options';
 import { useViewer } from '@/components/ViewerContext';
 import { AccountStatusTag, ToneTag } from '@/components/ui/tags';
@@ -18,12 +17,6 @@ import type { PanelLayout } from '@/components/ui/detail/DetailPanel';
 import type { DetailCtx } from '@/components/ui/workspace/ModuleWorkspace';
 import { ROLES, type Role } from '@/lib/permissions';
 import type { UserRow } from '@/lib/types';
-
-function useErrorText() {
-  const { i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
-  return (e: unknown) => (e instanceof ApiError ? translateError(e.code, language, e.message) : String(e));
-}
 
 export function UserDetail({ ctx, layout }: { ctx: DetailCtx<UserRow>; layout: PanelLayout }) {
   const { t } = useTranslation();
@@ -70,6 +63,7 @@ export function UserDetail({ ctx, layout }: { ctx: DetailCtx<UserRow>; layout: P
       creating={ctx.creating}
       loading={ctx.loading}
       error={ctx.error}
+      onRetry={ctx.onRetry}
       icon={<UserRound size={18} />}
       createTitle={t('usr.addTitle')}
       heading={(r) => ({
@@ -116,18 +110,13 @@ export function UserDetail({ ctx, layout }: { ctx: DetailCtx<UserRow>; layout: P
 
 function ApproveScreen({ ctx }: { ctx: ActionCtx<UserRow> }) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
   const [role, setRole] = useState<Role>('readonly');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   async function confirm() {
-    setBusy(true);
-    try { ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/approve`, { role })).data, t('usr.approved')); }
-    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/approve`, { role })).data, t('usr.approved'));
   }
   return (
     <ActionScreen title={t('usr.approve')} description={t('usr.approveDesc', { name: ctx.record.full_name, username: ctx.record.username })}
-      onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error} confirmLabel={t('usr.approve')}>
+      onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('usr.approve')}>
       <ActionField label={t('fields.role')} required>
         <div className="dp-checks" role="radiogroup" aria-label={t('fields.role')}>
           {ROLES.map((r) => (
@@ -144,34 +133,24 @@ function ApproveScreen({ ctx }: { ctx: ActionCtx<UserRow> }) {
 
 function RejectScreen({ ctx }: { ctx: ActionCtx<UserRow> }) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   async function confirm() {
-    setBusy(true);
-    try { ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/reject`)).data, t('usr.rejected')); }
-    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/reject`)).data, t('usr.rejected'));
   }
   return (
     <ActionScreen title={t('usr.reject')} description={t('usr.rejectDesc', { name: ctx.record.full_name })}
-      onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error} confirmLabel={t('usr.reject')} danger />
+      onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('usr.reject')} danger />
   );
 }
 
 function ResetPasswordScreen({ ctx }: { ctx: ActionCtx<UserRow> }) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
   const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   async function confirm() {
-    setBusy(true);
-    try { ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/password`, { password })).data, t('usr.passwordReset')); }
-    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/password`, { password })).data, t('usr.passwordReset'));
   }
   return (
     <ActionScreen title={t('usr.resetPassword')} description={t('usr.resetDesc', { name: ctx.record.full_name })}
-      onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error} confirmDisabled={password.length < 10}>
+      onCancel={ctx.cancel} onConfirm={confirm} confirmDisabled={password.length < 10}>
       <ActionField label={t('usr.newPassword')} required hint={t('usr.passwordHint')}>
         <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
       </ActionField>
@@ -181,16 +160,11 @@ function ResetPasswordScreen({ ctx }: { ctx: ActionCtx<UserRow> }) {
 
 function DisableScreen({ ctx }: { ctx: ActionCtx<UserRow> }) {
   const { t } = useTranslation();
-  const errorText = useErrorText();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   async function confirm() {
-    setBusy(true);
-    try { ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/disable`)).data, t('usr.disabled')); }
-    catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+    ctx.done((await api.post<UserRow>(`/api/users/${ctx.record.id}/disable`)).data, t('usr.disabled'));
   }
   return (
     <ActionScreen title={t('usr.disable')} description={t('usr.disableDesc', { name: ctx.record.full_name })}
-      onCancel={ctx.cancel} onConfirm={confirm} busy={busy} error={error} confirmLabel={t('usr.disable')} danger />
+      onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('usr.disable')} danger />
   );
 }

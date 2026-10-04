@@ -3,20 +3,22 @@
 /**
  * Một danh sách của Configuration (Part Number, Location, …): Masterlist +
  * Detail Panel như mọi module (docs/DETAIL_MODEL.md 4.4). Chỉ Admin.
- * Bảng có is_active: "Xóa" = Ẩn / Hiện lại. Status, Calibration Interval: xóa thật.
+ * Bảng có is_active: "Xóa" = Ẩn / Hiện lại. Status, Hiệu chuẩn › Setup: xóa thật.
+ * Setup hiệu chuẩn: PN (trong các PN đang có thiết bị) + chu kỳ + status mặc định; thiết bị
+ * của PN tự lên Dashboard hiệu chuẩn (database).
  */
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, SlidersHorizontal } from 'lucide-react';
 import { api } from '@/lib/client/api';
+import { useFetch } from '@/lib/client/useFetch';
 import { refreshOptions, toSelect, useOptions } from '@/lib/client/options';
+import { toast } from '@/components/ui';
 import { configList, STATUS_COLORS } from '@/lib/configuration';
 import { StatusTag, ToneTag } from '@/components/ui/tags';
 import { RecordDetail, type ActionDef, type SectionDef } from '@/components/ui/detail/RecordDetail';
 import { ModuleWorkspace, useList } from '@/components/ui/workspace/ModuleWorkspace';
 import type { Column } from '@/components/ui/masterlist/Masterlist';
-import type { ConfigList, ConfigRow, StatusColor, StatusPage } from '@/lib/types';
-
-const PAGES: StatusPage[] = ['equipment', 'calibration', 'golden_sample'];
+import type { ConfigList, ConfigRow, StatusColor } from '@/lib/types';
 
 export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
   const { t } = useTranslation();
@@ -24,18 +26,25 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
   const options = useOptions();
   const list = useList<ConfigRow>(`/api/configuration/${listKey}`);
   const listName = t(`cfg.list.${listKey}`);
-  const pageLabel = (p: StatusPage) => t(`values.${p}`);
   const colorLabel = (c: StatusColor | undefined) => (c ? t(`values.${c}`) : null);
   /** Chip màu: tag trạng thái tô đúng màu, chữ là tên màu. */
   const colorChip = (c: StatusColor | undefined) => (c ? <StatusTag name={colorLabel(c)} color={c} /> : null);
 
-  const columns: Column<ConfigRow>[] = def.isInterval ? [
+  // Hiệu chuẩn › Setup: part number chọn trong các PN đang có thiết bị, mỗi PN một dòng (bỏ PN đã có, trừ dòng đang xem).
+  const equipmentPns = useFetch<string[]>(def.isCalibration ? '/api/equipment/part-numbers' : null);
+  const pool = new Set(equipmentPns.data ?? []);
+  const taken = new Set(list.rows.map((r) => r.part_number_id));
+  const partNumberChoices = (current: string | undefined) => toSelect(
+    options?.part_numbers.filter((pn) => pn.id === current || (pool.has(pn.id) && !taken.has(pn.id))),
+    current, ` (${t('cfg.hidden')})`);
+  const partNumberHint = equipmentPns.loading ? t('common.loadingEllipsis') : equipmentPns.error ?? t('cfg.calibrationPartHint');
+
+  const columns: Column<ConfigRow>[] = def.isCalibration ? [
     { key: 'display_name', label: t('fields.part_number'), value: (r) => r.display_name, render: (r) => <strong>{r.display_name}</strong> },
     { key: 'interval_months', label: t('fields.interval_months'), value: (r) => r.interval_months ?? null },
     { key: 'warning_days', label: t('fields.warning_days'), value: (r) => r.warning_days ?? null },
   ] : def.isStatus ? [
     { key: 'display_name', label: t('fields.display_name'), value: (r) => r.display_name, render: (r) => <strong>{r.display_name}</strong> },
-    { key: 'applies_to', label: t('fields.applies_to'), value: (r) => (r.applies_to ?? []).map(pageLabel).join(', ') },
     { key: 'requires_remark', label: t('fields.requires_remark'), value: (r) => (r.requires_remark ? t('common.yes') : t('common.no')), filter: true },
     { key: 'color', label: t('fields.color'), value: (r) => colorLabel(r.color), render: (r) => colorChip(r.color), filter: true },
     { key: 'sort_order', label: t('fields.sort_order'), value: (r) => r.sort_order },
@@ -49,9 +58,10 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
 
   const sections: SectionDef<ConfigRow>[] = [{
     key: 'info', title: t('cfg.groupInfo'),
-    fields: def.isInterval ? [
+    fields: def.isCalibration ? [
       { key: 'part_number_id', label: t('fields.part_number'), kind: 'select', required: true, view: (r) => r.display_name,
-        options: (_d, r) => toSelect(options?.part_numbers, r?.part_number_id, ` (${t('cfg.hidden')})`) },
+        options: (_d, r) => partNumberChoices(r?.part_number_id), editHint: partNumberHint,
+        lock: (r) => (r ? t('cfg.partNumberFixed') : null) },
       { key: 'interval_months', label: t('fields.interval_months'), kind: 'number', required: true, min: 1, max: 600,
         view: (r) => t('cal.months', { count: r.interval_months ?? 0 }) },
       { key: 'warning_days', label: t('fields.warning_days'), kind: 'number', required: true, min: 1, max: 3650,
@@ -59,8 +69,6 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
     ] : def.isStatus ? [
       { key: 'display_name', label: t('fields.display_name'), required: true, maxLength: 100 },
       { key: 'sort_order', label: t('fields.sort_order'), kind: 'number', required: true, min: 0 },
-      { key: 'applies_to', label: t('fields.applies_to'), kind: 'checkboxes', required: true, hint: t('cfg.appliesToHint'),
-        options: () => PAGES.map((p) => ({ value: p, label: pageLabel(p) })) },
       { key: 'requires_remark', label: t('fields.requires_remark'), kind: 'boolean' },
       { key: 'color', label: t('fields.color'), kind: 'radio', required: true, hint: t('cfg.colorHint'),
         options: () => STATUS_COLORS.map((c) => ({ value: c, label: t(`values.${c}`) })),
@@ -74,9 +82,12 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
     ],
   }];
 
-  const defaults = def.isInterval ? { warning_days: 30 } : def.isStatus
-    ? { sort_order: 0, applies_to: ['equipment'], requires_remark: false }
+  const defaults = def.isCalibration ? { warning_days: 30 } : def.isStatus
+    ? { sort_order: 0, requires_remark: false }
     : { sort_order: 0, is_active: true };
+
+  // Dữ liệu gốc vừa đổi → mọi form cần danh sách chọn mới. Thay đổi đã lưu; chỉ báo nếu chưa tải lại được.
+  const refresh = () => { refreshOptions().catch(() => toast.warning(t('cfg.optionsStale'))); };
 
   const actions: ActionDef<ConfigRow>[] = def.hideable ? [{
     key: 'toggle', label: t('cfg.hide'), icon: <EyeOff size={14} aria-hidden="true" />, visible: (r) => r.is_active,
@@ -104,6 +115,7 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
           creating={ctx.creating}
           loading={ctx.loading}
           error={ctx.error}
+          onRetry={ctx.onRetry}
           icon={<SlidersHorizontal size={18} />}
           createTitle={t('cfg.addTitle', { list: listName })}
           heading={(r) => ({
@@ -123,15 +135,16 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
             const res = record
               ? await api.put<ConfigRow>(`/api/configuration/${listKey}/${record.id}`, payload)
               : await api.post<ConfigRow>(`/api/configuration/${listKey}`, payload);
-            refreshOptions();
             return { row: res.data };
           }}
           actions={actions}
           canDelete={def.deletable}
-          onDelete={async (r) => { await api.delete(`/api/configuration/${listKey}/${r.id}`); refreshOptions(); }}
+          deleteWarning={def.isCalibration ? (r) => t('cfg.calibrationDeleteWarning', { name: r.display_name }) : undefined}
+          onDelete={async (r) => { await api.delete(`/api/configuration/${listKey}/${r.id}`); refresh(); }}
           nav={ctx.nav}
           onClose={ctx.onClose}
-          onSaved={(row, created) => { refreshOptions(); ctx.onSaved(row, created); }}
+          // Lưu và Ẩn / Hiện đều qua đây — tải lại danh sách chọn một lần.
+          onSaved={(row, created) => { refresh(); ctx.onSaved(row, created); }}
           onDeleted={ctx.onDeleted}
           leaveRef={ctx.leaveRef}
         />

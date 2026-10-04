@@ -2,8 +2,8 @@
 
 /**
  * Menu chính (docs/APP_SHELL.md mục 1–2): sáu mục, một cấp duy nhất.
- * Giữ nguyên kiểu sidebar cũ (Prussian, mục đang chọn Picton, thu gọn còn
- * icon, ngăn kéo trên điện thoại). Configuration và User Management chỉ Admin
+ * Nền Prussian, mục đang chọn Picton, thu gọn còn icon, ngăn kéo trên
+ * điện thoại. Configuration và User Management chỉ Admin
  * thấy, ngăn với bốn mục trên bằng một đường kẻ. Không có số đếm cạnh menu.
  */
 import { usePathname } from 'next/navigation';

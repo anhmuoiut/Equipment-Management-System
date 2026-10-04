@@ -6,51 +6,27 @@
  * vào qua prop `extensions` — Equipment không đọc bảng hiệu chuẩn, nâng cấp
  * Calibration không phải sửa Equipment.
  */
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError, formatDate } from '@/lib/client/api';
-import { useCan } from '@/components/ViewerContext';
-import { Button, Spinner, toast } from '@/components/ui';
+import { formatDate } from '@/lib/client/api';
+import { useFetch } from '@/lib/client/useFetch';
+import { ErrorState, Spinner } from '@/components/ui';
 import { DetailValue } from '@/components/ui/detail/DetailPanel';
 import { DueDate, StatusTag } from '@/components/ui/tags';
-import { translateError } from '@/lib/i18n/errors';
 import type { SectionDef } from '@/components/ui/detail/RecordDetail';
 import type { CalibrationRow, EquipmentRow } from '@/lib/types';
 
-function EquipmentCalibrationGroup({ equipmentId }: { equipmentId: string }) {
-  const { t, i18n } = useTranslation();
-  const language = i18n.language === 'vi' ? 'vi' : 'en';
-  const can = useCan();
-  const [row, setRow] = useState<CalibrationRow | null | undefined>(undefined);
-  const [adding, setAdding] = useState(false);
+function EquipmentCalibrationGroup({ equipment }: { equipment: EquipmentRow }) {
+  const { t } = useTranslation();
+  const { data: row, loading, error, reload } = useFetch<CalibrationRow | null>(`/api/calibration/by-equipment/${equipment.id}`);
 
-  useEffect(() => {
-    setRow(undefined);
-    void api.get<CalibrationRow | null>(`/api/calibration/by-equipment/${equipmentId}`).then((r) => setRow(r.data)).catch(() => setRow(null));
-  }, [equipmentId]);
-
-  async function add() {
-    setAdding(true);
-    try {
-      const r = await api.post<CalibrationRow>('/api/calibration', { equipment_id: equipmentId });
-      setRow(r.data);
-      toast.success(t('cal.added'));
-    } catch (e) {
-      if (e instanceof ApiError) toast.error(translateError(e.code, language, e.message));
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  if (row === undefined) return <Spinner label={t('common.loadingEllipsis')} size="sm" />;
-  if (row === null) {
+  if (error) return <ErrorState message={error} onRetry={reload} />;
+  if (loading) return <Spinner label={t('common.loadingEllipsis')} size="sm" />;
+  if (!row) {
+    // Thiết bị tự lên Dashboard khi part number có trong Configuration › Hiệu chuẩn › Setup.
     return (
-      <DetailValue label={t('cal.tracking')} wide>
-        <span className="dp-inline">
-          {t('cal.notTracked')}
-          {can.edit && <Button size="sm" loading={adding} onClick={add}>{t('cal.addToDashboard')}</Button>}
-        </span>
+      <DetailValue label={t('cal.tracking')} wide hint={equipment.part_number_id ? t('cal.needsSetup') : t('cal.needsPartNumber')}>
+        {t('cal.notTracked')}
       </DetailValue>
     );
   }
@@ -71,5 +47,9 @@ function EquipmentCalibrationGroup({ equipmentId }: { equipmentId: string }) {
 /** Nhóm gắn vào chi tiết thiết bị. */
 export function useEquipmentCalibrationSection(): SectionDef<EquipmentRow> {
   const { t } = useTranslation();
-  return { key: 'calibration', title: t('cal.groupCalibration'), hideInCreate: true, render: (r) => <EquipmentCalibrationGroup equipmentId={r.id} /> };
+  return {
+    key: 'calibration', title: t('cal.groupCalibration'), hideInCreate: true,
+    // key theo id + part number: đổi thiết bị hoặc đổi part number thì nhóm này tải lại.
+    render: (r) => <EquipmentCalibrationGroup key={`${r.id}:${r.part_number_id ?? ''}`} equipment={r} />,
+  };
 }

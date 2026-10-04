@@ -39,10 +39,6 @@ export function DueDate({ date, state }: { date: string | null; state: DueState 
   );
 }
 
-export function dueTone(state: DueState) {
-  return DUE_TONE[state];
-}
-
 const ACCOUNT_TONE = { pending: 'warn', active: 'ok', rejected: 'neutral', disabled: 'alert' } as const;
 
 export function AccountStatusTag({ status }: { status: keyof typeof ACCOUNT_TONE }) {

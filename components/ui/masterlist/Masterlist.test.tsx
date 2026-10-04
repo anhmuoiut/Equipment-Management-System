@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 vi.mock('react-i18next', () => ({
@@ -9,7 +9,7 @@ vi.mock('react-i18next', () => ({
 class IO { observe() {} disconnect() {} }
 vi.stubGlobal('IntersectionObserver', IO);
 
-import { Masterlist, type Column } from './Masterlist';
+import { Masterlist, RowCard, type Column } from './Masterlist';
 
 type Row = { id: string; serial: string; type: string | null; qty: number };
 const rows: Row[] = [
@@ -83,5 +83,92 @@ describe('Masterlist — docs/DETAIL_MODEL.md mục 2', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('checkbox', { name: 'Type' }));
     const headers = within(screen.getByRole('table')).getAllByRole('columnheader').map((h) => h.textContent);
     expect(headers).toEqual(['ml.no', 'Serial', 'Qty']);
+  });
+});
+
+/** Phone layout: matchMedia('(max-width: 800px)') reports a match. */
+function phoneMode(on: boolean) {
+  vi.mocked(window.matchMedia).mockReturnValue({ matches: on, media: '', addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList);
+}
+
+describe('Phone layout — a card per row instead of a squeezed table', () => {
+  afterEach(() => phoneMode(false));
+  const cards = () => screen.queryAllByRole('button').filter((b) => b.classList.contains('ml-card'));
+  function setupPhone(extra: Partial<Parameters<typeof Masterlist<Row>>[0]> = {}) {
+    phoneMode(true);
+    const onSelect = vi.fn();
+    const onViewChange = vi.fn();
+    render(
+      <Masterlist<Row> title="Phone" rows={rows} loading={false} error={null} columns={columns} storageKey={`p-${Math.random()}`}
+        selectedId={null} onSelect={onSelect} exportName="test" onViewChange={onViewChange}
+        mobileCard={(r) => <RowCard title={r.serial} tag={r.type} lines={[`qty ${r.qty}`]} />} {...extra} />,
+    );
+    return { onSelect, onViewChange };
+  }
+
+  it('renders one tappable card per row — no table, no column picker, no sort headers', () => {
+    const { onSelect } = setupPhone();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('button', { name: /ml.columns/ })).toBeNull();
+    expect(cards().map((c) => c.querySelector('.rc-title')?.textContent)).toEqual(['SN-10', 'SN-2', 'SN-1', 'XYZ']);
+    fireEvent.click(cards()[1]!);
+    expect(onSelect).toHaveBeenCalledWith('b');
+  });
+
+  it('builds a card from the columns when the module gives none', () => {
+    setupPhone({ mobileCard: undefined });
+    const first = cards()[0]!;
+    expect(first.querySelector('.rc-title')?.textContent).toBe('SN-10');
+    expect(first.textContent).toContain('Tester');
+    expect(first.textContent).toContain('3');
+  });
+
+  it('search narrows the cards and reports the visible order', () => {
+    const { onViewChange } = setupPhone();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'tester' } });
+    expect(cards()).toHaveLength(2);
+    expect(onViewChange).toHaveBeenLastCalledWith(['a', 'c']);
+  });
+
+  it('Filter & sort opens as a sheet: filter by a column, sort, see the result count, clear', () => {
+    const { onViewChange } = setupPhone();
+    fireEvent.click(screen.getByRole('button', { name: 'ml.filtersAndSort' }));
+    const sheet = within(screen.getByRole('dialog'));
+    fireEvent.change(sheet.getByRole('combobox', { name: /Type/ }), { target: { value: 'Tester' } });
+    expect(onViewChange).toHaveBeenLastCalledWith(['a', 'c']);
+    fireEvent.change(sheet.getByRole('combobox', { name: 'ml.sortBy' }), { target: { value: 'serial' } });
+    expect(onViewChange).toHaveBeenLastCalledWith(['c', 'a']);
+    fireEvent.click(sheet.getByRole('button', { name: /ml.sortDesc/ }));
+    expect(onViewChange).toHaveBeenLastCalledWith(['a', 'c']);
+    expect(sheet.getByRole('button', { name: /ml.showResults/ })).toBeTruthy();
+    fireEvent.click(sheet.getByRole('button', { name: 'ml.clearFilters' }));
+    expect(onViewChange).toHaveBeenLastCalledWith(['a', 'b', 'c', 'd']);
+    fireEvent.click(sheet.getByRole('button', { name: /ml.showResults/ }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('active filter and sort show as removable chips when the sheet is closed', () => {
+    const { onViewChange } = setupPhone();
+    fireEvent.click(screen.getByRole('button', { name: 'ml.filtersAndSort' }));
+    fireEvent.change(within(screen.getByRole('dialog')).getByRole('combobox', { name: /Type/ }), { target: { value: 'Base' } });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /ml.showResults/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Type: Base/ }));
+    expect(onViewChange).toHaveBeenLastCalledWith(['a', 'b', 'c', 'd']);
+  });
+
+  it('puts Export and module tools in one ⋮ menu; Add is the floating + of the workspace, not a toolbar button', () => {
+    const open = vi.fn();
+    setupPhone({ onAdd: vi.fn(), tools: [{ key: 'import', label: 'Import Excel', onClick: open }] });
+    expect(screen.queryByRole('button', { name: /ml.add/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'ml.moreActions' }));
+    expect(screen.getByRole('menuitem', { name: /ml.export/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Import Excel' }));
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows quick filters as chips under the toolbar', () => {
+    const { onViewChange } = setupPhone({ quickFilters: [{ key: 'many', label: 'Many', test: (r) => r.qty >= 3 }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Many' }));
+    expect(onViewChange).toHaveBeenLastCalledWith(['a', 'd']);
   });
 });

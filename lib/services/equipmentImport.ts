@@ -1,7 +1,7 @@
 import 'server-only';
 
 /**
- * Import Excel cho Equipment (docs/DETAIL_MODEL.md mục 7, DATABASE_MODIFIED.md mục 2 + 5).
+ * Import Excel cho Equipment (docs/DETAIL_MODEL.md mục 6, DATABASE_MODIFIED.md mục 2 + 5).
  *
  * - File mẫu sinh lúc tải: danh sách chọn (Part number, Type, Level, Status,
  *   Location) lấy từ Configuration ngay lúc đó nên luôn khớp với app. Dòng 1
@@ -41,7 +41,7 @@ export function importChoices(lookups: Lookups): ImportChoices {
   const options = toOptions(lookups);
   const active = (items: { display_name: string; is_active: boolean }[]) =>
     items.filter((i) => i.is_active).map((i) => i.display_name);
-  const statuses = options.statuses.filter((s) => s.applies_to.includes('equipment'));
+  const statuses = options.statuses;
   return {
     part_numbers: active(options.part_numbers),
     types: active(options.types),
@@ -56,18 +56,18 @@ export function importChoices(lookups: Lookups): ImportChoices {
 // File mẫu
 // ---------------------------------------------------------------------------
 
-const PRUSSIAN = 'FF002B49';
-const NOTE_FILL = 'FFEAF6FC';
-const NOTE_INK = 'FF33495C';
-const STAR = 'FFFFD54F';
+export const PRUSSIAN = 'FF002B49';
+export const NOTE_FILL = 'FFEAF6FC';
+export const NOTE_INK = 'FF33495C';
+export const STAR = 'FFFFD54F';
 /** Ghi chú dòng 1 chỉ liệt kê nguyên danh sách khi danh sách ngắn. */
-const SHORT_LIST = 80;
+export const SHORT_LIST = 80;
 
-type Text = ReturnType<typeof textFor>;
+export type Text = ReturnType<typeof textFor>;
 type Validations = { add(range: string, validation: Record<string, unknown>): void };
-const validationsOf = (ws: ExcelJS.Worksheet) => (ws as unknown as { dataValidations: Validations }).dataValidations;
+export const validationsOf = (ws: ExcelJS.Worksheet) => (ws as unknown as { dataValidations: Validations }).dataValidations;
 
-const clip = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
+export const clip = (text: string, max: number) => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
 
 /** Danh sách (cột ở sheet Giá trị hợp lệ) theo thứ tự cột của file; Part number dùng chung cho cột cha. */
 const LIST_KEYS = [...new Set(IMPORT_COLUMNS.flatMap((c) => (c.list ? [c.list] : [])))];
@@ -103,7 +103,7 @@ function columnNote(col: ImportColumn, choices: ImportChoices, t: Text, valuesSh
 }
 
 /** Ước lượng chiều cao dòng (Excel không tự giãn dòng có chữ xuống dòng). */
-function fitHeight(texts: { text: string; width: number }[], lineHeight = 15): number {
+export function fitHeight(texts: { text: string; width: number }[], lineHeight = 15): number {
   const lines = Math.max(1, ...texts.map(({ text, width }) =>
     text.split('\n').reduce((n, part) => n + Math.max(1, Math.ceil(part.length / Math.max(width * 1.05, 1))), 0)));
   return Math.min(lines * lineHeight + 4, 409);
@@ -256,18 +256,21 @@ export async function equipmentImportTemplate(language: Language): Promise<Buffe
 
 export type SheetTable = { headers: string[]; rows: { row: number; cells: string[] }[] };
 
-function fileError(code: ImportFileError, extra: Record<string, unknown> = {}): AppError {
+export function fileError(code: ImportFileError, extra: Record<string, unknown> = {}): AppError {
   return new AppError('VALIDATION_ERROR', { fields: { file: code }, ...extra });
 }
 
-const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+export const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Tiêu đề cột → trường. Nhận cả "Serial number *", "SERIAL NUMBER", "serial_number". */
-const HEADER_KEYS = new Map<string, ImportColumnKey>(IMPORT_COLUMNS.flatMap((c) => [
-  [normalize(c.header), c.key] as const,
-  [normalize(c.key), c.key] as const,
-  [normalize(c.key.replace(/_id$/, '')), c.key] as const,
-]));
+export function headerKeys<K extends string>(columns: readonly { key: K; header: string }[]): Map<string, K> {
+  return new Map(columns.flatMap((c) => [
+    [normalize(c.header), c.key] as const,
+    [normalize(c.key), c.key] as const,
+    [normalize(c.key.replace(/_id$/, '')), c.key] as const,
+  ]));
+}
+const HEADER_KEYS = headerKeys(IMPORT_COLUMNS);
 
 /** Chữ trong ô — số, công thức, rich text, link đều về chuỗi đã cắt khoảng trắng. */
 export function cellText(value: ExcelJS.CellValue | undefined): string {
@@ -291,7 +294,7 @@ export function cellText(value: ExcelJS.CellValue | undefined): string {
  * Sheet có cột Serial number trong 5 dòng đầu; dòng đó là tiêu đề, dữ liệu
  * ở các dòng bên dưới (bỏ dòng trống). File mẫu: dòng 1 ghi chú, dòng 2 tiêu đề.
  */
-export async function readWorkbook(buffer: Buffer): Promise<SheetTable> {
+export async function readWorkbook(buffer: Buffer, keys: Map<string, string> = HEADER_KEYS): Promise<SheetTable> {
   const wb = new ExcelJS.Workbook();
   try {
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);
@@ -303,7 +306,7 @@ export async function readWorkbook(buffer: Buffer): Promise<SheetTable> {
       const row = ws.getRow(r);
       const headers: string[] = [];
       for (let c = 1; c <= row.cellCount; c++) headers.push(cellText(row.getCell(c).value));
-      if (!headers.some((h) => HEADER_KEYS.get(normalize(h)) === 'serial_number')) continue;
+      if (!headers.some((h) => keys.get(normalize(h)) === 'serial_number')) continue;
 
       const rows: SheetTable['rows'] = [];
       ws.eachRow({ includeEmpty: false }, (dataRow, number) => {
@@ -321,9 +324,9 @@ export async function readWorkbook(buffer: Buffer): Promise<SheetTable> {
 // Kiểm tra
 // ---------------------------------------------------------------------------
 
-type Entry = { id: string; usable: boolean; name: string; requiresRemark: boolean };
+export type Entry = { id: string; usable: boolean; name: string; requiresRemark: boolean };
 
-function indexBy<T extends { id: string; display_name: string }>(map: Map<string, T>, usable: (row: T) => boolean, remark?: (row: T) => boolean) {
+export function indexBy<T extends { id: string; display_name: string }>(map: Map<string, T>, usable: (row: T) => boolean, remark?: (row: T) => boolean) {
   const out = new Map<string, Entry>();
   map.forEach((row) => out.set(row.display_name.trim().toLowerCase(), {
     id: row.id, usable: usable(row), name: row.display_name, requiresRemark: remark?.(row) ?? false,
@@ -380,7 +383,7 @@ export function checkTable(
     types: indexBy(lookups.types, (r) => r.is_active),
     levels: indexBy(lookups.levels, (r) => r.is_active),
     locations: indexBy(lookups.locations, (r) => r.is_active),
-    statuses: indexBy(lookups.statuses, (r) => r.applies_to.includes('equipment'), (r) => r.requires_remark),
+    statuses: indexBy(lookups.statuses, () => true, (r) => r.requires_remark),
   };
 
   // ---- 1. Từng ô như form Thêm thiết bị.
@@ -403,7 +406,7 @@ export function checkTable(
       if (col.list) {
         const entry = lists[col.list].get(raw.toLowerCase());
         if (!entry) issues.push({ column: key, code: 'not_found', value: raw });
-        else if (!entry.usable) issues.push({ column: key, code: col.list === 'statuses' ? 'status_not_allowed' : 'inactive', value: raw });
+        else if (!entry.usable) issues.push({ column: key, code: 'inactive', value: raw });
         else {
           data[key] = entry.id;
           if (col.list === 'statuses') status = entry;
@@ -516,15 +519,19 @@ export function checkTable(
 // Import
 // ---------------------------------------------------------------------------
 
-type UploadedFile = Blob & { name?: string };
+export type UploadedFile = Blob & { name?: string };
 
-/** commit = false: chỉ kiểm tra. commit = true: kiểm tra lại từ đầu, hết lỗi mới ghi (tất cả hoặc không). */
-export async function importEquipmentFile(file: UploadedFile | null, commit: boolean, actor: string): Promise<ImportReport> {
+/** File upload hợp lệ (có, .xlsx, không quá lớn) → nội dung. */
+export async function readUpload(file: UploadedFile | null): Promise<Buffer> {
   if (!file || !file.size) throw fileError('required');
   if (!/\.xlsx$/i.test(file.name ?? '')) throw fileError('not_xlsx');
   if (file.size > IMPORT_MAX_FILE_MB * 1024 * 1024) throw fileError('too_large', { max: IMPORT_MAX_FILE_MB });
+  return Buffer.from(await file.arrayBuffer());
+}
 
-  const table = await readWorkbook(Buffer.from(await file.arrayBuffer()));
+/** commit = false: chỉ kiểm tra. commit = true: kiểm tra lại từ đầu, hết lỗi mới ghi (tất cả hoặc không). */
+export async function importEquipmentFile(file: UploadedFile | null, commit: boolean, actor: string): Promise<ImportReport> {
+  const table = await readWorkbook(await readUpload(file));
   const [lookups, existing] = await Promise.all([
     loadLookups(),
     selectAll<ExistingEquipment>('equipments', 'id, serial_number, part_number_id, location_id'),

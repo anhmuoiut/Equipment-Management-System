@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './brand.css';
 import { PreferencesProvider } from '@/components/Preferences';
@@ -7,6 +7,13 @@ export const metadata: Metadata = {
   title: 'Jabil | SolarEdge Equipment Management',
   description: 'Test Engineering - SolarEdge workcell'
 };
+
+/**
+ * `resizes-content`: when the on-screen keyboard opens, the page (and the fixed
+ * bottom bars of the Detail Panel) shrink above it instead of hiding behind it
+ * (Chrome / Android; iOS Safari ignores it). Zoom stays allowed.
+ */
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, interactiveWidget: 'resizes-content' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -1,12 +1,12 @@
 'use client';
 
-/** Trang Equipment: Masterlist (giữ đủ cột như thiết kế hiện tại) + Detail Panel. */
+/** Trang Equipment: Masterlist + Detail Panel; điện thoại hiện mỗi thiết bị một thẻ (serial, trạng thái, vị trí). */
 import { useTranslation } from 'react-i18next';
-import { CornerDownRight, ListTree, Upload } from 'lucide-react';
+import { CornerDownRight, ListTree, MapPin, Upload } from 'lucide-react';
 import { useCan } from '@/components/ViewerContext';
 import { StatusTag } from '@/components/ui/tags';
 import { ModuleWorkspace, useList } from '@/components/ui/workspace/ModuleWorkspace';
-import type { Column } from '@/components/ui/masterlist/Masterlist';
+import { RowCard, type Column } from '@/components/ui/masterlist/Masterlist';
 import type { SectionDef } from '@/components/ui/detail/RecordDetail';
 import { EquipmentDetail } from './EquipmentDetail';
 import { EquipmentImport } from './EquipmentImport';
@@ -30,11 +30,26 @@ export function EquipmentWorkspace({ extensions }: { extensions?: SectionDef<Equ
     { key: 'remark', label: t('fields.remark'), value: (r) => r.remark, wrap: true, width: 180 },
   ];
 
+  /** Có con / là con của thiết bị khác — dùng ở cột đầu của bảng và trên thẻ. */
+  const relation = (r: EquipmentRow) => (r.has_children
+    ? <span className="rel" title={t('eq.hasChildren')}><ListTree size={14} aria-label={t('eq.hasChildren')} /></span>
+    : r.parent_id ? <span className="rel" title={t('eq.isChild', { serial: r.parent_serial })}><CornerDownRight size={14} aria-label={t('eq.isChild', { serial: r.parent_serial })} /></span>
+      : null);
+
   return (
     <ModuleWorkspace<EquipmentRow>
       title={t('nav.equipment')}
       list={list}
       columns={columns}
+      mobileCard={(r) => (
+        <RowCard
+          title={<>{r.serial_number}{relation(r)}</>}
+          tag={<StatusTag name={r.status} color={r.status_color} />}
+          lines={[
+            <><MapPin size={13} aria-hidden="true" /><span className="rc-place">{r.location ?? '—'}</span>{[r.part_number, r.type, r.jabil_id].filter(Boolean).map((x) => ` · ${x}`)}</>,
+          ]}
+        />
+      )}
       storageKey="equipment"
       exportName="equipment"
       canAdd={can.edit}
@@ -47,10 +62,7 @@ export function EquipmentWorkspace({ extensions }: { extensions?: SectionDef<Equ
       leading={{
         label: t('eq.relation'),
         header: <ListTree size={14} aria-hidden="true" />,
-        render: (r) => (r.has_children
-          ? <span className="rel" title={t('eq.hasChildren')}><ListTree size={14} aria-label={t('eq.hasChildren')} /></span>
-          : r.parent_id ? <span className="rel" title={t('eq.isChild', { serial: r.parent_serial })}><CornerDownRight size={14} aria-label={t('eq.isChild', { serial: r.parent_serial })} /></span>
-            : null),
+        render: relation,
       }}
       renderDetail={(ctx) => <EquipmentDetail ctx={ctx} layout="panel" extensions={extensions} rows={list.rows} />}
     />

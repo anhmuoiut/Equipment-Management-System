@@ -12,18 +12,19 @@ const order = z.number().int().min(0).max(100000);
 
 /** Trường được sửa của từng danh sách — docs/DATABASE_MODIFIED.md mục 5. */
 export function schemaFor(list: ConfigListDef, mode: 'create' | 'update') {
-  let shape: z.ZodRawShape;
-  if (list.isInterval) {
-    shape = {
-      part_number_id: reqId,
+  if (list.isCalibration) {
+    // Part number chỉ chọn khi thêm (đổi PN = xóa dòng rồi thêm lại).
+    const fields = {
       interval_months: z.number().int().min(1).max(600),
       warning_days: z.number().int().min(1).max(3650),
     };
-  } else if (list.isStatus) {
+    return mode === 'create' ? z.object({ part_number_id: reqId, ...fields }).strict() : z.object(fields).partial().strict();
+  }
+  let shape: z.ZodRawShape;
+  if (list.isStatus) {
     shape = {
       display_name: reqText(100),
       sort_order: order,
-      applies_to: z.array(z.enum(['equipment', 'calibration', 'golden_sample'])).min(1),
       requires_remark: z.boolean(),
       color: z.enum(STATUS_COLORS),
     };

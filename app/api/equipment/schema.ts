@@ -8,7 +8,7 @@ const fields = {
   asset: optText(200),
   type_id: optId,
   level_id: optId,
-  status_id: optId,
+  status_id: reqId,
   location_id: reqId,
   remark: optText(1000),
 };

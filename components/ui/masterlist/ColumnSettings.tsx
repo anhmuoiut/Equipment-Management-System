@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * Tùy chọn hiển thị cột — mỗi người tự ẩn / hiện, đổi thứ tự, khôi phục mặc
- * định. Mặc định hiện đủ cột. Lưu trên trình duyệt của từng người.
+ * Tùy chọn hiển thị cột (bảng desktop / tablet) — mỗi người tự ẩn / hiện, đổi
+ * thứ tự, khôi phục mặc định. Lưu trên trình duyệt của từng người. Điện thoại
+ * dùng thẻ (Masterlist) nên không có tùy chọn này.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,7 @@ export function useColumnPrefs(storageKey: string, keys: string[]): ColumnPrefs 
       setHidden((saved?.hidden ?? []).filter((k) => keys.includes(k)));
     } catch {
       setOrder(keys);
+      setHidden([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storage, keySig]);

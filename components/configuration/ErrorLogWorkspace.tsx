@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { Bug } from 'lucide-react';
 import { formatTime } from '@/lib/client/api';
 import { DetailPanel, DetailSection, DetailValue } from '@/components/ui/detail/DetailPanel';
-import { ErrorState } from '@/components/ui';
+import { ErrorState, Spinner } from '@/components/ui';
 import { ModuleWorkspace, useList } from '@/components/ui/workspace/ModuleWorkspace';
-import type { Column } from '@/components/ui/masterlist/Masterlist';
+import { RowCard, type Column } from '@/components/ui/masterlist/Masterlist';
 import type { ErrorLogRow } from '@/lib/types';
 
 export function ErrorLogWorkspace() {
@@ -28,13 +28,15 @@ export function ErrorLogWorkspace() {
       title={t('cfg.list.error-log')}
       list={list}
       columns={columns}
+      mobileCard={(r) => <RowCard title={r.error_code ?? '—'} tag={formatTime(r.created_at)} lines={[r.route, r.message]} />}
       storageKey="configuration-error-log"
       exportName="error-log"
       canAdd={false}
       renderDetail={(ctx) => (
         <DetailPanel layout="panel" icon={<Bug size={18} />} title={ctx.row?.request_id ?? '…'}
           subtitle={ctx.row ? formatTime(ctx.row.created_at) : undefined} nav={ctx.nav} onClose={ctx.onClose}>
-          {ctx.error ? <ErrorState message={ctx.error} /> : ctx.row && (
+          {ctx.error ? <ErrorState message={ctx.error} onRetry={ctx.onRetry} />
+            : !ctx.row ? <Spinner label={t('common.loadingEllipsis')} /> : (
             <div className="dp-body-inner">
               <DetailSection title={t('err.group')}>
                 <DetailValue label={t('err.requestId')}>{ctx.row.request_id}</DetailValue>

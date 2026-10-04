@@ -35,8 +35,8 @@ export function ok<T>(data: T, requestId: string, meta: Record<string, unknown> 
   return NextResponse.json({ success: true, data, meta: { ...meta, request_id: requestId } });
 }
 
-export function fail(err: AppError, requestId: string) {
-  // Lỗi 5xx: chi tiết (message gốc của Postgres…) chỉ ghi vào error_log / terminal, không gửi ra trình duyệt.
+function fail(err: AppError, requestId: string) {
+  // Chỉ gửi details an toàn của lỗi 4xx (lỗi theo trường…); `diagnostic` không bao giờ rời server.
   const details = err.status >= 500 ? {} : err.details;
   return NextResponse.json(
     { success: false, error: { code: err.code, message: err.message, details, request_id: requestId } },
@@ -75,7 +75,7 @@ export function withAuth(handler: Handler, options: Options = {}) {
         .select('id, username, full_name, email, role, account_status, must_change_password, token_version, sessions_revoked_at')
         .eq('id', userId)
         .maybeSingle<UserProfile & { token_version: number; sessions_revoked_at: string | null }>();
-      if (error) throw new AppError('SERVER_ERROR', { stage: 'load_profile' });
+      if (error) throw new AppError('SERVER_ERROR', {}, { stage: 'load_profile', pg: error.message });
       if (!profile) throw new AppError('UNAUTHORIZED');
       if (isSessionRevoked(session, profile)) throw new AppError('UNAUTHORIZED');
       if (profile.account_status !== 'active') throw new AppError('USER_INACTIVE');
@@ -88,8 +88,11 @@ export function withAuth(handler: Handler, options: Options = {}) {
       if (e instanceof AppError) {
         if (e.status >= 500) {
           // In ra terminal để thấy nguyên nhân ngay khi chạy `npm run dev`.
-          console.error(`[${requestId}] ${route} ${e.code}`, e.details);
-          await logError(requestId, route, userId, e.code, e.message, JSON.stringify(e.details));
+          console.error(`[${requestId}] ${route} ${e.code}`, e.diagnostic);
+          await logError(requestId, route, userId, e.code, e.message, JSON.stringify(e.diagnostic));
+        } else if (process.env.NODE_ENV !== 'production') {
+          // Lỗi nghiệp vụ (4xx) không vào error_log — khi dev vẫn thấy lý do ngay trong terminal.
+          console.warn(`[${requestId}] ${route} → ${e.status} ${e.code}`, { ...e.details, ...e.diagnostic });
         }
         return fail(e, requestId);
       }

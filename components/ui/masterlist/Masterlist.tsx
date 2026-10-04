@@ -7,11 +7,18 @@
  *
  * Dữ liệu đã tải đủ ở client nên lọc / sắp xếp tức thì, và thứ tự đang hiện
  * được báo lên (onViewChange) để Detail Panel chuyển ‹ › đúng thứ tự đó.
+ *
+ * Điện thoại (≤ 800px): không ép bảng vào màn hình hẹp — mỗi dòng là một thẻ
+ * (`mobileCard` của module, hoặc thẻ chung dựng từ các cột); thanh công cụ chỉ
+ * còn tìm kiếm + Lọc & sắp xếp (tấm trượt từ đáy) + menu ⋮ (Xuất Excel, công cụ).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Filter, Plus, Search, X } from 'lucide-react';
-import { Button, EmptyState, ErrorState, TableSkeleton } from '@/components/ui';
+import { errorMessage } from '@/lib/client/api';
+import { usePhone } from '@/lib/client/usePhone';
+import { Button, EmptyState, ErrorState, Modal, Skeleton, TableSkeleton, toast } from '@/components/ui';
+import { ActionMenu, type MoreItem } from '@/components/ui/ActionMenu';
 import { ColumnSettings, useColumnPrefs } from './ColumnSettings';
 import { exportToExcel } from './exportExcel';
 
@@ -32,6 +39,9 @@ export type Column<R> = {
 
 export type QuickFilter<R> = { key: string; label: string; test: (row: R) => boolean };
 
+/** Công cụ của module (Import…): nút trên thanh công cụ desktop, mục trong menu ⋮ trên điện thoại. */
+export type ListTool = { key: string; label: string; icon?: ReactNode; active?: boolean; onClick: () => void };
+
 type SortState = { key: string; dir: 'asc' | 'desc' } | null;
 
 const PAGE = 200;
@@ -45,9 +55,43 @@ function compare(a: string | number | null, b: string | number | null): number {
   return collator.compare(String(a), String(b));
 }
 
+/**
+ * Nội dung một thẻ dòng trên điện thoại: tiêu đề (+ tag bên phải) và vài dòng phụ.
+ * Chỉ dùng phần tử inline — thẻ nằm trong một <button>.
+ */
+export function RowCard({ title, tag, lines }: { title: ReactNode; tag?: ReactNode; lines?: ReactNode[] }) {
+  return (
+    <>
+      <span className="rc-head">
+        <span className="rc-title">{title}</span>
+        {tag && <span className="rc-tag">{tag}</span>}
+      </span>
+      {lines?.map((line, i) => (line ? <span key={i} className="rc-line">{line}</span> : null))}
+    </>
+  );
+}
+
+/** Thẻ chung cho module không khai báo `mobileCard`: cột đầu là tiêu đề, vài cột sau là cặp nhãn – giá trị. */
+function GenericCard<R>({ row, columns }: { row: R; columns: Column<R>[] }) {
+  const cell = (c: Column<R>) => (c.render ? c.render(row) : c.value(row));
+  const [first, ...rest] = columns;
+  const pairs = rest
+    .map((c) => ({ c, v: cell(c) }))
+    .filter(({ v }) => v !== null && v !== undefined && v !== '')
+    .slice(0, 5);
+  return (
+    <RowCard
+      title={first ? cell(first) : null}
+      lines={[pairs.length > 0 && pairs.map(({ c, v }) => (
+        <span key={c.key} className="rc-pair"><span className="rc-key">{c.label}</span> {v}</span>
+      ))]}
+    />
+  );
+}
+
 export function Masterlist<R extends { id: string }>({
   title, rows, loading, error, onRetry, columns, storageKey, selectedId, onSelect,
-  onAdd, addLabel, toolbarExtra, exportName, quickFilters, leading, onViewChange, rowTone,
+  onAdd, addLabel, tools, exportName, quickFilters, leading, onViewChange, rowTone, mobileCard,
 }: {
   title: string;
   rows: R[];
@@ -59,9 +103,10 @@ export function Masterlist<R extends { id: string }>({
   storageKey: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Thêm mới: nút `+ Thêm` trên desktop (điện thoại dùng nút nổi của ModuleWorkspace). */
   onAdd?: () => void;
   addLabel?: string;
-  toolbarExtra?: ReactNode;
+  tools?: ListTool[];
   exportName: string;
   quickFilters?: QuickFilter<R>[];
   /** Cột đầu trước `No` (Equipment: quan hệ cha–con). */
@@ -69,8 +114,11 @@ export function Masterlist<R extends { id: string }>({
   onViewChange?: (ids: string[]) => void;
   /** Tô nền dòng (ví dụ quá hạn). */
   rowTone?: (row: R) => 'alert' | 'warn' | undefined;
+  /** Thẻ dòng trên điện thoại (xem RowCard); mặc định dựng từ các cột. */
+  mobileCard?: (row: R) => ReactNode;
 }) {
   const { t } = useTranslation();
+  const phone = usePhone();
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortState>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -78,8 +126,9 @@ export function Masterlist<R extends { id: string }>({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const [exporting, setExporting] = useState(false);
-  const prefs = useColumnPrefs(storageKey, columns.map((c) => c.key));
-  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  const columnKeys = columns.map((c) => c.key);
+  const prefs = useColumnPrefs(storageKey, columnKeys);
+  const sentinelRef = useRef<HTMLElement | null>(null);
 
   const visibleColumns = useMemo(
     () => prefs.order.map((k) => columns.find((c) => c.key === k)).filter((c): c is Column<R> => !!c && !prefs.hidden.includes(c.key)),
@@ -130,6 +179,8 @@ export function Masterlist<R extends { id: string }>({
   const ids = useMemo(() => view.map((r) => r.id), [view]);
   useEffect(() => { onViewChange?.(ids); }, [ids, onViewChange]);
   useEffect(() => { setLimit(PAGE); }, [search, filters, sort, quick]);
+  // Quay về desktop thì bỏ tấm lọc đang mở (desktop dùng khung lọc nằm trong trang).
+  useEffect(() => { if (!phone) setFiltersOpen(false); }, [phone]);
 
   // Dòng đang mở nằm ngoài phần đã vẽ (ví dụ chuyển bằng ‹ ›) → vẽ thêm tới nó.
   useEffect(() => {
@@ -150,7 +201,7 @@ export function Masterlist<R extends { id: string }>({
     });
     io.observe(el);
     return () => io.disconnect();
-  }, [view.length, limit]);
+  }, [view.length, limit, phone]);
 
   function toggleSort(key: string) {
     setSort((s) => (s?.key !== key ? { key, dir: 'asc' } : s.dir === 'asc' ? { key, dir: 'desc' } : null));
@@ -163,13 +214,34 @@ export function Masterlist<R extends { id: string }>({
         { label: t('ml.no'), value: (_r: R, i: number) => i + 1 },
         ...visibleColumns.map((c) => ({ label: c.label, value: (r: R) => c.value(r) })),
       ], view);
+    } catch (e) {
+      // Ví dụ mất mạng khi tải thư viện Excel (tải khi cần).
+      toast.error(errorMessage(e, t));
     } finally {
       setExporting(false);
     }
   }
 
   const activeFilters = Object.entries(filters);
+  const sortLabel = sort ? columns.find((c) => c.key === sort.key)?.label : undefined;
   const colCount = visibleColumns.length + 1 + (leading ? 1 : 0);
+  const setFilter = (key: string, value: string) => setFilters((f) => {
+    const next = { ...f };
+    if (value === '__all') delete next[key]; else next[key] = value;
+    return next;
+  });
+
+  // Menu ⋮ trên điện thoại: Xuất Excel + công cụ của module (Import…).
+  const menu: MoreItem[] = [
+    ...(view.length > 0 ? [{ key: 'export', label: t('ml.export'), icon: <Download size={16} aria-hidden="true" />, onClick: () => void doExport() }] : []),
+    ...(tools ?? []).map((x) => ({ key: x.key, label: x.label, icon: x.icon, onClick: x.onClick })),
+  ];
+
+  const toolButtons = tools?.map((x) => (
+    <Button key={x.key} size="sm" aria-pressed={x.active} data-active={x.active} onClick={x.onClick}>
+      {x.icon}{x.label}
+    </Button>
+  ));
 
   return (
     <section className="ml" aria-label={title}>
@@ -181,45 +253,61 @@ export function Masterlist<R extends { id: string }>({
             placeholder={t('ml.searchPlaceholder')} aria-label={t('common.search')}
           />
         </label>
-        {filterable.length > 0 && (
-          <Button size="sm" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}>
-            <Filter size={14} aria-hidden="true" />{t('ml.filters')}
-            {activeFilters.length > 0 && <span className="ml-badge">{activeFilters.length}</span>}
-          </Button>
-        )}
-        {quickFilters?.map((f) => (
-          <Button key={f.key} size="sm" aria-pressed={quick === f.key} data-active={quick === f.key}
-            onClick={() => setQuick((q) => (q === f.key ? null : f.key))}>
-            {f.label}
-          </Button>
-        ))}
-        <div className="ml-toolbar-end">
-          <ColumnSettings columns={columns} prefs={prefs} />
-          <Button size="sm" onClick={doExport} loading={exporting} disabled={view.length === 0}>
-            <Download size={14} aria-hidden="true" />{t('ml.export')}
-          </Button>
-          {toolbarExtra}
-          {onAdd && (
-            <Button size="sm" variant="primary" onClick={onAdd}>
-              <Plus size={14} aria-hidden="true" />{addLabel ?? t('ml.add')}
+        {phone ? (
+          <>
+            <Button className="ml-icon-btn" aria-label={t('ml.filtersAndSort')} aria-expanded={filtersOpen} onClick={() => setFiltersOpen(true)}>
+              <Filter size={18} aria-hidden="true" />
+              {activeFilters.length + (sort ? 1 : 0) > 0 && <span className="ml-badge">{activeFilters.length + (sort ? 1 : 0)}</span>}
             </Button>
-          )}
-        </div>
+            {menu.length > 0 && <ActionMenu items={menu} busy={exporting} iconOnly ariaLabel={t('ml.moreActions')} />}
+          </>
+        ) : (
+          <>
+            {filterable.length > 0 && (
+              <Button size="sm" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}>
+                <Filter size={14} aria-hidden="true" />{t('ml.filters')}
+                {activeFilters.length > 0 && <span className="ml-badge">{activeFilters.length}</span>}
+              </Button>
+            )}
+            {quickFilters?.map((f) => (
+              <Button key={f.key} size="sm" aria-pressed={quick === f.key} data-active={quick === f.key}
+                onClick={() => setQuick((q) => (q === f.key ? null : f.key))}>
+                {f.label}
+              </Button>
+            ))}
+            <div className="ml-toolbar-end">
+              <ColumnSettings columns={columns} prefs={prefs} />
+              <Button size="sm" onClick={doExport} loading={exporting} disabled={view.length === 0}>
+                <Download size={14} aria-hidden="true" />{t('ml.export')}
+              </Button>
+              {toolButtons}
+              {onAdd && (
+                <Button size="sm" variant="primary" onClick={onAdd}>
+                  <Plus size={14} aria-hidden="true" />{addLabel ?? t('ml.add')}
+                </Button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      {filtersOpen && filterable.length > 0 && (
+      {phone && quickFilters && quickFilters.length > 0 && (
+        <div className="ml-quick">
+          {quickFilters.map((f) => (
+            <Button key={f.key} size="sm" aria-pressed={quick === f.key} data-active={quick === f.key}
+              onClick={() => setQuick((q) => (q === f.key ? null : f.key))}>
+              {f.label}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {!phone && filtersOpen && filterable.length > 0 && (
         <div className="ml-filters">
           {filterable.map((c) => (
             <label key={c.key} className="ml-filter">
               <span>{c.label}</span>
-              <select
-                value={filters[c.key] ?? '__all'}
-                onChange={(e) => setFilters((f) => {
-                  const next = { ...f };
-                  if (e.target.value === '__all') delete next[c.key]; else next[c.key] = e.target.value;
-                  return next;
-                })}
-              >
+              <select value={filters[c.key] ?? '__all'} onChange={(e) => setFilter(c.key, e.target.value)}>
                 <option value="__all">{t('ml.all')}</option>
                 {filterValues[c.key]?.map((v) => <option key={v} value={v}>{v || t('ml.empty')}</option>)}
               </select>
@@ -229,7 +317,7 @@ export function Masterlist<R extends { id: string }>({
         </div>
       )}
 
-      {activeFilters.length > 0 && !filtersOpen && (
+      {(activeFilters.length > 0 || (phone && sort)) && !filtersOpen && (
         <div className="ml-chips">
           {activeFilters.map(([key, value]) => (
             <button key={key} type="button" className="ml-chip"
@@ -237,52 +325,81 @@ export function Masterlist<R extends { id: string }>({
               {columns.find((c) => c.key === key)?.label}: {value || t('ml.empty')} <X size={12} aria-hidden="true" />
             </button>
           ))}
+          {phone && sort && (
+            <button type="button" className="ml-chip" onClick={() => setSort(null)}>
+              {sort.dir === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />}
+              {sortLabel} <X size={12} aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
       <div className="ml-scroll">
-        <table className="ml-table">
-          <thead>
-            <tr>
-              {leading && <th className="ml-col-leading" aria-label={leading.label}>{leading.header}</th>}
-              <th className="ml-col-no">{t('ml.no')}</th>
-              {visibleColumns.map((c) => (
-                <th key={c.key} style={c.width ? { minWidth: c.width } : undefined}
-                  aria-sort={sort?.key === c.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <button type="button" className="ml-sort" onClick={() => toggleSort(c.key)}>
-                    {c.label}
-                    {sort?.key === c.key
-                      ? (sort.dir === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />)
-                      : <ArrowUpDown size={12} aria-hidden="true" className="ml-sort-idle" />}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+        {phone ? (
+          <ul className="ml-cards">
             {loading && rows.length === 0 ? (
-              <TableSkeleton columns={colCount} />
+              Array.from({ length: 6 }, (_, i) => (
+                <li key={i} className="ml-card ml-card--skeleton" aria-hidden="true">
+                  <Skeleton className="h-4" style={{ width: '45%' }} />
+                  <Skeleton className="h-3" style={{ width: '80%' }} />
+                </li>
+              ))
             ) : (
-              view.slice(0, limit).map((r, i) => (
-                <tr key={r.id} data-row-id={r.id} data-selected={r.id === selectedId || undefined} data-tone={rowTone?.(r)}
-                  tabIndex={0} onClick={() => onSelect(r.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(r.id); } }}>
-                  {leading && <td className="ml-col-leading">{leading.render(r)}</td>}
-                  <td className="ml-col-no">{i + 1}</td>
-                  {visibleColumns.map((c) => {
-                    const content = c.render ? c.render(r) : c.value(r);
-                    return (
-                      <td key={c.key} data-wrap={c.wrap || undefined}>
-                        {content === null || content === '' || content === undefined ? <span className="ml-empty">—</span> : content}
-                      </td>
-                    );
-                  })}
-                </tr>
+              view.slice(0, limit).map((r) => (
+                <li key={r.id}>
+                  <button type="button" className="ml-card" data-row-id={r.id} data-selected={r.id === selectedId || undefined}
+                    data-tone={rowTone?.(r)} onClick={() => onSelect(r.id)}>
+                    {mobileCard ? mobileCard(r) : <GenericCard row={r} columns={columns} />}
+                  </button>
+                </li>
               ))
             )}
-            {view.length > limit && <tr ref={sentinelRef}><td colSpan={colCount} className="ml-more">{t('common.loadingEllipsis')}</td></tr>}
-          </tbody>
-        </table>
+            {view.length > limit && <li ref={(el) => { sentinelRef.current = el; }} className="ml-more">{t('common.loadingEllipsis')}</li>}
+          </ul>
+        ) : (
+          <table className="ml-table">
+            <thead>
+              <tr>
+                {leading && <th className="ml-col-leading" aria-label={leading.label}>{leading.header}</th>}
+                <th className="ml-col-no">{t('ml.no')}</th>
+                {visibleColumns.map((c) => (
+                  <th key={c.key} style={c.width ? { minWidth: c.width } : undefined}
+                    aria-sort={sort?.key === c.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" className="ml-sort" onClick={() => toggleSort(c.key)}>
+                      {c.label}
+                      {sort?.key === c.key
+                        ? (sort.dir === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />)
+                        : <ArrowUpDown size={12} aria-hidden="true" className="ml-sort-idle" />}
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading && rows.length === 0 ? (
+                <TableSkeleton columns={colCount} />
+              ) : (
+                view.slice(0, limit).map((r, i) => (
+                  <tr key={r.id} data-row-id={r.id} data-selected={r.id === selectedId || undefined} data-tone={rowTone?.(r)}
+                    tabIndex={0} onClick={() => onSelect(r.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(r.id); } }}>
+                    {leading && <td className="ml-col-leading">{leading.render(r)}</td>}
+                    <td className="ml-col-no">{i + 1}</td>
+                    {visibleColumns.map((c) => {
+                      const content = c.render ? c.render(r) : c.value(r);
+                      return (
+                        <td key={c.key} title={String(c.value(r) ?? '')} data-wrap={c.wrap || undefined}>
+                          {content === null || content === '' || content === undefined ? <span className="ml-empty">—</span> : content}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
+              {view.length > limit && <tr ref={(el) => { sentinelRef.current = el; }}><td colSpan={colCount} className="ml-more">{t('common.loadingEllipsis')}</td></tr>}
+            </tbody>
+          </table>
+        )}
         {error && <ErrorState message={error} onRetry={onRetry} />}
         {!error && !loading && view.length === 0 && (
           <EmptyState
@@ -293,6 +410,43 @@ export function Masterlist<R extends { id: string }>({
           />
         )}
       </div>
+
+      {phone && filtersOpen && (
+        <Modal sheet title={t('ml.filtersAndSort')} onClose={() => setFiltersOpen(false)}
+          footer={(
+            <>
+              <Button onClick={() => { setFilters({}); setSort(null); }} disabled={activeFilters.length === 0 && !sort}>{t('ml.clearFilters')}</Button>
+              <Button variant="primary" onClick={() => setFiltersOpen(false)}>{t('ml.showResults', { count: view.length })}</Button>
+            </>
+          )}>
+          <div className="ml-sheet-form">
+            {filterable.map((c) => (
+              <label key={c.key} className="ml-filter">
+                <span>{c.label}</span>
+                <select value={filters[c.key] ?? '__all'} onChange={(e) => setFilter(c.key, e.target.value)}>
+                  <option value="__all">{t('ml.all')}</option>
+                  {filterValues[c.key]?.map((v) => <option key={v} value={v}>{v || t('ml.empty')}</option>)}
+                </select>
+              </label>
+            ))}
+            <div className="ml-filter">
+              <label htmlFor="ml-sort-by">{t('ml.sortBy')}</label>
+              <select id="ml-sort-by" value={sort?.key ?? ''} onChange={(e) => setSort(e.target.value ? { key: e.target.value, dir: sort?.dir ?? 'asc' } : null)}>
+                <option value="">{t('ml.sortNone')}</option>
+                {columns.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+              <div className="ml-seg" role="group" aria-label={t('ml.sortBy')}>
+                <button type="button" aria-pressed={sort?.dir === 'asc'} disabled={!sort} onClick={() => sort && setSort({ ...sort, dir: 'asc' })}>
+                  <ArrowUp size={14} aria-hidden="true" />{t('ml.sortAsc')}
+                </button>
+                <button type="button" aria-pressed={sort?.dir === 'desc'} disabled={!sort} onClick={() => sort && setSort({ ...sort, dir: 'desc' })}>
+                  <ArrowDown size={14} aria-hidden="true" />{t('ml.sortDesc')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }
