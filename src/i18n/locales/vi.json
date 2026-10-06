@@ -227,7 +227,8 @@
     },
     "stayed": "Ở lại chỗ cũ khi {{serial}} được chuyển đi",
     "stayedSwap": "Ở lại chỗ cũ khi {{serial}} đổi chỗ",
-    "parentDeleted": "Thiết bị cha {{serial}} đã bị xóa"
+    "parentDeleted": "Thiết bị cha {{serial}} đã bị xóa",
+    "viaPartNumber": "Type theo part number {{pn}}"
   },
   "fields": {
     "serial_number": "Serial number",
@@ -319,7 +320,7 @@
     "moveConfirm": "Đổi cha",
     "attachConfirm": "Gắn vào cha",
     "swap": "Swap",
-    "swapDesc": "Hai thiết bị đổi chỗ (thiết bị cha + vị trí) cho nhau.",
+    "swapDesc": "Hai thiết bị đổi chỗ cho nhau: thiết bị cha, vị trí và trạng thái (trạng thái đi theo chỗ).",
     "swapWith": "Đổi chỗ với",
     "underParent": "thuộc {{serial}}",
     "swapped": "Đã đổi chỗ.",
@@ -335,11 +336,16 @@
     "treeCount": "{{count}} thiết bị trong cây",
     "parentCreateHint": "Chọn nếu thiết bị này gắn vào một thiết bị khác — vị trí sẽ theo thiết bị cha.",
     "locationFromParent": "Theo thiết bị cha — bỏ chọn thiết bị cha để đặt vị trí riêng.",
+    "levelFromParent": "Theo thiết bị cha — bỏ chọn thiết bị cha để đặt Level riêng.",
+    "followsFixedParent": "Theo thiết bị cha.",
+    "typeFromPartNumber": "Theo part number — Admin đặt ở Configuration › Part Number.",
     "addChild": "Thêm thiết bị con",
     "addChildTitle": "Thêm thiết bị con của {{serial}}",
+    "parentFixed": "Đang thêm thiết bị con của {{serial}} — không đổi ở đây. Muốn gắn vào cha khác: lưu xong rồi dùng Đổi cha.",
     "attachParent": "Gắn vào thiết bị cha",
     "groupLocationRelation": "Vị trí & quan hệ",
     "fromParent": "theo thiết bị cha",
+    "fromPartNumber": "theo part number",
     "noChildren": "Không có thiết bị con",
     "childrenQuestion": "Thiết bị con xử lý thế nào?",
     "childrenFollow": "Đi theo",
@@ -402,7 +408,9 @@
       "parent_not_found": "{{column}}: không tìm thấy thiết bị cha \"{{value}}\" (trong hệ thống hoặc trong file).",
       "parent_ambiguous": "{{column}}: \"{{value}}\" khớp {{count}} thiết bị — điền thêm Parent part number, hoặc để trống rồi gắn cha sau bằng Đổi cha.",
       "parent_cycle": "{{column}}: vòng lặp cha – con trong file (thiết bị không thể là cha của chính nó).",
-      "location_follows_parent": "{{column}}: thiết bị con theo vị trí của cha ({{value}}) — để trống ô này."
+      "location_follows_parent": "{{column}}: thiết bị con theo vị trí của cha ({{value}}) — để trống ô này.",
+      "level_follows_parent": "{{column}}: thiết bị con theo Level của cha ({{value}}) — để trống ô này.",
+      "type_follows_part_number": "{{column}}: theo part number ({{value}}) — để trống ô này."
     },
     "file": {
       "required": "Chưa chọn file.",
@@ -447,6 +455,8 @@
       "parentSerial": "Serial của thiết bị cha: thiết bị đã có, hoặc một dòng khác trong file này (thứ tự dòng không quan trọng). Để trống nếu không có cha",
       "parentPart": "Chỉ cần khi serial cha trùng ở nhiều thiết bị",
       "locationParent": "có Parent thì để trống: vị trí theo thiết bị cha",
+      "levelParent": "có Parent thì để trống: Level theo thiết bị cha",
+      "typeFromPart": "có Part number thì để trống: Type theo part number (Configuration › Part Number)",
       "stepParent": "Thiết bị con: điền Parent serial number (thiết bị cha đã có trong hệ thống, hoặc một dòng khác trong file). Để trống Location — thiết bị con luôn ở cùng vị trí với cha."
     },
     "importing": "Đang import…"
@@ -525,6 +535,7 @@
     "active": "Đang dùng",
     "hidden": "Đã ẩn",
     "activeHint": "Giá trị đã ẩn vẫn giữ ở dữ liệu cũ, nhưng không chọn được cho dữ liệu mới.",
+    "partTypeHint": "Mọi thiết bị mang part number này có Type này — đổi Type thì tất cả đổi theo.",
     "hide": "Ẩn",
     "show": "Hiện lại",
     "hiddenDone": "Đã ẩn.",

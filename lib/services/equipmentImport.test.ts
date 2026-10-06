@@ -14,8 +14,12 @@ const named = (prefix: string, names: [string, boolean?][]): Map<string, Named> 
 const status = (id: string, name: string, remark = false): [string, StatusOption] =>
   [id, { id, display_name: name, sort_order: 0, requires_remark: remark, color: 'gray' }];
 
+// Mỗi part number có Type (Configuration › Part Number): P12316 → Tester, P20001 → Fixture, OLD-PN → Tester.
+const PN_TYPES: Record<string, string> = { 'pn-0': 'type-0', 'pn-1': 'type-1', 'pn-2': 'type-0' };
+
 const lookups: Lookups = {
-  part_numbers: named('pn', [['P12316'], ['P20001'], ['OLD-PN', false]]),
+  part_numbers: new Map([...named('pn', [['P12316'], ['P20001'], ['OLD-PN', false]])]
+    .map(([id, pn]) => [id, { ...pn, type_id: PN_TYPES[id]! }])),
   types: named('type', [['Tester'], ['Fixture']]),
   levels: named('level', [['1'], ['2'], ['3'], ['4'], ['5']]),
   locations: named('loc', [['B3F1'], ['B3F2'], ['Closed', false]]),
@@ -48,8 +52,8 @@ const ids = () => { let n = 0; return () => `new-${++n}`; };
 const check = async (rows: (string | number | null)[][], existing: ExistingEquipment[] = []) =>
   checkTable(await readWorkbook(await filledTemplate(rows)), lookups, existing, ids());
 
-const eq = (id: string, serial: string, part: string | null, location: string): ExistingEquipment =>
-  ({ id, serial_number: serial, part_number_id: part, location_id: location });
+const eq = (id: string, serial: string, part: string | null, location: string, level: string | null = null): ExistingEquipment =>
+  ({ id, serial_number: serial, part_number_id: part, location_id: location, level_id: level });
 
 /** Một dòng file mẫu; mặc định chỉ có Serial + Status (Active, bắt buộc) + Location. */
 type Cells = {
@@ -77,7 +81,7 @@ describe('equipment import template — ghi chú theo Configuration lúc tải',
       'Serial number *', 'Part number', 'Jabil ID', 'Asset', 'Type', 'Level', 'Status *', 'Location *',
       'Parent serial number', 'Parent part number', 'Remark',
     ]);
-    expect(cellText(ws.getCell('F1').value)).toBe('Chọn: 1, 2, 3, 4, 5');
+    expect(cellText(ws.getCell('F1').value)).toBe('Chọn: 1, 2, 3, 4, 5 · có Parent thì để trống: Level theo thiết bị cha');
     expect(cellText(ws.getCell('A1').value)).toContain('Bắt buộc');
     expect(cellText(ws.getCell('A1').value)).toContain('200');
     // Status: bắt buộc, một danh sách trạng thái chung; Repair cần Remark.
@@ -97,7 +101,7 @@ describe('equipment import template — ghi chú theo Configuration lúc tải',
     const level = ws.getCell('F3').dataValidation;
     expect(level.type).toBe('list');
     expect(level.formulae).toEqual(["'Giá trị hợp lệ'!$C$2:$C$6"]);
-    expect(level.prompt).toBe('Chọn: 1, 2, 3, 4, 5');
+    expect(level.prompt).toBe('Chọn: 1, 2, 3, 4, 5 · có Parent thì để trống: Level theo thiết bị cha');
     expect(ws.getCell('F1002').dataValidation.type).toBe('list');
     expect(ws.getCell('A3').dataValidation).toMatchObject({ type: 'textLength', operator: 'lessThanOrEqual', formulae: [200] });
     expect(ws.getCell('K3').dataValidation.formulae).toEqual([1000]);
@@ -117,7 +121,7 @@ describe('equipment import template — ghi chú theo Configuration lúc tải',
     const more = { ...lookups, levels: named('level', [['1'], ['2'], ['3'], ['4'], ['5'], ['6']]) };
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load((await buildTemplate(more, 'en')) as unknown as ArrayBuffer);
-    expect(cellText(wb.getWorksheet('Equipment')!.getCell('F1').value)).toBe('Pick: 1, 2, 3, 4, 5, 6');
+    expect(cellText(wb.getWorksheet('Equipment')!.getCell('F1').value)).toBe('Pick: 1, 2, 3, 4, 5, 6 · leave blank when a parent is given: level follows the parent');
     expect(wb.getWorksheet('Equipment')!.getCell('F3').dataValidation.formulae).toEqual(["'Valid values'!$C$2:$C$7"]);
   });
 });
@@ -262,5 +266,71 @@ describe('equipment import — thiết bị cha', () => {
     ws.addRow(['CH-2', 'Active', '']);
     const { report } = checkTable(await readWorkbook(Buffer.from(await wb.xlsx.writeBuffer())), lookups, [RACK], ids());
     expect(report.rows.map((r) => [r.row, r.issues])).toEqual([[3, [{ column: 'location_id', code: 'required' }]]]);
+  });
+});
+
+describe('equipment import — Type theo part number', () => {
+  it("a blank Type takes the part number's Type; the same Type is fine; another Type is an error", async () => {
+    const { report, inserts } = await check([
+      line({ sn: 'A', pn: 'P12316' }),
+      line({ sn: 'B', pn: 'P12316', type: 'tester' }),
+      line({ sn: 'C', pn: 'P12316', type: 'Fixture' }),
+      line({ sn: 'D', type: 'Fixture' }),
+    ]);
+    expect(report.rows.map((r) => [r.row, r.issues])).toEqual([
+      [5, [{ column: 'type_id', code: 'type_follows_part_number', value: 'Tester' }]],
+    ]);
+    // Không có part number → Type tự chọn như trước.
+    expect(inserts.map((r) => [r.serial_number, r.type_id])).toEqual([['A', 'type-0'], ['B', 'type-0'], ['D', 'type-1']]);
+  });
+
+  it('a Type that is not in Configuration at all is reported once, as "follows the part number"', async () => {
+    const { report } = await check([line({ sn: 'A', pn: 'P12316', type: 'Nonsense' })]);
+    expect(report.rows[0]!.issues).toEqual([{ column: 'type_id', code: 'type_follows_part_number', value: 'Tester' }]);
+  });
+
+  it("the part number's Type is accepted even after the admin hid that Type", async () => {
+    const hidden: Lookups = { ...lookups, types: named('type', [['Tester', false], ['Fixture']]) };
+    const table = await readWorkbook(await filledTemplate([line({ sn: 'A', pn: 'P12316', type: 'Tester' }), line({ sn: 'B', pn: 'P12316' })]));
+    const { report, inserts } = checkTable(table, hidden, [], ids());
+    expect(report.rows).toEqual([]);
+    expect(inserts.map((r) => r.type_id)).toEqual(['type-0', 'type-0']);
+  });
+
+  it('the template tells the user to leave Type blank when Part number is given', async () => {
+    const ws = (await loadTemplate()).getWorksheet('Equipment')!;
+    expect(cellText(ws.getCell('E1').value)).toBe(
+      'Chọn: Tester, Fixture · có Part number thì để trống: Type theo part number (Configuration › Part Number)');
+  });
+});
+
+describe('equipment import — Level theo thiết bị cha', () => {
+  const RACK = eq('rack-1', 'RACK-01', 'pn-1', 'loc-1', 'level-2');
+
+  it("a child takes the parent's Level (existing equipment or another row, down the chain); a different Level is an error", async () => {
+    const { report, inserts } = await check([
+      line({ sn: 'CH-1', loc: null, parent: 'RACK-01' }),
+      line({ sn: 'CH-2', loc: null, parent: 'RACK-01', level: '3' }),
+      line({ sn: 'CH-3', loc: null, parent: 'RACK-01', level: '5' }),
+      line({ sn: 'CARD', loc: null, parent: 'BOX' }),
+      line({ sn: 'BOX', level: '1' }),
+    ], [RACK]);
+    expect(report.rows.map((r) => [r.row, r.issues])).toEqual([
+      [5, [{ column: 'level_id', code: 'level_follows_parent', value: '3' }]],
+    ]);
+    expect(inserts.map((r) => [r.serial_number, r.level_id])).toEqual([
+      ['CH-1', 'level-2'], ['CH-2', 'level-2'], ['CARD', 'level-0'], ['BOX', 'level-0'],
+    ]);
+  });
+
+  it('a Level that is not in Configuration is reported once, as "follows the parent"; a parent without Level gives —', async () => {
+    const { report } = await check([
+      line({ sn: 'CH-1', loc: null, parent: 'RACK-01', level: 'Nope' }),
+      line({ sn: 'CH-2', loc: null, parent: 'BARE', level: '1' }),
+    ], [RACK, eq('bare-1', 'BARE', null, 'loc-0')]);
+    expect(report.rows.map((r) => [r.row, r.issues])).toEqual([
+      [3, [{ column: 'level_id', code: 'level_follows_parent', value: '3' }]],
+      [4, [{ column: 'level_id', code: 'level_follows_parent', value: '—' }]],
+    ]);
   });
 });

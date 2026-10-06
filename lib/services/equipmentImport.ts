@@ -18,7 +18,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { rpc, selectAll } from './core/db';
-import { loadLookups, nameOf, toOptions, type Lookups } from './core/lookups';
+import { loadLookups, nameOf, partNumberType, toOptions, type Lookups } from './core/lookups';
 import { AppError } from '@/lib/errors';
 import { textFor, type Language } from '@/lib/i18n/text';
 import {
@@ -77,6 +77,8 @@ function extraRules(col: ImportColumn, choices: ImportChoices, t: Text): string[
   const remark = choices.remark_statuses.join(', ');
   switch (col.key) {
     case 'serial_number': return [t('imp.tpl.serialDuplicate')];
+    case 'type_id': return [t('imp.tpl.typeFromPart')];
+    case 'level_id': return [t('imp.tpl.levelParent')];
     case 'status_id': return remark ? [t('imp.tpl.needsRemark', { statuses: remark })] : [];
     case 'remark': return remark ? [t('imp.tpl.remarkFor', { statuses: remark })] : [];
     default: return [];
@@ -337,7 +339,9 @@ export function indexBy<T extends { id: string; display_name: string }>(map: Map
 export const serialKey = (serial: string) => serial.trim().toLowerCase();
 
 /** Thiết bị đã có — để tìm thiết bị cha và cảnh báo serial trùng. */
-export type ExistingEquipment = { id: string; serial_number: string; part_number_id: string | null; location_id: string };
+export type ExistingEquipment = {
+  id: string; serial_number: string; part_number_id: string | null; location_id: string; level_id: string | null;
+};
 
 /** Một dòng sẽ ghi — đúng tên cột của bảng equipments. */
 export type InsertRow = {
@@ -420,6 +424,17 @@ export function checkTable(
     if (status?.requiresRemark && !data.remark && !issues.some((i) => i.column === 'remark')) {
       issues.push({ column: 'remark', code: 'remark_required', value: status.name });
     }
+    // Type theo part number (như Location theo cha): ô trống hoặc đúng Type đó (kể cả Type đã ẩn) → lấy
+    // theo part number; ghi Type khác → một lỗi duy nhất cho ô này.
+    const partType = partNumberType(lookups, data.part_number_id);
+    if (partType) {
+      const partTypeName = nameOf(lookups.types, partType) ?? '';
+      for (let i = issues.length - 1; i >= 0; i--) if (issues[i]!.column === 'type_id') issues.splice(i, 1);
+      if (cell('type_id') && cell('type_id').toLowerCase() !== partTypeName.toLowerCase()) {
+        issues.push({ column: 'type_id', code: 'type_follows_part_number', value: partTypeName });
+      }
+      data.type_id = partType;
+    }
     if (cell('parent_serial').length > 200) issues.push({ column: 'parent_serial', code: 'too_long', max: 200 });
     if (cell('parent_part_number') && !cell('parent_serial')) issues.push({ column: 'parent_serial', code: 'required' });
     return { source, issues, data, cell, parent: null };
@@ -455,18 +470,19 @@ export function checkTable(
     else w.parent = candidates[0]!.parent;
   });
 
-  // ---- 3. Vị trí theo cha (theo cả chuỗi cha trong file); chặn vòng lặp.
+  // ---- 3. Vị trí + Level theo cha (theo cả chuỗi cha trong file); chặn vòng lặp.
   const locationNames = lookups.locations;
   works.forEach((w) => {
     if (!w.parent) return;
     const seen = new Set<Work>([w]);
     let current: Work = w;
     let location: string | null = null;
+    let level: string | null = null;
     let cycle = false;
     for (;;) {
       const parent: Parent | null = current.parent;
-      if (!parent) { location = current.data.location_id; break; }
-      if ('existing' in parent) { location = parent.existing.location_id; break; }
+      if (!parent) { location = current.data.location_id; level = current.data.level_id; break; }
+      if ('existing' in parent) { location = parent.existing.location_id; level = parent.existing.level_id; break; }
       const next = works[parent.row]!;
       if (seen.has(next)) { cycle = true; break; }
       seen.add(next);
@@ -480,6 +496,15 @@ export function checkTable(
       w.issues.push({ column: 'location_id', code: 'location_follows_parent', value: nameOf(locationNames, location) ?? '' });
     }
     w.data.location_id = location;
+    // Level: ô trống hoặc đúng Level của cha (kể cả Level đã ẩn) → theo cha; Level khác → một lỗi cho ô này.
+    const levelName = nameOf(lookups.levels, level) ?? '';
+    if (w.cell('level_id')) {
+      w.issues = w.issues.filter((i) => i.column !== 'level_id');
+      if (w.cell('level_id').toLowerCase() !== levelName.toLowerCase()) {
+        w.issues.push({ column: 'level_id', code: 'level_follows_parent', value: levelName || '—' });
+      }
+    }
+    w.data.level_id = level;
     w.data.parent_id = 'existing' in w.parent ? w.parent.existing.id : works[w.parent.row]!.data.id;
   });
 
@@ -534,7 +559,7 @@ export async function importEquipmentFile(file: UploadedFile | null, commit: boo
   const table = await readWorkbook(await readUpload(file));
   const [lookups, existing] = await Promise.all([
     loadLookups(),
-    selectAll<ExistingEquipment>('equipments', 'id, serial_number, part_number_id, location_id'),
+    selectAll<ExistingEquipment>('equipments', 'id, serial_number, part_number_id, location_id, level_id'),
   ]);
   const { report, inserts } = checkTable(table, lookups, existing);
   if (!commit || report.invalid > 0) return report;

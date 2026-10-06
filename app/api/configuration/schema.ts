@@ -31,6 +31,8 @@ export function schemaFor(list: ConfigListDef, mode: 'create' | 'update') {
   } else {
     shape = { display_name: reqText(200), sort_order: order, is_active: z.boolean() };
     if (list.hasDescription) shape.description = optText(1000);
+    // Bắt buộc, không xóa trống được (sửa: chỉ gửi khi đổi).
+    if (list.hasType) shape.type_id = reqId;
   }
   const schema = z.object(shape).strict();
   return mode === 'create' ? schema : schema.partial();

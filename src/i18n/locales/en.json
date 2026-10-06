@@ -227,7 +227,8 @@
     },
     "stayed": "Stayed in place when {{serial}} moved",
     "stayedSwap": "Stayed in place when {{serial}} was swapped",
-    "parentDeleted": "Parent {{serial}} was deleted"
+    "parentDeleted": "Parent {{serial}} was deleted",
+    "viaPartNumber": "Type follows part number {{pn}}"
   },
   "fields": {
     "serial_number": "Serial number",
@@ -319,7 +320,7 @@
     "moveConfirm": "Move",
     "attachConfirm": "Attach",
     "swap": "Swap",
-    "swapDesc": "The two equipment exchange places (parent + location).",
+    "swapDesc": "The two equipment exchange places: parent, location and status (the status goes with the place).",
     "swapWith": "Swap with",
     "underParent": "under {{serial}}",
     "swapped": "Swapped.",
@@ -335,11 +336,16 @@
     "treeCount": "{{count}} equipment in this tree",
     "parentCreateHint": "Pick one if this equipment is mounted in another — its location follows the parent.",
     "locationFromParent": "Follows the parent — clear Parent equipment to set a location of its own.",
+    "levelFromParent": "Follows the parent — clear Parent equipment to set a level of its own.",
+    "followsFixedParent": "Follows the parent.",
+    "typeFromPartNumber": "Follows the part number — admins set it in Configuration › Part Number.",
     "addChild": "Add child equipment",
     "addChildTitle": "Add child equipment of {{serial}}",
+    "parentFixed": "Adding a child of {{serial}} — fixed here. To use another parent, save first, then Move.",
     "attachParent": "Attach to a parent",
     "groupLocationRelation": "Location & relationships",
     "fromParent": "from parent",
+    "fromPartNumber": "from part number",
     "noChildren": "No child equipment",
     "childrenQuestion": "What happens to the child equipment?",
     "childrenFollow": "Go along",
@@ -402,7 +408,9 @@
       "parent_not_found": "{{column}}: parent \"{{value}}\" not found (in the system or in this file).",
       "parent_ambiguous": "{{column}}: \"{{value}}\" matches {{count}} equipment — also fill in Parent part number, or leave blank and attach later with Move.",
       "parent_cycle": "{{column}}: parent loop in this file (equipment cannot be its own ancestor).",
-      "location_follows_parent": "{{column}}: a child follows its parent's location ({{value}}) — leave this blank."
+      "location_follows_parent": "{{column}}: a child follows its parent's location ({{value}}) — leave this blank.",
+      "level_follows_parent": "{{column}}: a child follows its parent's level ({{value}}) — leave this blank.",
+      "type_follows_part_number": "{{column}}: follows the part number ({{value}}) — leave this blank."
     },
     "file": {
       "required": "No file chosen.",
@@ -447,6 +455,8 @@
       "parentSerial": "Serial of the parent: existing equipment, or another row in this file (row order does not matter). Leave blank if there is no parent",
       "parentPart": "Only needed when the parent serial is used by more than one equipment",
       "locationParent": "leave blank when a parent is given: location follows the parent",
+      "levelParent": "leave blank when a parent is given: level follows the parent",
+      "typeFromPart": "leave blank when Part number is given: Type follows the part number (Configuration › Part Number)",
       "stepParent": "Child equipment: fill in Parent serial number (existing equipment, or another row in this file). Leave Location blank — a child is always at its parent's location."
     },
     "importing": "Importing…"
@@ -525,6 +535,7 @@
     "active": "In use",
     "hidden": "Hidden",
     "activeHint": "Hidden values stay on existing records but cannot be chosen for new data.",
+    "partTypeHint": "Every equipment with this part number gets this Type — changing it updates all of them.",
     "hide": "Hide",
     "show": "Show again",
     "hiddenDone": "Hidden.",

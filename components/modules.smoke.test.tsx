@@ -29,7 +29,7 @@ const audit = {
 };
 const opt = (id: string, name: string) => ({ id, display_name: name, sort_order: 0, is_active: true });
 const options = {
-  part_numbers: [opt('pn1', 'P12316')], locations: [opt('l1', 'B3F1'), opt('l2', 'B3F2')], types: [opt('t1', 'Tester')],
+  part_numbers: [{ ...opt('pn1', 'P12316'), type_id: 't1' }], locations: [opt('l1', 'B3F1'), opt('l2', 'B3F2')], types: [opt('t1', 'Tester')],
   levels: [opt('lv1', 'EOL')], departments: [opt('d1', 'TE')], calibration_vendors: [opt('v1', 'Internal')],
   statuses: [
     { id: 's1', display_name: 'Active', sort_order: 1, requires_remark: false, color: 'green' },
@@ -62,7 +62,7 @@ const users = [{
   auth_provider: 'local', must_change_password: false, ...audit,
 }];
 const config = {
-  'part-numbers': [{ id: 'pn1', display_name: 'P12316', sort_order: 0, is_active: true, ...audit }],
+  'part-numbers': [{ id: 'pn1', display_name: 'P12316', type_id: 't1', type: 'Tester', sort_order: 0, is_active: true, ...audit }],
   statuses: [{ id: 's1', display_name: 'Active', sort_order: 1, is_active: true, requires_remark: false, color: 'green', ...audit }],
   'calibration-setup': [{ id: 'cc1', display_name: 'P12316', sort_order: 0, is_active: true, part_number_id: 'pn1', interval_months: 12, warning_days: 30, ...audit }],
 };
@@ -158,12 +158,33 @@ describe('modules smoke', () => {
     expect(screen.queryByRole('button', { name: /cal\./ })).toBeNull();
   });
 
-  it('Equipment child: parent is editable, location is locked with the reason', async () => {
+  it('Equipment child: parent is editable, location and level are locked with the reason', async () => {
     await mount(<EquipmentPage />);
     await openRow('SN-CHILD');
     await clickEdit();
     expect(screen.getByText('eq.locationFromParent')).toBeTruthy();
     expect(screen.getByText('eq.parentHint')).toBeTruthy();
+    // Level theo cha: hiện Level của cha, không có ô chọn.
+    const level = screen.getByText('eq.levelFromParent').closest('.dp-field') as HTMLElement;
+    expect(within(level).getByText('EOL')).toBeTruthy();
+    expect(screen.queryByLabelText(/fields.level/)).toBeNull();
+  });
+
+  it('Equipment with a part number: Type follows the part number and is locked in Edit', async () => {
+    await mount(<EquipmentPage />);
+    await openRow('SN-ROOT');
+    expect(screen.getByText('eq.fromPartNumber')).toBeTruthy();
+    await clickEdit();
+    expect(screen.getByText('eq.typeFromPartNumber')).toBeTruthy();
+    expect(screen.queryByLabelText(/fields.type/)).toBeNull();
+  });
+
+  it('Equipment without a part number: Type is chosen freely', async () => {
+    await mount(<EquipmentPage />);
+    await openRow('SN-OTHER');
+    await clickEdit();
+    expect(screen.queryByText('eq.typeFromPartNumber')).toBeNull();
+    expect(screen.getByLabelText(/fields.type/)).toBeTruthy();
   });
 
   it('Equipment parent: lists children; Actions → Add child opens the form with the parent filled in', async () => {
@@ -177,8 +198,22 @@ describe('modules smoke', () => {
     await openActions();
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /eq.addChild/ })); });
     expect(within(header()).getByRole('heading', { level: 2 }).textContent).toBe('eq.addChildTitle');
-    expect(screen.getByText('eq.locationFromParent')).toBeTruthy();
-    expect(screen.getAllByText(/SN-ROOT/).length).toBeGreaterThan(0);
+    // Cha cố định: hiện SN · PN · vị trí của cha, không có ô chọn; vị trí theo cha.
+    expect(screen.getByText('eq.parentFixed')).toBeTruthy();
+    expect(screen.getByText('SN-ROOT · P12316 · B3F1')).toBeTruthy();
+    expect(screen.queryByLabelText(/fields.parent/)).toBeNull();
+    // Vị trí và Level theo cha cố định — không có ô chọn.
+    expect(screen.getAllByText('eq.followsFixedParent')).toHaveLength(2);
+    expect(screen.queryByLabelText(/fields.level/)).toBeNull();
+
+    // Lưu vẫn gửi thiết bị cha (ô khóa không nằm trong payload của form).
+    vi.mocked(api.post).mockClear();
+    vi.mocked(api.post).mockResolvedValueOnce({ data: equipment[1], meta: {} });
+    await act(async () => { fireEvent.change(screen.getByLabelText(/fields.serial_number/), { target: { value: 'SN-NEW' } }); });
+    await act(async () => { fireEvent.click(screen.getByLabelText(/fields.status/)); });
+    await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'Active' })); });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'common.save' })[0]!); });
+    expect(api.post).toHaveBeenCalledWith('/api/equipment', expect.objectContaining({ serial_number: 'SN-NEW', status_id: 's1', parent_id: 'e1' }));
   });
 
   it('Equipment without a parent: Actions → Attach to a parent opens the picker of existing equipment', async () => {
@@ -195,7 +230,8 @@ describe('modules smoke', () => {
     await mount(<EquipmentPage />);
     await openRow('SN-CHILD');
     expect(screen.getByRole('button', { name: /^SN-ROOT/ })).toBeTruthy();
-    expect(screen.getByText('eq.fromParent')).toBeTruthy();
+    // Vị trí và Level: ghi nhỏ "theo thiết bị cha".
+    expect(screen.getAllByText('eq.fromParent')).toHaveLength(2);
     await openActions();
     expect(screen.getByRole('menuitem', { name: /eq.move/ })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /eq.detach/ })).toBeTruthy();
@@ -215,6 +251,9 @@ describe('modules smoke', () => {
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: /eq.childrenStay/ })); });
     expect(confirm.disabled).toBe(false);
     expect(screen.getByText('eq.kidsStay')).toBeTruthy();
+    // Trạng thái đi theo chỗ: SN-OTHER nhận trạng thái của SN-ROOT (Active).
+    const preview = document.querySelector('.dp-preview') as HTMLElement;
+    expect(within(preview.children[1] as HTMLElement).getByText('Active')).toBeTruthy();
     vi.mocked(api.post).mockResolvedValueOnce({ data: equipment[0], meta: {} });
     await act(async () => { fireEvent.click(confirm); });
     expect(api.post).toHaveBeenCalledWith('/api/equipment/swap', { a: 'e1', b: 'e3', children: 'stay' });
@@ -281,6 +320,21 @@ describe('modules smoke', () => {
     await clickEdit();
     // Setup hiệu chuẩn: part number khóa khi sửa (đổi PN = xóa rồi thêm lại).
     if (list === 'calibration-setup') expect(screen.getByText('cfg.partNumberFixed')).toBeTruthy();
+  });
+
+  it('Configuration part numbers: Type column in the list; Type is required when adding', async () => {
+    await mount(<ConfigWorkspace listKey="part-numbers" />);
+    expect(screen.getByRole('columnheader', { name: /fields.type/ })).toBeTruthy();
+    expect(screen.getAllByText('Tester').length).toBeGreaterThan(0);
+
+    const { api } = await import('@/lib/client/api');
+    vi.mocked(api.post).mockClear();
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /ml.add/ })[0]!); });
+    expect(screen.getByText('cfg.partTypeHint')).toBeTruthy();
+    await act(async () => { fireEvent.change(screen.getByLabelText(/fields.display_name/), { target: { value: 'P99999' } }); });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'common.save' })[0]!); });
+    expect(api.post).not.toHaveBeenCalled();
+    expect(within(screen.getByLabelText(/fields.type/).closest('.dp-field') as HTMLElement).getByRole('alert').textContent).toBe('dp.required');
   });
 
   it('Calibration masterlist has no manual Add (equipment joins via Configuration › Calibration › Setup)', async () => {

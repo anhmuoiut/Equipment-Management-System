@@ -27,7 +27,10 @@ function useFormatHistoryValue() {
   };
 }
 
-/** Ghi chú do database đặt: via_parent:SN, swap_with:SN, stayed:SN, stayed_swap:SN, parent_deleted:SN. */
+/**
+ * Ghi chú do database đặt: via_parent:SN, swap_with:SN, stayed:SN, stayed_swap:SN, parent_deleted:SN,
+ * via_part_number:PN (Admin đổi Type của part number).
+ */
 export function useFormatNote() {
   const { t } = useTranslation();
   return (note: string | null): string | null => {
@@ -39,6 +42,7 @@ export function useFormatNote() {
     if (kind === 'stayed') return t('hist.stayed', { serial: value });
     if (kind === 'stayed_swap') return t('hist.stayedSwap', { serial: value });
     if (kind === 'parent_deleted') return t('hist.parentDeleted', { serial: value });
+    if (kind === 'via_part_number') return t('hist.viaPartNumber', { pn: value });
     return note;
   };
 }

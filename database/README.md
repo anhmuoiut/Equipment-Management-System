@@ -11,8 +11,14 @@ Mở Supabase → **SQL Editor**, dán từng file vào rồi bấm **Run**:
 | 1 | `01_reset_blank.sql` | Xóa sạch schema `public` (mọi bảng, view, function và **toàn bộ dữ liệu**). Không hoàn tác được. Kết quả kiểm tra cuối file phải ra 0 dòng | Có |
 | 2 | `02_schema.sql` | Tạo 19 bảng theo DATABASE_MODIFIED.md, bật RLS. Kết quả kiểm tra cuối file phải ra 19 `BASE TABLE` | Có |
 | 3 | `03_seed_sample.sql` | Dữ liệu mẫu cho Configuration: Type, Level, Status, vendor "Internal". Sửa trước khi chạy nếu cần | Không |
-| 4 | `04_functions.sql` | Nghiệp vụ: tự ghi lịch sử, `app_write`, Đổi vị trí / Move / Swap / Detach / Xóa (thiết bị con đi theo hoặc ở lại chỗ cũ), Import Excel (Equipment, Golden), tự tính `due_date`, view `recent_activities` (Dashboard — import gộp một dòng). Kết quả kiểm tra cuối file: `history_triggers = 13`, `app_write = 1`, `equipment_import = 1`, `golden_import = 1`, `equipment_swap_args = 4`. Chạy lại được nhiều lần — file này đổi thì chạy lại (database đang có dữ liệu cũng không sao) | Có |
+| 4 | `04_functions.sql` | Nghiệp vụ: tự ghi lịch sử, `app_write`, Đổi vị trí / Move / Swap / Detach / Xóa (thiết bị con đi theo hoặc ở lại chỗ cũ), Import Excel (Equipment, Golden), Type theo Part Number, Level theo thiết bị cha, tự tính `due_date`, view `recent_activities` (Dashboard — import gộp một dòng). Kết quả kiểm tra cuối file: `history_triggers = 12`, `type_triggers = 2`, `level_triggers = 2`, `app_write = 1`, `equipment_import = 1`, `golden_import = 1`, `equipment_swap_args = 4`. Chạy lại được nhiều lần — file này đổi thì chạy lại (database đang có dữ liệu cũng không sao) | Có |
 | 5 | Tạo admin đầu tiên | Xem [Tạo admin đầu tiên](#tạo-admin-đầu-tiên) (cần bước 4) | Có |
+
+**Nâng cấp database đã dựng** (không cần khi dựng mới từ bước 1):
+
+| File | Khi nào | Sau đó |
+| --- | --- | --- |
+| `05_part_number_type.sql` | Database dựng trước khi Part Number có Type (`part_numbers` chưa có cột `type_id`). Đã có part number thì file dừng và liệt kê chúng, không đổi gì | Chạy lại `04_functions.sql` (`type_triggers = 2`) |
 
 Tài khoản Supabase Auth đã có (email + mật khẩu) **không** bị xóa ở bước 1. Nếu Supabase project này chỉ dùng cho Equipment Management, bỏ comment dòng `delete from auth.users;` trong `01_reset_blank.sql` trước khi chạy.
 

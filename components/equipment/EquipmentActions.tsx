@@ -14,6 +14,7 @@ import { api } from '@/lib/client/api';
 import { toSelect, useOptions } from '@/lib/client/options';
 import { Notice } from '@/components/ui';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { StatusTag } from '@/components/ui/tags';
 import { ActionField, ActionScreen, type ActionCtx } from '@/components/ui/detail/RecordDetail';
 import type { ChildrenMode, EquipmentRow } from '@/lib/types';
 
@@ -196,8 +197,9 @@ export function SwapScreen({ ctx, rows }: ScreenProps) {
       {target && !noChange && (
         <ActionField label={t('eq.preview')}>
           <ul className="dp-preview">
-            <li><strong>{a.serial_number}</strong> → {place(target)}</li>
-            <li><strong>{target.serial_number}</strong> → {place(a)}</li>
+            {/* Trạng thái đi theo chỗ: mỗi bên nhận trạng thái của bên kia. */}
+            <li><strong>{a.serial_number}</strong> → {place(target)} · <StatusTag name={target.status} color={target.status_color} /></li>
+            <li><strong>{target.serial_number}</strong> → {place(a)} · <StatusTag name={a.status} color={a.status_color} /></li>
             {mode && groups.map((g) => {
               const newcomer = g.owner.id === a.id ? target : a;
               return (

@@ -44,6 +44,7 @@ Ký hiệu: **✔** = bắt buộc (`not null`) · **PK** = khóa chính · **FK
 ```
 Configuration (dữ liệu gốc dùng chung + cấu hình hiệu chuẩn)
   part_numbers   locations   types   statuses   levels   departments
+  part_numbers ──► types       (type_id — Type của mọi thiết bị mang part number)
   calibration_configurations ──► part_numbers  (part_number_id, UQ)
   calibration_vendors
   configuration_histories                      (record_id, không FK)
@@ -173,9 +174,9 @@ View nằm ở `04_functions.sql` (chạy lại được, không cần dựng l�
 | `part_number_id` | uuid | | | FK `part_numbers`; index | Mã part |
 | `serial_number` | text | ✔ | | index; **không** UQ — trùng chỉ cảnh báo | Số serial in trên thiết bị |
 | `asset` | text | | | index | Mã tài sản kiểm kê |
-| `type_id` | uuid | | | FK `types`; index | Loại thiết bị |
+| `type_id` | uuid | | | FK `types`; index | Loại thiết bị. Có part number → **luôn bằng Type của part number** (database tự đặt khi thêm / sửa / import; form khóa ô, ghi "theo part number"). Không có part number → chọn tay |
 | `status_id` | uuid | ✔ | | FK `statuses` (`on delete restrict`); index | Trạng thái vận hành — bắt buộc. Trang Calibration hiện trạng thái này (một nguồn) |
-| `level_id` | uuid | | | FK `levels` | Level trên dây chuyền |
+| `level_id` | uuid | | | FK `levels` | Level trên dây chuyền. Có cha → **luôn bằng Level của cha** (database tự đặt khi thêm / sửa / Đổi cha / Swap / import; form khóa ô, ghi "theo thiết bị cha"). Không có cha → chọn tay; Tách khỏi cha giữ Level đang có |
 | `location_id` | uuid | ✔ | | FK `locations`; index | Vị trí hiện tại; có cha thì tự theo vị trí của cha |
 | `remark` | text | | | form giới hạn 1000 ký tự | Ghi chú; bắt buộc khi trạng thái có `requires_remark` |
 | `parent_id` | uuid | | | FK `equipments` (`on delete cascade` — xóa cha thì xóa cả cây con); check `id <> parent_id`; index | Thiết bị cha; đặt khi thêm (form, import Excel), đổi trong form Sửa hoặc qua Move / Swap / Detach |
@@ -185,15 +186,15 @@ View nằm ở `04_functions.sql` (chạy lại được, không cần dựng l�
 | `updated_by` | uuid | | | FK `user_profiles` | |
 
 Quy tắc nghiệp vụ:
-- Thiết bị con luôn cùng vị trí với thiết bị cha.
+- Thiết bị con luôn cùng vị trí và cùng Level với thiết bị cha (`04_functions.sql` mục 3c cho Level). Cha đổi Level → cả cây con đổi theo, lịch sử của con ghi chú `via_parent:<SN>`.
 - Thao tác cây trên thiết bị **có con** — Đổi vị trí, Gắn vào / Đổi cha (Move), Tách khỏi cha (Detach), Swap, Xóa, và đổi cha / vị trí trong form Sửa — bắt buộc người dùng chọn cách xử lý thiết bị con (`p_children` của các hàm trong `04_functions.sql`, mặc định `follow`):
   - **Đi theo** (`follow`): cả nhánh con đi cùng thiết bị (Xóa: xóa cả nhánh).
   - **Ở lại chỗ cũ** (`stay`): con trực tiếp giữ nguyên vị trí và gắn vào thiết bị **đến thay** (Swap: con của A → B, con của B → A) hoặc thiết bị **cha cũ** (Move / Detach / Xóa); không có cha cũ, hoặc Đổi vị trí, thì con đứng riêng. Cháu luôn đi cùng con của nó.
-- Swap: không swap với cha / con của chính nó; chặn swap không thay đổi gì (cùng cha, cùng vị trí, trừ khi chọn con ở lại — khi đó hai bên đổi con cho nhau).
+- Swap: hai thiết bị đổi cho nhau thiết bị cha, vị trí và **trạng thái** (`status_id` — trạng thái đi theo chỗ: thiết bị vào chỗ đang chạy nhận Active, thiết bị ra dự phòng nhận Inactive; thiết bị tháo ra bị hỏng thì sửa tay sau đó). Level theo cha mới. Thiết bị con không đổi trạng thái. Không swap với cha / con của chính nó; chặn swap không thay đổi gì (cùng cha, cùng vị trí, trừ khi chọn con ở lại — khi đó hai bên đổi con cho nhau).
 - Lịch sử thiết bị bị xóa cùng cây ghi đúng serial của thiết bị cha (lấy từ lịch sử khi cha đã bị xóa).
 - Serial trùng chỉ cảnh báo, không chặn.
 
-Trường trên form thiết bị (theo thứ tự): Serial Number ✔, Part Number, Jabil ID, Asset, Type, Level, Status, Thiết bị cha, Location ✔ (trừ khi có cha), Remark. Có cha thì `location_id` = vị trí của cha (server tự đặt, bỏ qua giá trị gửi lên). Sửa `parent_id` trong form: cha mới → server gọi `equipment_move` (lịch sử `MOVE`), bỏ trống → `equipment_detach` (`DETACH`); server kiểm tra cha tồn tại và không nằm trong cây con trước khi ghi. Thiết bị có con mà đổi cha / vị trí: form hỏi thêm `children_mode` (đi theo / ở lại), truyền xuống `p_children`. Import Excel: cột Parent serial number + Parent part number (tìm cha trong hệ thống hoặc trong cùng file); hàm `equipment_import` nhận sẵn `id` + `parent_id` của từng dòng do server đặt.
+Trường trên form thiết bị (theo thứ tự): Serial Number ✔, Part Number, Jabil ID, Asset, Type (chọn part number → tự điền theo part number và khóa), Level (có cha → theo cha và khóa), Status, Thiết bị cha (Thêm thiết bị con: điền sẵn và khóa), Location ✔ (trừ khi có cha), Remark. Import Excel: có Part number thì để trống cột Type, có Parent thì để trống cột Level (ghi đúng giá trị đó cũng được; ghi khác → lỗi dòng). Có cha thì `location_id`, `level_id` = của cha (server tự đặt, bỏ qua giá trị gửi lên). Sửa `parent_id` trong form: cha mới → server gọi `equipment_move` (lịch sử `MOVE`), bỏ trống → `equipment_detach` (`DETACH`); server kiểm tra cha tồn tại và không nằm trong cây con trước khi ghi. Thiết bị có con mà đổi cha / vị trí: form hỏi thêm `children_mode` (đi theo / ở lại), truyền xuống `p_children`. Import Excel: cột Parent serial number + Parent part number (tìm cha trong hệ thống hoặc trong cùng file); hàm `equipment_import` nhận sẵn `id` + `parent_id` của từng dòng do server đặt.
 
 ### `equipment_histories` — lịch sử thiết bị
 
@@ -307,7 +308,7 @@ Mọi trang cấu hình nằm ở menu **Configuration**, chỉ **Admin** vào �
 | --- | --- | --- |
 | Configuration › Part Number | `part_numbers` | `equipments`, `calibration_configurations` |
 | Configuration › Location | `locations` | `equipments`, `golden_samples` |
-| Configuration › Type | `types` | `equipments` |
+| Configuration › Type | `types` | `part_numbers`, `equipments` |
 | Configuration › Status | `statuses` | `equipments`, `calibration_equipments`, `golden_samples` |
 | Configuration › Level | `levels` | `equipments` |
 | Configuration › Department | `departments` | `user_profiles` |
@@ -325,12 +326,18 @@ Quy tắc:
 | --- | --- | --- | --- | --- | --- |
 | `id` | uuid | ✔ | tự sinh | PK | |
 | `display_name` | text | ✔ | | UQ (không phân biệt hoa/thường) | Mã part |
+| `type_id` | uuid | ✔ | | FK `types`; index | Loại thiết bị của part number — Admin chọn khi thêm part number |
 | `sort_order` | integer | ✔ | `0` | index (`sort_order`, `display_name`) | Thứ tự hiển thị |
 | `is_active` | boolean | ✔ | `true` | | `false` = ngừng dùng cho dữ liệu mới |
 | `created_by` | uuid | | | FK `user_profiles` | |
 | `created_at` | timestamptz | ✔ | now() | | |
 | `updated_by` | uuid | | | FK `user_profiles` | |
 | `updated_at` | timestamptz | ✔ | now() | | |
+
+Quy tắc Type theo part number (`04_functions.sql` mục 3b):
+- Thiết bị có part number luôn mang `type_id` của part number — database tự đặt cho mọi đường ghi (form, Import Excel, script); người dùng không sửa được Type của thiết bị đó.
+- Admin đổi Type của part number → Type của mọi thiết bị mang part number này đổi theo; lịch sử thiết bị ghi `UPDATE` "type" kèm ghi chú `via_part_number:<PN>`.
+- Type đã ẩn: part number đang trỏ tới vẫn giữ; thêm / đổi part number sang Type đã ẩn thì bị chặn.
 
 ### `locations` — vị trí
 

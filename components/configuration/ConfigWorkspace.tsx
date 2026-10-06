@@ -4,6 +4,7 @@
  * Một danh sách của Configuration (Part Number, Location, …): Masterlist +
  * Detail Panel như mọi module (docs/DETAIL_MODEL.md 4.4). Chỉ Admin.
  * Bảng có is_active: "Xóa" = Ẩn / Hiện lại. Status, Hiệu chuẩn › Setup: xóa thật.
+ * Part Number: Type bắt buộc — thiết bị mang part number tự lấy Type đó (database).
  * Setup hiệu chuẩn: PN (trong các PN đang có thiết bị) + chu kỳ + status mặc định; thiết bị
  * của PN tự lên Dashboard hiệu chuẩn (database).
  */
@@ -50,6 +51,7 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
     { key: 'sort_order', label: t('fields.sort_order'), value: (r) => r.sort_order },
   ] : [
     { key: 'display_name', label: t('fields.display_name'), value: (r) => r.display_name, render: (r) => <strong>{r.display_name}</strong> },
+    ...(def.hasType ? [{ key: 'type', label: t('fields.type'), value: (r: ConfigRow) => r.type ?? null, filter: true }] : []),
     ...(def.hasDescription ? [{ key: 'description', label: t('fields.description'), value: (r: ConfigRow) => r.description ?? null, wrap: true, width: 200 }] : []),
     { key: 'sort_order', label: t('fields.sort_order'), value: (r) => r.sort_order },
     { key: 'is_active', label: t('fields.is_active'), value: (r) => (r.is_active ? t('cfg.active') : t('cfg.hidden')),
@@ -75,6 +77,10 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
         optionView: (o) => colorChip(o.value as StatusColor), view: (r) => colorChip(r.color) },
     ] : [
       { key: 'display_name', label: t('fields.display_name'), required: true, maxLength: 200 },
+      // Part Number → Type: equipment with this part number always gets this Type (the database keeps them in step).
+      ...(def.hasType ? [{ key: 'type_id', label: t('fields.type'), kind: 'select' as const, required: true, view: (r: ConfigRow) => r.type,
+        options: (_d: unknown, r: ConfigRow | null) => toSelect(options?.types, r?.type_id, ` (${t('cfg.hidden')})`),
+        editHint: t('cfg.partTypeHint') }] : []),
       ...(def.hasDescription ? [{ key: 'description', label: t('fields.description'), kind: 'textarea' as const, wide: true, maxLength: 1000 }] : []),
       { key: 'sort_order', label: t('fields.sort_order'), kind: 'number', required: true, min: 0 },
       { key: 'is_active', label: t('fields.is_active'), kind: 'boolean', hint: t('cfg.activeHint'),

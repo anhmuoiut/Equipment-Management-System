@@ -113,10 +113,29 @@ create trigger user_histories_append_only before update or delete on public.user
 --    Xóa = ẩn (is_active = false), trừ statuses và calibration_configurations.
 -- =============================================================================
 
+-- types — loại (tạo trước part_numbers: part number trỏ tới loại) ------------------
+create table public.types (
+  id           uuid primary key default gen_random_uuid(),
+  display_name text not null,
+  description  text,
+  sort_order   integer not null default 0,
+  is_active    boolean not null default true,
+  created_by   uuid references public.user_profiles (id),
+  created_at   timestamptz not null default now(),
+  updated_by   uuid references public.user_profiles (id),
+  updated_at   timestamptz not null default now()
+);
+create unique index types_display_name_key on public.types (lower(display_name));
+create index types_sort_idx on public.types (sort_order, display_name);
+create trigger types_set_updated_at before update on public.types
+  for each row execute function public.set_updated_at();
+
 -- part_numbers — mã part --------------------------------------------------------
+-- type_id: loại của mọi thiết bị mang part number này (04_functions.sql mục 3b).
 create table public.part_numbers (
   id           uuid primary key default gen_random_uuid(),
   display_name text not null,
+  type_id      uuid not null references public.types (id),
   sort_order   integer not null default 0,
   is_active    boolean not null default true,
   created_by   uuid references public.user_profiles (id),
@@ -126,8 +145,11 @@ create table public.part_numbers (
 );
 create unique index part_numbers_display_name_key on public.part_numbers (lower(display_name));
 create index part_numbers_sort_idx on public.part_numbers (sort_order, display_name);
+create index part_numbers_type_idx on public.part_numbers (type_id);
 create trigger part_numbers_set_updated_at before update on public.part_numbers
   for each row execute function public.set_updated_at();
+
+comment on column public.part_numbers.type_id is 'Loại của mọi thiết bị mang part number này — database tự đặt equipments.type_id theo.';
 
 -- locations — vị trí -------------------------------------------------------------
 create table public.locations (
@@ -143,23 +165,6 @@ create table public.locations (
 create unique index locations_display_name_key on public.locations (lower(display_name));
 create index locations_sort_idx on public.locations (sort_order, display_name);
 create trigger locations_set_updated_at before update on public.locations
-  for each row execute function public.set_updated_at();
-
--- types — loại -------------------------------------------------------------------
-create table public.types (
-  id           uuid primary key default gen_random_uuid(),
-  display_name text not null,
-  description  text,
-  sort_order   integer not null default 0,
-  is_active    boolean not null default true,
-  created_by   uuid references public.user_profiles (id),
-  created_at   timestamptz not null default now(),
-  updated_by   uuid references public.user_profiles (id),
-  updated_at   timestamptz not null default now()
-);
-create unique index types_display_name_key on public.types (lower(display_name));
-create index types_sort_idx on public.types (sort_order, display_name);
-create trigger types_set_updated_at before update on public.types
   for each row execute function public.set_updated_at();
 
 -- statuses — trạng thái (xóa thật; đang dùng thì không xóa được) ------------------
@@ -316,6 +321,7 @@ create trigger equipments_set_updated_at before update on public.equipments
 comment on table public.equipments is 'Thiết bị. Xóa thật; xóa cha thì xóa cả cây con.';
 comment on column public.equipments.serial_number is 'Không UQ — trùng chỉ cảnh báo.';
 comment on column public.equipments.parent_id is 'Thiết bị cha; chỉ đổi qua Move / Swap / Detach.';
+comment on column public.equipments.type_id is 'Có part number → luôn bằng part_numbers.type_id (database tự đặt); không có part number → chọn tay.';
 
 -- equipment_histories — lịch sử thiết bị --------------------------------------------
 create table public.equipment_histories (

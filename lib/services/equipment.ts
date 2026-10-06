@@ -7,7 +7,9 @@ import 'server-only';
  */
 import { appWrite, rpc, selectAll, selectOne } from './core/db';
 import { readHistory } from './core/history';
-import { assertActive, assertStatus, auditOf, loadLookups, nameOf, statusColorOf, type Lookups } from './core/lookups';
+import {
+  assertActive, assertStatus, auditOf, loadLookups, nameOf, partNumberType, statusColorOf, type Lookups,
+} from './core/lookups';
 import { AppError } from '@/lib/errors';
 import type { ChildrenMode, EquipmentRow, EquipmentTreeNode, HistoryEntry } from '@/lib/types';
 
@@ -71,12 +73,26 @@ export async function getEquipment(id: string): Promise<EquipmentRow> {
 
 function validate(input: EquipmentInput, lookups: Lookups, before?: DbEquipment) {
   assertActive(lookups.part_numbers, input.part_number_id, 'part_number_id', before?.part_number_id);
-  assertActive(lookups.types, input.type_id, 'type_id', before?.type_id);
+  // Type from the part number is the admin's choice — accepted even if that Type was hidden later.
+  const partNumber = input.part_number_id !== undefined ? input.part_number_id : before?.part_number_id;
+  if (!partNumberType(lookups, partNumber)) assertActive(lookups.types, input.type_id, 'type_id', before?.type_id);
   assertActive(lookups.levels, input.level_id, 'level_id', before?.level_id);
   assertActive(lookups.locations, input.location_id, 'location_id', before?.location_id);
   const statusId = input.status_id !== undefined ? input.status_id : before?.status_id;
   const remark = input.remark !== undefined ? input.remark : before?.remark;
   if (!before || statusId !== before.status_id || input.remark !== undefined) assertStatus(lookups, statusId, remark);
+}
+
+/**
+ * Type theo part number (Configuration › Part Number): có part number → Type của part number,
+ * Type gửi lên bị bỏ qua (form khóa ô này). Database cũng tự đặt (04_functions.sql mục 3b) —
+ * đây để kiểm tra và ghi đúng giá trị. Không đổi part number / Type thì không ghi thêm.
+ */
+function withPartNumberType(input: EquipmentInput, lookups: Lookups, before?: DbEquipment): EquipmentInput {
+  const partNumber = input.part_number_id !== undefined ? input.part_number_id : before?.part_number_id;
+  const type = partNumberType(lookups, partNumber);
+  if (!type || (input.part_number_id === undefined && input.type_id === undefined)) return input;
+  return { ...input, type_id: type };
 }
 
 async function duplicateSerial(serial: string, exceptId?: string): Promise<boolean> {
@@ -85,19 +101,20 @@ async function duplicateSerial(serial: string, exceptId?: string): Promise<boole
   return rows.some((r) => r.id !== exceptId && r.serial_number.trim().toLowerCase() === key);
 }
 
-/** Thêm thiết bị. Có cha thì vị trí lấy theo cha (bỏ qua location_id gửi lên). */
+/** Thêm thiết bị. Có cha thì vị trí và Level lấy theo cha (bỏ qua giá trị gửi lên). */
 export async function createEquipment(input: EquipmentInput, actor: string) {
   if (!input.serial_number) throw new AppError('VALIDATION_ERROR', { fields: { serial_number: 'required' } });
-  const { parent_id: parentId, children_mode: _unused, ...fields } = input;
-  let data: EquipmentInput = fields;
+  const { parent_id: parentId, children_mode: _unused, ...sent } = input;
   const [lookups, parent] = await Promise.all([
     loadLookups(),
-    parentId ? selectOne<DbEquipment>('equipments', parentId, 'id, location_id') : null,
+    parentId ? selectOne<DbEquipment>('equipments', parentId, 'id, location_id, level_id') : null,
   ]);
+  const fields = withPartNumberType(sent, lookups);
+  let data: EquipmentInput = fields;
   if (parentId) {
     if (!parent) throw new AppError('PARENT_NOT_FOUND', { fields: { parent_id: 'not_found' } });
-    validate({ ...fields, location_id: undefined }, lookups);
-    data = { ...fields, location_id: parent.location_id, parent_id: parent.id };
+    validate({ ...fields, location_id: undefined, level_id: undefined }, lookups);
+    data = { ...fields, location_id: parent.location_id, level_id: parent.level_id, parent_id: parent.id };
   } else {
     if (!input.location_id) throw new AppError('VALIDATION_ERROR', { fields: { location_id: 'required' } });
     validate(fields, lookups);
@@ -126,30 +143,37 @@ async function assertParent(id: string, parentId: string) {
  * - Thiết bị cha: đổi cha → vị trí theo cha mới, cả cây con đi theo (lịch sử MOVE);
  *   bỏ trống → tách khỏi cha, giữ vị trí hiện tại (DETACH) rồi mới áp vị trí mới nếu có.
  * - Vị trí: có cha thì theo cha; không có cha đổi vị trí thì cả cây con đổi theo.
+ * - Level: có cha (sau khi sửa) thì theo cha — giá trị gửi lên bị bỏ qua; không có cha thì sửa
+ *   được, cả cây con đổi theo (database, 04_functions.sql mục 3c). Tách khỏi cha + đổi Level:
+ *   ghi Level sau khi tách (trước đó database còn đặt theo cha cũ).
  * Kiểm tra hết (giá trị chọn, vòng lặp) trước khi ghi.
  */
 export async function updateEquipment(id: string, input: EquipmentInput, actor: string) {
   const [before, lookups] = await Promise.all([selectOne<DbEquipment>('equipments', id), loadLookups()]);
   if (!before) throw new AppError('EQUIPMENT_NOT_FOUND');
 
-  const { location_id, parent_id: parentInput, children_mode: children = 'follow', ...fields } = input;
+  const { location_id, level_id: levelInput, parent_id: parentInput, children_mode: children = 'follow', ...sent } = input;
+  const fields = withPartNumberType(sent, lookups, before);
   const parentChanged = parentInput !== undefined && parentInput !== before.parent_id;
   const parentAfter = parentInput !== undefined ? parentInput : before.parent_id;
   const locationChanged = location_id !== undefined && location_id !== before.location_id;
   // Có cha (và không đổi cha) thì vị trí theo cha; đổi sang cha mới thì vị trí theo cha mới.
   if (locationChanged && parentAfter && !parentChanged) throw new AppError('LOCATION_INHERITED_READ_ONLY');
   const setLocation = locationChanged && !parentAfter;
+  const setLevel = levelInput !== undefined && levelInput !== before.level_id && !parentAfter;
 
-  validate({ ...fields, location_id: setLocation ? location_id : undefined }, lookups, before);
+  validate({ ...fields, location_id: setLocation ? location_id : undefined, level_id: setLevel ? levelInput : undefined }, lookups, before);
   if (parentChanged && parentInput) await assertParent(id, parentInput);
 
   const duplicate = input.serial_number && input.serial_number !== before.serial_number
     ? await duplicateSerial(input.serial_number, id) : false;
-  if (Object.keys(fields).length) await appWrite('equipments', 'update', id, fields, actor);
+  const now = setLevel && !parentChanged ? { ...fields, level_id: levelInput } : fields;
+  if (Object.keys(now).length) await appWrite('equipments', 'update', id, now, actor);
   if (parentChanged) {
     if (parentInput) await rpc('equipment_move', { p_id: id, p_parent_id: parentInput, p_actor: actor, p_children: children });
     else await rpc('equipment_detach', { p_id: id, p_actor: actor, p_children: children });
   }
+  if (setLevel && parentChanged) await appWrite('equipments', 'update', id, { level_id: levelInput }, actor);
   if (setLocation) {
     await rpc('equipment_change_location', { p_id: id, p_location_id: location_id, p_actor: actor, p_children: children });
   }

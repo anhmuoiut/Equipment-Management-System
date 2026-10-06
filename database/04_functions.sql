@@ -6,7 +6,8 @@
 -- 2. app_write: một cửa ghi dữ liệu cho server — thêm / sửa / xóa một dòng,
 --    kèm người thao tác, ghi chú, nguồn (ui / import / script).
 -- 3. Equipment: đổi vị trí, Move / Detach / Swap, xóa — thiết bị con đi theo
---    hoặc ở lại chỗ cũ (p_children); import Excel.
+--    hoặc ở lại chỗ cũ (p_children); import Excel; Type theo Part Number (3b);
+--    Level theo thiết bị cha (3c).
 -- 4. Calibration: tự tính due_date; tính lại khi đổi chu kỳ / part number.
 -- 5. Dashboard: view recent_activities (thay đổi gần đây; import gộp một dòng).
 --
@@ -454,7 +455,9 @@ begin
 end;
 $$;
 
--- Đổi chỗ hai thiết bị: mỗi bên nhận cha + vị trí của bên kia.
+-- Đổi chỗ hai thiết bị: mỗi bên nhận cha + vị trí + trạng thái của bên kia (trạng thái
+-- đi theo chỗ: thiết bị vào chỗ đang chạy nhận Active, thiết bị ra dự phòng nhận Inactive…).
+-- Level theo cha mới (mục 3c). Thiết bị con không đổi trạng thái.
 -- follow: mỗi bên mang theo cả nhánh con; stay: con ở lại chỗ cũ và gắn vào
 -- thiết bị đến thay (con của A → B, con của B → A). Không cho swap với cha / con
 -- của chính nó, và chặn swap không thay đổi gì (cùng cha, cùng vị trí).
@@ -484,9 +487,13 @@ begin
   perform public.set_ctx('source', 'ui');
   perform public.set_ctx('action', 'SWAP');
   perform public.set_ctx('note', 'swap_with:' || b.serial_number);
-  update public.equipments set parent_id = b.parent_id, location_id = b.location_id, updated_by = p_actor where id = p_a;
+  update public.equipments
+     set parent_id = b.parent_id, location_id = b.location_id, status_id = b.status_id, updated_by = p_actor
+   where id = p_a;
   perform public.set_ctx('note', 'swap_with:' || a.serial_number);
-  update public.equipments set parent_id = a.parent_id, location_id = a.location_id, updated_by = p_actor where id = p_b;
+  update public.equipments
+     set parent_id = a.parent_id, location_id = a.location_id, status_id = a.status_id, updated_by = p_actor
+   where id = p_b;
   if v_mode = 'stay' then
     perform public.equipment_reparent(v_a_kids, p_b, p_actor, 'stayed_swap:' || a.serial_number);
     perform public.equipment_reparent(v_b_kids, p_a, p_actor, 'stayed_swap:' || b.serial_number);
@@ -576,6 +583,99 @@ begin
   return v_count;
 end;
 $$;
+
+-- =============================================================================
+-- 3b. EQUIPMENT — Type theo Part Number (part_numbers.type_id)
+--     Thiết bị có part number → luôn mang đúng Type của part number, dù ghi từ
+--     form, Import Excel hay script (Type gửi lên bị thay). Không có part number
+--     → Type chọn tay. Admin đổi Type của part number → mọi thiết bị của part
+--     number đổi theo; lịch sử thiết bị ghi UPDATE "type", ghi chú via_part_number:<PN>.
+-- =============================================================================
+create or replace function public.equipment_type_from_part_number() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.part_number_id is not null then
+    select type_id into new.type_id from public.part_numbers where id = new.part_number_id;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists equipments_type_from_part_number on public.equipments;
+create trigger equipments_type_from_part_number
+  before insert or update of part_number_id, type_id on public.equipments
+  for each row execute function public.equipment_type_from_part_number();
+
+-- Chạy trước part_numbers_write_history (trigger cùng loại chạy theo thứ tự tên) →
+-- trả lại ghi chú cũ để lịch sử của chính part number không mang via_part_number.
+create or replace function public.part_number_type_changed() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  v_note text := public.ctx('note');
+begin
+  perform public.set_ctx('note', 'via_part_number:' || new.display_name);
+  update public.equipments
+     set type_id = new.type_id, updated_by = public.ctx('actor_id')::uuid
+   where part_number_id = new.id and type_id is distinct from new.type_id;
+  perform public.set_ctx('note', v_note);
+  return null;
+end;
+$$;
+drop trigger if exists part_numbers_type_changed on public.part_numbers;
+create trigger part_numbers_type_changed
+  after update of type_id on public.part_numbers
+  for each row when (new.type_id is distinct from old.type_id)
+  execute function public.part_number_type_changed();
+
+-- =============================================================================
+-- 3c. EQUIPMENT — Level theo thiết bị cha (như vị trí)
+--     Có cha → luôn mang Level của cha, dù ghi từ form, Đổi cha, Swap, Import hay
+--     script (Level gửi lên bị thay). Không có cha → Level chọn tay; Tách khỏi cha
+--     giữ Level đang có. Cha đổi Level → cả cây con đổi theo; lịch sử của con ghi
+--     ghi chú via_parent:<SN>.
+-- =============================================================================
+create or replace function public.equipment_level_from_parent() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  v_level uuid;
+begin
+  if new.parent_id is not null then
+    -- Cha chưa có (Import: dòng cha nằm sau trong cùng file) → giữ giá trị server đã đặt theo cha.
+    select level_id into v_level from public.equipments where id = new.parent_id;
+    if found then new.level_id := v_level; end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists equipments_level_from_parent on public.equipments;
+create trigger equipments_level_from_parent
+  before insert or update of parent_id, level_id on public.equipments
+  for each row execute function public.equipment_level_from_parent();
+
+-- Chạy trước equipments_write_history (theo thứ tự tên) → trả lại ngữ cảnh để lịch sử
+-- của chính thiết bị giữ đúng hành động / ghi chú (ví dụ SWAP, swap_with:<SN>).
+create or replace function public.equipment_level_cascade() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  v_action text := public.ctx('action');
+  v_note   text := public.ctx('note');
+begin
+  perform public.set_ctx('action', null);
+  perform public.set_ctx('note', 'via_parent:' || new.serial_number);
+  update public.equipments
+     set level_id = new.level_id, updated_by = coalesce(public.ctx('actor_id')::uuid, new.updated_by)
+   where parent_id = new.id and level_id is distinct from new.level_id;
+  perform public.set_ctx('action', v_action);
+  perform public.set_ctx('note', v_note);
+  return null;
+end;
+$$;
+-- Không dùng "update of level_id": Đổi cha / Swap đổi Level qua trigger trên (cột không
+-- nằm trong câu update) — vẫn phải lan xuống con.
+drop trigger if exists equipments_level_cascade on public.equipments;
+create trigger equipments_level_cascade
+  after update on public.equipments
+  for each row when (new.level_id is distinct from old.level_id)
+  execute function public.equipment_level_cascade();
 
 -- =============================================================================
 -- 4. CALIBRATION — due_date = calibration_date + chu kỳ của part number
@@ -717,10 +817,15 @@ commit;
 
 -- -----------------------------------------------------------------------------
 -- Kiểm tra: history_triggers phải là 12, app_write, equipment_import và golden_import phải là 1,
--- equipment_swap_args phải là 4 (có p_children — con đi theo / ở lại).
+-- equipment_swap_args phải là 4 (có p_children — con đi theo / ở lại),
+-- type_triggers phải là 2 (Type theo Part Number), level_triggers phải là 2 (Level theo thiết bị cha).
 -- -----------------------------------------------------------------------------
 select
   (select count(*) from pg_trigger where tgname ~ '_write_history$') as history_triggers,
+  (select count(*) from pg_trigger
+    where tgname in ('equipments_type_from_part_number', 'part_numbers_type_changed')) as type_triggers,
+  (select count(*) from pg_trigger
+    where tgname in ('equipments_level_from_parent', 'equipments_level_cascade')) as level_triggers,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'app_write') as app_write,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

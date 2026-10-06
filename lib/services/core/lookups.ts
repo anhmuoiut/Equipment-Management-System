@@ -6,12 +6,14 @@ import 'server-only';
  */
 import { selectAll } from './db';
 import { AppError } from '@/lib/errors';
-import type { OptionItem, Options, StatusColor, StatusOption } from '@/lib/types';
+import type { OptionItem, Options, PartNumberOption, StatusColor, StatusOption } from '@/lib/types';
 
 type Named = { id: string; display_name: string; sort_order: number; is_active: boolean };
+/** `type_id`: Type của mọi thiết bị mang part number này. */
+type PartNumber = Named & { type_id: string };
 
 export type Lookups = {
-  part_numbers: Map<string, Named>;
+  part_numbers: Map<string, PartNumber>;
   locations: Map<string, Named>;
   types: Map<string, Named>;
   levels: Map<string, Named>;
@@ -29,7 +31,7 @@ const BASIC = 'id, display_name, sort_order, is_active';
 
 export async function loadLookups(): Promise<Lookups> {
   const [part_numbers, locations, types, levels, departments, calibration_vendors, statuses, users] = await Promise.all([
-    selectAll<Named>('part_numbers', BASIC),
+    selectAll<PartNumber>('part_numbers', `${BASIC}, type_id`),
     selectAll<Named>('locations', BASIC),
     selectAll<Named>('types', BASIC),
     selectAll<Named>('levels', BASIC),
@@ -54,6 +56,11 @@ export function statusColorOf(lookups: Lookups, id: string | null | undefined): 
   return id ? lookups.statuses.get(id)?.color ?? null : null;
 }
 
+/** Type của part number (Configuration › Part Number) — thiết bị mang part number đó luôn có Type này. */
+export function partNumberType(lookups: Lookups, partNumberId: string | null | undefined): string | null {
+  return partNumberId ? lookups.part_numbers.get(partNumberId)?.type_id ?? null : null;
+}
+
 export function userName(lookups: Lookups, id: string | null | undefined): string | null {
   return id ? lookups.users.get(id) ?? null : null;
 }
@@ -71,7 +78,7 @@ export function auditOf(lookups: Lookups, row: {
 export function toOptions(lookups: Lookups): Options {
   const list = (map: Map<string, Named>): OptionItem[] => [...map.values()].sort(byOrder);
   return {
-    part_numbers: list(lookups.part_numbers),
+    part_numbers: [...lookups.part_numbers.values()].sort(byOrder) satisfies PartNumberOption[],
     locations: list(lookups.locations),
     types: list(lookups.types),
     levels: list(lookups.levels),

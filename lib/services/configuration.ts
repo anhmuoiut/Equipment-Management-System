@@ -6,7 +6,7 @@ import 'server-only';
  */
 import { appWrite, db, selectAll, selectOne } from './core/db';
 import { readHistory, withActorNames } from './core/history';
-import { auditOf, loadLookups, nameOf } from './core/lookups';
+import { assertActive, auditOf, loadLookups, nameOf } from './core/lookups';
 import { AppError, mapRpcError } from '@/lib/errors';
 import type { ConfigListDef } from '@/lib/configuration';
 import type { ConfigRow, ErrorLogRow, HistoryEntry } from '@/lib/types';
@@ -33,6 +33,7 @@ function toRow(list: ConfigListDef, r: DbRow, lookups: Lookups): ConfigRow {
     ...auditOf(lookups, r),
   };
   if (list.hasDescription) return { ...base, description: (r.description as string | null) ?? null };
+  if (list.hasType) return { ...base, type_id: r.type_id as string, type: nameOf(lookups.types, r.type_id as string) };
   if (list.isStatus) {
     return {
       ...base, requires_remark: r.requires_remark as boolean,
@@ -56,11 +57,18 @@ export async function getConfig(list: ConfigListDef, id: string): Promise<Config
 
 export async function createConfig(list: ConfigListDef, input: Record<string, unknown>, actor: string): Promise<ConfigRow> {
   if (list.isCalibration) await assertPartNumberActive(input.part_number_id as string | undefined);
+  if (list.hasType) assertActive((await loadLookups()).types, input.type_id as string | undefined, 'type_id');
   const created = await appWrite<DbRow>(list.table, 'insert', null, input, actor);
   return getConfig(list, created.id);
 }
 
+/** Part Number: đổi Type → database đổi Type của mọi thiết bị mang part number này (04_functions.sql mục 3b). */
 export async function updateConfig(list: ConfigListDef, id: string, input: Record<string, unknown>, actor: string): Promise<ConfigRow> {
+  if (list.hasType && input.type_id !== undefined) {
+    const [before, lookups] = await Promise.all([selectOne<DbRow>(list.table, id), loadLookups()]);
+    if (!before) throw new AppError('NOT_FOUND');
+    assertActive(lookups.types, input.type_id as string, 'type_id', before.type_id as string);
+  }
   if (Object.keys(input).length) await appWrite(list.table, 'update', id, input, actor);
   return getConfig(list, id);
 }

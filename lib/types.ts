@@ -17,6 +17,8 @@ export type Audit = {
 
 // ---------------------------------------------------------------- Lựa chọn
 export type OptionItem = { id: string; display_name: string; sort_order: number; is_active: boolean };
+/** Part number + Type mà mọi thiết bị mang part number này có. */
+export type PartNumberOption = OptionItem & { type_id: string };
 /** Trang có cột trạng thái (Dashboard đếm theo từng trang). Một danh sách trạng thái chung cho mọi trang. */
 export type StatusPage = 'equipment' | 'calibration' | 'golden_sample';
 /** 5 màu hệ thống của trạng thái (statuses.color) — mã màu ở globals.css. */
@@ -26,7 +28,7 @@ export type StatusOption = {
   requires_remark: boolean; color: StatusColor;
 };
 export type Options = {
-  part_numbers: OptionItem[];
+  part_numbers: PartNumberOption[];
   locations: OptionItem[];
   types: OptionItem[];
   levels: OptionItem[];
@@ -119,6 +121,8 @@ export type ConfigRow = Audit & {
   sort_order: number;
   is_active: boolean;
   description?: string | null;                 // types
+  type_id?: string;                            // part-numbers
+  type?: string | null;                        // part-numbers
   requires_remark?: boolean;                   // statuses
   color?: StatusColor;                         // statuses
   part_number_id?: string;                     // calibration-setup

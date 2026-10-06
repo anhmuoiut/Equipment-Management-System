@@ -58,12 +58,18 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
   // Thiết bị đang xem + con cháu (subtree): không chọn làm cha được (tạo vòng lặp).
   const { childrenOf, subtree } = useMemo(() => equipmentFamily(all, record?.id), [all, record?.id]);
   const parentOf = (d: Draft) => (d.parent_id ? all?.find((e) => e.id === d.parent_id) : undefined);
-  const parentLocation = (d: Draft) =>
-    parentOf(d)?.location ?? (record && d.parent_id === record.parent_id ? record.location : null);
-  const parentChoices = () => (all ?? []).filter((e) => !subtree.has(e.id)).map((e) => ({
-    value: e.id, label: [e.serial_number, e.part_number, e.location].filter(Boolean).join(' · '),
-  }));
+  /** Vị trí / Level theo thiết bị cha đang chọn (cha chưa đổi: lấy của chính thiết bị). */
+  const fromParent = (d: Draft, key: 'location' | 'level') =>
+    parentOf(d)?.[key] ?? (record && d.parent_id === record.parent_id ? record[key] : null);
+  const equipmentLabel = (e: EquipmentRow) => [e.serial_number, e.part_number, e.location].filter(Boolean).join(' · ');
+  const parentChoices = () => (all ?? []).filter((e) => !subtree.has(e.id)).map((e) => ({ value: e.id, label: equipmentLabel(e) }));
+  // Thêm thiết bị con (Thao tác › Thêm thiết bị con): cha cố định — đổi cha sau khi lưu, bằng Đổi cha.
+  const fixedParent = ctx.creating && typeof ctx.defaults?.parent_id === 'string' ? ctx.defaults.parent_id : null;
+  const fixedParentSerial = fixedParent ? parentOf({ parent_id: fixedParent })?.serial_number ?? '' : '';
   const addChild = ctx.create && can.edit ? (parent: EquipmentRow) => ctx.create!({ parent_id: parent.id }) : undefined;
+  // Type theo part number (Configuration › Part Number): chọn part number → Type tự điền và khóa.
+  const partType = (pn: unknown) => (pn ? options?.part_numbers.find((p) => p.id === pn)?.type_id ?? null : null);
+  const typeName = (id: string | null) => (id ? options?.types.find((x) => x.id === id)?.display_name ?? null : null);
 
   const sections: SectionDef<EquipmentRow>[] = [
     {
@@ -77,10 +83,17 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
     },
     {
       key: 'classification', title: t('eq.groupClassification'), fields: [
-        { key: 'type_id', label: t('fields.type'), kind: 'select', view: (r) => r.type,
-          options: (_d, r) => toSelect(options?.types, r?.type_id, hidden) },
-        { key: 'level_id', label: t('fields.level'), kind: 'select', view: (r) => r.level,
-          options: (_d, r) => toSelect(options?.levels, r?.level_id, hidden) },
+        { key: 'type_id', label: t('fields.type'), kind: 'select',
+          view: (r) => (r.part_number_id ? <>{r.type}<span className="eq-note">{t('eq.fromPartNumber')}</span></> : r.type),
+          options: (_d, r) => toSelect(options?.types, r?.type_id, hidden),
+          lock: (_r, d) => (partType(d.part_number_id) ? t('eq.typeFromPartNumber') : null),
+          draftView: (d) => typeName(partType(d.part_number_id)) },
+        // Level theo thiết bị cha (như vị trí) — database giữ cả cây cùng Level.
+        { key: 'level_id', label: t('fields.level'), kind: 'select',
+          view: (r) => (r.parent_id ? <>{r.level ?? '—'}<span className="eq-note">{t('eq.fromParent')}</span></> : r.level),
+          options: (_d, r) => toSelect(options?.levels, r?.level_id, hidden),
+          lock: (_r, d) => (d.parent_id ? t(fixedParent ? 'eq.followsFixedParent' : 'eq.levelFromParent') : null),
+          draftView: (d) => fromParent(d, 'level') ?? '—' },
         { key: 'status_id', label: t('fields.status'), kind: 'select', view: (r) => <StatusTag name={r.status} color={r.status_color} />,
           options: () => statusSelect(options?.statuses), required: true },
       ],
@@ -90,10 +103,12 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
         { key: 'location_id', label: t('fields.location'), kind: 'select', required: (d) => !d.parent_id,
           view: (r) => (r.parent_id ? <>{r.location}<span className="eq-note">{t('eq.fromParent')}</span></> : r.location),
           options: (_d, r) => toSelect(options?.locations, r?.location_id, hidden),
-          lock: (_r, d) => (d.parent_id ? t('eq.locationFromParent') : null),
-          draftView: parentLocation },
+          lock: (_r, d) => (d.parent_id ? t(fixedParent ? 'eq.followsFixedParent' : 'eq.locationFromParent') : null),
+          draftView: (d) => fromParent(d, 'location') },
         { key: 'parent_id', label: t('fields.parent'), kind: 'select',
           options: parentChoices,
+          lock: () => (fixedParent ? t('eq.parentFixed', { serial: fixedParentSerial }) : null),
+          draftView: (d) => { const p = parentOf(d); return p ? equipmentLabel(p) : null; },
           view: (r) => (r.parent_id ? (
             <EquipmentChip serial={r.parent_serial ?? '—'} part={all?.find((e) => e.id === r.parent_id)?.part_number}
               onOpen={() => ctx.open(r.parent_id!)} />
@@ -181,9 +196,10 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
       historyLabels={{ parent: t('fields.parent') }}
       canEdit={can.edit}
       onSave={async (payload, record) => {
+        // Ô khóa không nằm trong payload — cha cố định của "Thêm thiết bị con" gửi kèm ở đây.
         const res = record
           ? await api.put<EquipmentRow>(`/api/equipment/${record.id}`, payload)
-          : await api.post<EquipmentRow>('/api/equipment', payload);
+          : await api.post<EquipmentRow>('/api/equipment', fixedParent ? { ...payload, parent_id: fixedParent } : payload);
         return { row: res.data, message: res.meta.duplicate ? t('eq.duplicateSerial') : undefined };
       }}
       actions={actions}

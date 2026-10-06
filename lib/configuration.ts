@@ -15,13 +15,15 @@ export type ConfigListDef = {
   /** Xóa thật (statuses, calibration_configurations). */
   deletable: boolean;
   hasDescription?: boolean;
+  /** Part Number: Type bắt buộc — mọi thiết bị mang part number này có Type đó. */
+  hasType?: boolean;
   isStatus?: boolean;
   /** Hiệu chuẩn › Setup: part number (trong các PN đang có thiết bị), chu kỳ, báo trước, status mặc định. */
   isCalibration?: boolean;
 };
 
 export const CONFIG_LISTS: readonly ConfigListDef[] = [
-  { key: 'part-numbers', table: 'part_numbers', group: 'master', hideable: true, deletable: false },
+  { key: 'part-numbers', table: 'part_numbers', group: 'master', hideable: true, deletable: false, hasType: true },
   { key: 'locations', table: 'locations', group: 'master', hideable: true, deletable: false },
   { key: 'types', table: 'types', group: 'master', hideable: true, deletable: false, hasDescription: true },
   { key: 'statuses', table: 'statuses', group: 'master', hideable: false, deletable: true, isStatus: true },

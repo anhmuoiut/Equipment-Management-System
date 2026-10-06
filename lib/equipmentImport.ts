@@ -51,11 +51,13 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
 
 export type ImportIssueCode =
   | 'required' | 'too_long' | 'not_found' | 'inactive' | 'remark_required'
-  | 'parent_not_found' | 'parent_ambiguous' | 'parent_cycle' | 'location_follows_parent';
+  | 'parent_not_found' | 'parent_ambiguous' | 'parent_cycle' | 'location_follows_parent' | 'level_follows_parent'
+  | 'type_follows_part_number';
 
 /**
  * Lỗi của một ô. `value`: chữ trong ô (remark_required: tên trạng thái;
- * location_follows_parent: vị trí của thiết bị cha). `count`: parent_ambiguous.
+ * location_follows_parent / level_follows_parent: vị trí / Level của thiết bị cha;
+ * type_follows_part_number: Type của part number). `count`: parent_ambiguous.
  */
 export type ImportIssue = { column: string; code: ImportIssueCode; value?: string; max?: number; count?: number };
 
