@@ -4,7 +4,7 @@
 import { useTranslation } from 'react-i18next';
 import { CalendarClock, MapPin } from 'lucide-react';
 import { formatDate } from '@/lib/client/api';
-import { DueDate, StatusTag } from '@/components/ui/tags';
+import { CalibrationStatusTag, DueDate, RemarkCell } from '@/components/ui/tags';
 import { ModuleWorkspace, useList } from '@/components/ui/workspace/ModuleWorkspace';
 import { RowCard, type Column } from '@/components/ui/masterlist/Masterlist';
 import { CalibrationDetail } from './CalibrationDetail';
@@ -15,7 +15,7 @@ export function CalibrationWorkspace() {
   const list = useList<CalibrationRow>('/api/calibration');
 
   const columns: Column<CalibrationRow>[] = [
-    { key: 'status', label: t('fields.status'), value: (r) => r.status, render: (r) => <StatusTag name={r.status} color={r.status_color} />, filter: true },
+    { key: 'status', label: t('fields.status'), value: (r) => t(`cal.status.${r.status}`), render: (r) => <CalibrationStatusTag status={r.status} />, filter: true },
     { key: 'serial_number', label: t('fields.serial_number'), value: (r) => r.serial_number, render: (r) => <strong>{r.serial_number}</strong> },
     { key: 'part_number', label: t('fields.part_number'), value: (r) => r.part_number, filter: true },
     { key: 'type', label: t('fields.type'), value: (r) => r.type, filter: true },
@@ -26,7 +26,8 @@ export function CalibrationWorkspace() {
     { key: 'due_date', label: t('fields.due_date'), value: (r) => r.due_date, render: (r) => <DueDate date={r.due_date} state={r.due_state} /> },
     { key: 'interval_months', label: t('fields.interval_months'), value: (r) => r.interval_months,
       render: (r) => (r.interval_months ? t('cal.months', { count: r.interval_months }) : null) },
-    { key: 'remark', label: t('fields.remark'), value: (r) => r.remark, wrap: true, width: 180 },
+    { key: 'remark', label: t('fields.remark'), value: (r) => [...r.tags.map((x) => x.display_name), r.remark ?? ''].join(' ').trim() || null,
+      render: (r) => <RemarkCell tags={r.tags} remark={r.remark} />, wrap: true, width: 200 },
   ];
 
   return (
@@ -37,7 +38,7 @@ export function CalibrationWorkspace() {
       mobileCard={(r) => (
         <RowCard
           title={r.serial_number}
-          tag={<StatusTag name={r.status} color={r.status_color} />}
+          tag={<CalibrationStatusTag status={r.status} />}
           lines={[
             <><MapPin size={13} aria-hidden="true" /><span className="rc-place">{r.location ?? '—'}</span>{[r.part_number, r.type].filter(Boolean).map((x) => ` · ${x}`)}</>,
             <><CalendarClock size={13} aria-hidden="true" />{r.due_state === 'none' ? t('cal.due.none') : <DueDate date={r.due_date} state={r.due_state} />}</>,
@@ -45,6 +46,7 @@ export function CalibrationWorkspace() {
         />
       )}
       storageKey="calibration"
+      defaultColumns={['status', 'serial_number', 'part_number', 'location', 'calibration_date', 'due_date']}
       exportName="calibration"
       // Thiết bị lên Dashboard tự động theo Configuration › Hiệu chuẩn › Setup — không thêm bằng tay.
       canAdd={false}

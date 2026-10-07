@@ -8,22 +8,22 @@ import 'server-only';
  */
 import { appWrite, db, selectAll, selectOne } from './core/db';
 import { readHistory } from './core/history';
-import { assertActive, auditOf, loadLookups, nameOf, statusColorOf, type Lookups } from './core/lookups';
+import { assertActive, assertTags, auditOf, loadLookups, nameOf, tagItems, type Lookups } from './core/lookups';
 import { AppError, mapRpcError } from '@/lib/errors';
-import type { CalibrationRow, DueState, HistoryEntry } from '@/lib/types';
+import type { CalibrationRow, CalibrationStatus, DueState, HistoryEntry } from '@/lib/types';
 
 type DbCalibration = {
   id: string; equipment_id: string; vendor_id: string | null;
-  calibration_date: string | null; due_date: string | null; remark: string | null;
+  calibration_date: string | null; due_date: string | null; remark: string | null; tag_ids: string[];
   created_at: string; created_by: string | null; updated_at: string; updated_by: string | null;
 };
 type DbEquipmentRef = {
-  id: string; serial_number: string; part_number_id: string | null; type_id: string | null; location_id: string; status_id: string;
+  id: string; serial_number: string; part_number_id: string | null; type_id: string | null; location_id: string;
 };
 type DbInterval = { part_number_id: string; interval_months: number; warning_days: number };
 
 export type CalibrationInput = {
-  vendor_id?: string | null; calibration_date?: string | null; remark?: string | null;
+  vendor_id?: string | null; calibration_date?: string | null; remark?: string | null; tag_ids?: string[];
 };
 
 /** Hôm nay theo giờ Việt Nam (yyyy-mm-dd). */
@@ -40,8 +40,20 @@ export function dueState(dueDate: string | null, warningDays: number | null, has
   return days <= (warningDays ?? 30) ? 'due_soon' : 'ok';
 }
 
+/**
+ * Calibration Status — hệ thống tự tính, không ai chọn, không lưu: chưa có ngày hiệu chuẩn = Under calibration;
+ * có ngày thì theo hạn (Valid / Due soon / Overdue).
+ */
+export function calibrationStatus(calibrationDate: string | null, state: DueState): CalibrationStatus {
+  if (!calibrationDate) return 'under_calibration';
+  if (state === 'overdue') return 'overdue';
+  if (state === 'due_soon') return 'due_soon';
+  return 'valid';
+}
+
 function toRow(c: DbCalibration, e: DbEquipmentRef | undefined, intervals: Map<string, DbInterval>, lookups: Lookups): CalibrationRow {
   const interval = e?.part_number_id ? intervals.get(e.part_number_id) : undefined;
+  const due_state = dueState(c.due_date, interval?.warning_days ?? null, !!interval);
   return {
     id: c.id,
     equipment_id: c.equipment_id,
@@ -49,15 +61,15 @@ function toRow(c: DbCalibration, e: DbEquipmentRef | undefined, intervals: Map<s
     part_number: nameOf(lookups.part_numbers, e?.part_number_id),
     type: nameOf(lookups.types, e?.type_id),
     location: nameOf(lookups.locations, e?.location_id),
-    // Trạng thái là của thiết bị — một nguồn, không giữ bản sao ở Calibration.
-    status_id: e?.status_id ?? null, status: nameOf(lookups.statuses, e?.status_id), status_color: statusColorOf(lookups, e?.status_id),
     vendor_id: c.vendor_id, vendor: nameOf(lookups.calibration_vendors, c.vendor_id),
     calibration_date: c.calibration_date,
     due_date: c.due_date,
     interval_months: interval?.interval_months ?? null,
     warning_days: interval?.warning_days ?? null,
-    due_state: dueState(c.due_date, interval?.warning_days ?? null, !!interval),
+    due_state,
+    status: calibrationStatus(c.calibration_date, due_state),
     remark: c.remark,
+    tag_ids: c.tag_ids ?? [], tags: tagItems(lookups, c.tag_ids),
     ...auditOf(lookups, c),
   };
 }
@@ -65,7 +77,7 @@ function toRow(c: DbCalibration, e: DbEquipmentRef | undefined, intervals: Map<s
 /** `lookups`: dữ liệu gốc đã (đang) tải ở chỗ gọi — dùng chung thay vì đọc lại. */
 async function context(lookups: Lookups | Promise<Lookups> = loadLookups()) {
   const [equipment, intervals, resolved] = await Promise.all([
-    selectAll<DbEquipmentRef>('equipments', 'id, serial_number, part_number_id, type_id, location_id, status_id'),
+    selectAll<DbEquipmentRef>('equipments', 'id, serial_number, part_number_id, type_id, location_id'),
     selectAll<DbInterval>('calibration_configurations', 'id, part_number_id, interval_months, warning_days'),
     lookups,
   ]);
@@ -99,6 +111,7 @@ export async function getCalibrationByEquipment(equipmentId: string): Promise<Ca
 
 function validate(input: CalibrationInput, lookups: Lookups, before: DbCalibration) {
   assertActive(lookups.calibration_vendors, input.vendor_id, 'vendor_id', before.vendor_id);
+  assertTags(lookups, input.tag_ids);
 }
 
 /** Sửa thông tin nhập sai (UPDATE) hoặc ghi nhận lần hiệu chuẩn mới (đổi ngày → CALIBRATE). */

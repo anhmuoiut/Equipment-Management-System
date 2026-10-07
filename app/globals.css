@@ -30,7 +30,7 @@
   --info-tint: #EAF2FF;
   --neutral: var(--ink-2);
   --neutral-tint: color-mix(in srgb, var(--jabil-prussian) 6%, var(--jabil-white));
-  /* 5 màu trạng thái (statuses.color, docs/JABIL_UI.md "Status colors"): chấm,
+  /* 5 màu trạng thái (tags.color, docs/JABIL_UI.md "Status colors"): chấm,
      thanh biểu đồ. Chữ trạng thái dùng --success / --warn / --alert / --info /
      --neutral trên nền -tint. Bộ màu đã kiểm tra mù màu đỏ-lục cho mọi cặp. */
   --status-green: #3DA535;

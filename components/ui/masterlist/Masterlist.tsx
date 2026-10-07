@@ -91,7 +91,7 @@ function GenericCard<R>({ row, columns }: { row: R; columns: Column<R>[] }) {
 }
 
 export function Masterlist<R extends { id: string }>({
-  title, rows, loading, error, onRetry, columns, storageKey, selectedId, onSelect,
+  title, rows, loading, error, onRetry, columns, storageKey, defaultColumns, selectedId, onSelect,
   onAdd, addLabel, tools, exportName, quickFilters, leading, onViewChange, rowTone, mobileCard,
 }: {
   title: string;
@@ -102,6 +102,8 @@ export function Masterlist<R extends { id: string }>({
   columns: Column<R>[];
   /** Khóa lưu tùy chọn cột trên trình duyệt. */
   storageKey: string;
+  /** Cột hiện sẵn, theo thứ tự này (cột khác ẩn, mở ở Tùy chọn hiển thị). Bỏ trống = hiện hết. */
+  defaultColumns?: string[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   /** Thêm mới: nút `+ Thêm` trên desktop (điện thoại dùng nút nổi của ModuleWorkspace). */
@@ -128,7 +130,7 @@ export function Masterlist<R extends { id: string }>({
   const [limit, setLimit] = useState(PAGE);
   const [exporting, setExporting] = useState(false);
   const columnKeys = columns.map((c) => c.key);
-  const prefs = useColumnPrefs(storageKey, columnKeys);
+  const prefs = useColumnPrefs(storageKey, columnKeys, defaultColumns);
   const sentinelRef = useRef<HTMLElement | null>(null);
 
   const visibleColumns = useMemo(

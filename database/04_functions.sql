@@ -7,7 +7,7 @@
 --    kèm người thao tác, ghi chú, nguồn (ui / import / script).
 -- 3. Equipment: đổi vị trí, Move / Detach / Swap, xóa — thiết bị con đi theo
 --    hoặc ở lại chỗ cũ (p_children); import Excel; Type theo Part Number (3b);
---    Level theo thiết bị cha (3c).
+--    Level theo thiết bị cha (3c); Usage cần cha theo Part Number (3d); Thẻ trong Remark (3e).
 -- 4. Calibration: tự tính due_date; tính lại khi đổi chu kỳ / part number.
 -- 5. Dashboard: view recent_activities (thay đổi gần đây; import gộp một dòng).
 --
@@ -44,7 +44,6 @@ begin
   case p_column
     when 'part_number_id' then select display_name into v from public.part_numbers where id = p_id;
     when 'type_id'        then select display_name into v from public.types where id = p_id;
-    when 'status_id'      then select display_name into v from public.statuses where id = p_id;
     when 'level_id'       then select display_name into v from public.levels where id = p_id;
     when 'location_id'    then select display_name into v from public.locations where id = p_id;
     when 'department_id'  then select display_name into v from public.departments where id = p_id;
@@ -61,6 +60,15 @@ begin
 end;
 $$;
 
+-- Mảng id thẻ (jsonb) → mảng tên thẻ, theo thứ tự cấu hình.
+create or replace function public.history_tag_names(p_ids jsonb) returns jsonb
+language sql stable set search_path = '' as $$
+  select case when p_ids is null then null else coalesce((
+    select jsonb_agg(t.display_name order by t.sort_order, t.display_name)
+    from public.tags t where t.id::text in (select jsonb_array_elements_text(p_ids))
+  ), '[]'::jsonb) end
+$$;
+
 -- { trường: { old, new } } — chỉ trường thay đổi; FK lưu chữ hiển thị, tên bỏ đuôi _id.
 create or replace function public.history_diff(p_old jsonb, p_new jsonb) returns jsonb
 language plpgsql stable set search_path = '' as $$
@@ -69,7 +77,7 @@ declare
   v_old jsonb;
   v_new jsonb;
   v_out jsonb := '{}'::jsonb;
-  v_fk constant text[] := array['part_number_id', 'type_id', 'status_id', 'level_id', 'location_id',
+  v_fk constant text[] := array['part_number_id', 'type_id', 'level_id', 'location_id',
     'department_id', 'vendor_id', 'parent_id', 'equipment_id', 'approved_by'];
   v_skip constant text[] := array['id', 'created_at', 'created_by', 'updated_at', 'updated_by',
     'password_hash', 'token_version', 'sessions_revoked_at'];
@@ -79,7 +87,12 @@ begin
     v_old := nullif(p_old -> k, 'null'::jsonb);
     v_new := nullif(p_new -> k, 'null'::jsonb);
     continue when v_old is not distinct from v_new;
-    if k = any (v_fk) then
+    if k = 'tag_ids' then
+      -- Thẻ: lưu tên thẻ (theo thứ tự cấu hình), bỏ qua khi cả hai đều rỗng.
+      continue when coalesce(public.history_tag_names(v_old), '[]'::jsonb) = coalesce(public.history_tag_names(v_new), '[]'::jsonb);
+      v_out := v_out || jsonb_build_object('tags', jsonb_build_object(
+        'old', public.history_tag_names(v_old), 'new', public.history_tag_names(v_new)));
+    elsif k = any (v_fk) then
       v_out := v_out || jsonb_build_object(
         case when k = 'approved_by' then k else regexp_replace(k, '_id$', '') end,
         jsonb_build_object(
@@ -123,7 +136,7 @@ begin
       if public.ctx('delete_root') is not null and public.ctx('delete_root') <> v_id::text then
         v_note := 'via_parent:' || public.ctx('delete_root_label');
       end if;
-    elsif v_action is distinct from 'SWAP' then
+    elsif coalesce(v_action, '') not in ('SWAP', 'CHECK_OUT', 'CHECK_IN') then
       v_action := case
         when 'parent' = any (v_keys) and v_new ->> 'parent_id' is null then 'DETACH'
         when 'parent' = any (v_keys) then 'MOVE'
@@ -169,7 +182,7 @@ begin
     values ((v_row ->> 'equipment_id')::uuid, v_label, v_action, coalesce(v_changes, '{}'::jsonb), v_note, v_source, v_actor);
 
   -- ------------------------------------------------------------ Configuration
-  elsif tg_table_name in ('part_numbers', 'locations', 'types', 'statuses', 'levels', 'departments',
+  elsif tg_table_name in ('part_numbers', 'locations', 'types', 'tags', 'levels', 'departments',
                           'calibration_configurations', 'calibration_vendors') then
     if tg_op = 'UPDATE' and v_changes = '{}'::jsonb then return null; end if;
     if tg_table_name = 'calibration_configurations' then
@@ -217,7 +230,7 @@ declare
   t text;
 begin
   foreach t in array array['equipments', 'golden_samples', 'calibration_equipments', 'user_profiles',
-    'part_numbers', 'locations', 'types', 'statuses', 'levels', 'departments',
+    'part_numbers', 'locations', 'types', 'tags', 'levels', 'departments',
     'calibration_configurations', 'calibration_vendors'] loop
     execute format('drop trigger if exists %I on public.%I', t || '_write_history', t);
     execute format('create trigger %I after insert or update or delete on public.%I
@@ -250,7 +263,7 @@ declare
   v_result  jsonb;
 begin
   if p_table not in ('equipments', 'golden_samples', 'calibration_equipments', 'user_profiles',
-                     'part_numbers', 'locations', 'types', 'statuses', 'levels', 'departments',
+                     'part_numbers', 'locations', 'types', 'tags', 'levels', 'departments',
                      'calibration_configurations', 'calibration_vendors') then
     raise exception 'VALIDATION_ERROR' using detail = 'table not writable: ' || p_table;
   end if;
@@ -376,6 +389,38 @@ begin
 end;
 $$;
 
+-- Thiết bị (follow: cả cây con) đang In use thì không đổi vị trí / đổi cha / tách / xóa được —
+-- phải Check-in trước. stay: chỉ xét chính thiết bị (con ở lại chỗ cũ).
+create or replace function public.equipment_assert_not_in_use(p_id uuid, p_mode text) returns void
+language plpgsql stable set search_path = '' as $$
+begin
+  if exists (
+    select 1 from public.equipments e
+    where e.usage = 'in_use'
+      and (e.id = p_id or (p_mode = 'follow' and e.id in (select public.equipment_subtree_ids(p_id))))
+  ) then
+    raise exception 'EQUIPMENT_IN_USE';
+  end if;
+end;
+$$;
+
+-- Con cháu (không gồm chính nó) lấy Usage của thiết bị — ghi chú "theo thiết bị cha".
+create or replace function public.equipment_cascade_usage(p_id uuid, p_actor uuid) returns void
+language plpgsql set search_path = '' as $$
+declare
+  v_usage  text;
+  v_serial text;
+begin
+  select usage, serial_number into v_usage, v_serial from public.equipments where id = p_id;
+  perform public.set_ctx('action', null);
+  perform public.set_ctx('note', 'via_parent:' || v_serial);
+  update public.equipments
+  set usage = v_usage, updated_by = p_actor
+  where id in (select public.equipment_subtree_ids(p_id)) and id <> p_id and usage is distinct from v_usage;
+  perform public.set_ctx('note', null);
+end;
+$$;
+
 -- Đổi vị trí — chỉ thiết bị không có cha. follow: cả cây con đi theo;
 -- stay: con đứng riêng tại vị trí cũ.
 create or replace function public.equipment_change_location(
@@ -389,6 +434,7 @@ begin
   select * into v_row from public.equipments where id = p_id for update;
   if not found then raise exception 'EQUIPMENT_NOT_FOUND'; end if;
   if v_row.parent_id is not null then raise exception 'LOCATION_INHERITED_READ_ONLY'; end if;
+  perform public.equipment_assert_not_in_use(p_id, v_mode);
   perform public.set_ctx('actor_id', p_actor::text);
   perform public.set_ctx('source', 'ui');
   if v_mode = 'stay' then
@@ -402,8 +448,8 @@ begin
 end;
 $$;
 
--- Đổi cha / gắn vào cha (Move) — vị trí lấy theo cha mới; không được tạo vòng lặp.
--- stay: con gắn vào cha cũ (hoặc đứng riêng), giữ vị trí.
+-- Đổi cha / gắn vào cha (Move) — vị trí và Usage lấy theo cha mới (cả nhánh con đi theo); không được tạo
+-- vòng lặp. stay: con gắn vào cha cũ (hoặc đứng riêng), giữ vị trí và Usage của chính nó.
 create or replace function public.equipment_move(
   p_id uuid, p_parent_id uuid, p_actor uuid, p_children text default 'follow'
 ) returns jsonb
@@ -418,6 +464,7 @@ begin
   select * into v_parent from public.equipments where id = p_parent_id;
   if not found then raise exception 'PARENT_NOT_FOUND'; end if;
   if p_parent_id in (select public.equipment_subtree_ids(p_id)) then raise exception 'PARENT_CYCLE_DETECTED'; end if;
+  perform public.equipment_assert_not_in_use(p_id, v_mode);
   perform public.set_ctx('actor_id', p_actor::text);
   perform public.set_ctx('source', 'ui');
   if v_mode = 'stay' then
@@ -426,14 +473,16 @@ begin
   perform public.set_ctx('action', null);
   perform public.set_ctx('note', null);
   update public.equipments
-  set parent_id = p_parent_id, location_id = v_parent.location_id, updated_by = p_actor
+  set parent_id = p_parent_id, location_id = v_parent.location_id, usage = v_parent.usage, updated_by = p_actor
   where id = p_id;
   perform public.equipment_cascade_location(p_id, p_actor);
+  perform public.equipment_cascade_usage(p_id, p_actor);
   return (select to_jsonb(e.*) from public.equipments e where id = p_id);
 end;
 $$;
 
--- Tách khỏi cha — giữ nguyên vị trí hiện tại. stay: con ở lại với cha cũ.
+-- Tách khỏi cha — giữ nguyên vị trí hiện tại. stay: con ở lại với cha cũ. Thiết bị tách ra (và con cháu
+-- đi theo) về Not in use — không còn cha thì không còn In use (mục 3d).
 create or replace function public.equipment_detach(p_id uuid, p_actor uuid, p_children text default 'follow') returns jsonb
 language plpgsql set search_path = '' as $$
 declare
@@ -450,14 +499,20 @@ begin
   end if;
   perform public.set_ctx('action', null);
   perform public.set_ctx('note', null);
-  update public.equipments set parent_id = null, updated_by = p_actor where id = p_id;
+  -- Con cháu còn lại dưới thiết bị (follow) về Not in use trước; thiết bị: một câu update → một dòng lịch sử DETACH.
+  perform public.set_ctx('note', 'via_parent:' || v_row.serial_number);
+  update public.equipments set usage = 'not_in_use', updated_by = p_actor
+  where id in (select public.equipment_subtree_ids(p_id)) and id <> p_id and usage <> 'not_in_use';
+  perform public.set_ctx('note', null);
+  update public.equipments set parent_id = null, usage = 'not_in_use', updated_by = p_actor where id = p_id;
   return (select to_jsonb(e.*) from public.equipments e where id = p_id);
 end;
 $$;
 
--- Đổi chỗ hai thiết bị: mỗi bên nhận cha + vị trí + trạng thái của bên kia (trạng thái
--- đi theo chỗ: thiết bị vào chỗ đang chạy nhận Active, thiết bị ra dự phòng nhận Inactive…).
--- Level theo cha mới (mục 3c). Thiết bị con không đổi trạng thái.
+-- Chỉ đổi chỗ được hai thiết bị CÙNG Type (Fixture với Fixture, Base với Base…) — SWAP_TYPE_MISMATCH.
+-- Đổi chỗ hai thiết bị: mỗi bên nhận cha + vị trí + Usage (In use / Not in use) của bên kia —
+-- Usage đi theo chỗ. Status là của thiết bị (theo SN) nên KHÔNG đổi. Level theo cha mới (mục 3c).
+-- follow: cả nhánh con lấy Usage mới của thiết bị; stay: con giữ Usage của chính nó.
 -- follow: mỗi bên mang theo cả nhánh con; stay: con ở lại chỗ cũ và gắn vào
 -- thiết bị đến thay (con của A → B, con của B → A). Không cho swap với cha / con
 -- của chính nó, và chặn swap không thay đổi gì (cùng cha, cùng vị trí).
@@ -474,6 +529,7 @@ begin
   select * into a from public.equipments where id = p_a for update;
   select * into b from public.equipments where id = p_b for update;
   if a.id is null or b.id is null then raise exception 'EQUIPMENT_NOT_FOUND'; end if;
+  if a.type_id is distinct from b.type_id then raise exception 'SWAP_TYPE_MISMATCH'; end if;
   if p_b in (select public.equipment_subtree_ids(p_a)) or p_a in (select public.equipment_subtree_ids(p_b)) then
     raise exception 'SWAP_INVALID_ANCESTOR_RELATION';
   end if;
@@ -487,19 +543,70 @@ begin
   perform public.set_ctx('source', 'ui');
   perform public.set_ctx('action', 'SWAP');
   perform public.set_ctx('note', 'swap_with:' || b.serial_number);
-  update public.equipments
-     set parent_id = b.parent_id, location_id = b.location_id, status_id = b.status_id, updated_by = p_actor
-   where id = p_a;
+  update public.equipments set parent_id = b.parent_id, location_id = b.location_id, usage = b.usage, updated_by = p_actor where id = p_a;
   perform public.set_ctx('note', 'swap_with:' || a.serial_number);
-  update public.equipments
-     set parent_id = a.parent_id, location_id = a.location_id, status_id = a.status_id, updated_by = p_actor
-   where id = p_b;
+  update public.equipments set parent_id = a.parent_id, location_id = a.location_id, usage = a.usage, updated_by = p_actor where id = p_b;
   if v_mode = 'stay' then
     perform public.equipment_reparent(v_a_kids, p_b, p_actor, 'stayed_swap:' || a.serial_number);
     perform public.equipment_reparent(v_b_kids, p_a, p_actor, 'stayed_swap:' || b.serial_number);
   end if;
   perform public.equipment_cascade_location(p_a, p_actor);
   perform public.equipment_cascade_location(p_b, p_actor);
+  if v_mode = 'follow' then
+    perform public.equipment_cascade_usage(p_a, p_actor);
+    perform public.equipment_cascade_usage(p_b, p_actor);
+  end if;
+end;
+$$;
+
+-- Thêm thiết bị con (form, Thêm thiết bị con, Import) → lấy Usage của cha đang In use / Not in use.
+-- Cha chưa có (Import: dòng cha nằm sau trong cùng file) → giữ giá trị mặc định.
+create or replace function public.equipment_usage_from_parent() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  v_usage text;
+begin
+  if new.parent_id is not null then
+    select usage into v_usage from public.equipments where id = new.parent_id;
+    if found then new.usage := v_usage; end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists equipments_usage_from_parent on public.equipments;
+create trigger equipments_usage_from_parent before insert on public.equipments
+  for each row execute function public.equipment_usage_from_parent();
+
+-- Check-out / Check-in: p_usage = 'in_use' (Check-out) hoặc 'not_in_use' (Check-in) cho các thiết bị
+-- p_ids VÀ toàn bộ con cháu của chúng, trong một giao dịch. Lịch sử: CHECK_OUT / CHECK_IN kèm
+-- ghi chú p_note. Không thiết bị nào đổi → USAGE_NO_CHANGE. Trả về số thiết bị đã đổi.
+create or replace function public.equipment_set_usage(p_ids uuid[], p_usage text, p_actor uuid, p_note text default null) returns integer
+language plpgsql set search_path = '' as $$
+declare
+  v_count integer;
+begin
+  if p_usage not in ('in_use', 'not_in_use') then
+    raise exception 'VALIDATION_ERROR' using detail = 'usage must be in_use or not_in_use';
+  end if;
+  if coalesce(cardinality(p_ids), 0) = 0 then
+    raise exception 'VALIDATION_ERROR' using detail = 'no equipment';
+  end if;
+  if exists (select 1 from unnest(p_ids) i where not exists (select 1 from public.equipments e where e.id = i)) then
+    raise exception 'EQUIPMENT_NOT_FOUND';
+  end if;
+  perform public.set_ctx('actor_id', p_actor::text);
+  perform public.set_ctx('source', 'ui');
+  perform public.set_ctx('action', case p_usage when 'in_use' then 'CHECK_OUT' else 'CHECK_IN' end);
+  perform public.set_ctx('note', p_note);
+  update public.equipments
+  set usage = p_usage, updated_by = p_actor
+  where usage is distinct from p_usage
+    and id in (select public.equipment_subtree_ids(i) from unnest(p_ids) i);
+  get diagnostics v_count = row_count;
+  perform public.set_ctx('action', null);
+  perform public.set_ctx('note', null);
+  if v_count = 0 then raise exception 'USAGE_NO_CHANGE'; end if;
+  return v_count;
 end;
 $$;
 
@@ -515,6 +622,7 @@ declare
 begin
   select * into v_row from public.equipments where id = p_id for update;
   if not found then raise exception 'EQUIPMENT_NOT_FOUND'; end if;
+  perform public.equipment_assert_not_in_use(p_id, v_mode);
   perform public.set_ctx('actor_id', p_actor::text);
   perform public.set_ctx('source', 'ui');
   if v_mode = 'stay' then
@@ -549,10 +657,10 @@ begin
   perform public.set_ctx('action', null);
   perform public.set_ctx('note', null);
   insert into public.equipments
-    (id, serial_number, jabil_id, part_number_id, asset, type_id, level_id, status_id, location_id, parent_id, remark,
+    (id, serial_number, jabil_id, part_number_id, asset, type_id, level_id, location_id, parent_id, remark,
      created_by, updated_by)
   select coalesce(r.id, gen_random_uuid()), r.serial_number, r.jabil_id, r.part_number_id, r.asset, r.type_id, r.level_id,
-         r.status_id, r.location_id, r.parent_id, r.remark, p_actor, p_actor
+         r.location_id, r.parent_id, r.remark, p_actor, p_actor
   from jsonb_populate_recordset(null::public.equipments, p_rows) r;
   get diagnostics v_count = row_count;
   return v_count;
@@ -575,8 +683,8 @@ begin
   perform public.set_ctx('action', null);
   perform public.set_ctx('note', null);
   insert into public.golden_samples
-    (part_number, serial_number, utd_part_number, location_id, status_id, origin, purpose, remark, created_by, updated_by)
-  select r.part_number, r.serial_number, r.utd_part_number, r.location_id, r.status_id, r.origin, r.purpose, r.remark,
+    (part_number, serial_number, utd_part_number, location_id, origin, purpose, remark, created_by, updated_by)
+  select r.part_number, r.serial_number, r.utd_part_number, r.location_id, r.origin, r.purpose, r.remark,
          p_actor, p_actor
   from jsonb_populate_recordset(null::public.golden_samples, p_rows) r;
   get diagnostics v_count = row_count;
@@ -586,9 +694,8 @@ $$;
 
 -- =============================================================================
 -- 3b. EQUIPMENT — Type theo Part Number (part_numbers.type_id)
---     Thiết bị có part number → luôn mang đúng Type của part number, dù ghi từ
---     form, Import Excel hay script (Type gửi lên bị thay). Không có part number
---     → Type chọn tay. Admin đổi Type của part number → mọi thiết bị của part
+--     Thiết bị luôn mang đúng Type của part number (cả hai bắt buộc), dù ghi từ
+--     form, Import Excel hay script (Type gửi lên bị thay). Admin đổi Type của part number → mọi thiết bị của part
 --     number đổi theo; lịch sử thiết bị ghi UPDATE "type", ghi chú via_part_number:<PN>.
 -- =============================================================================
 create or replace function public.equipment_type_from_part_number() returns trigger
@@ -678,6 +785,90 @@ create trigger equipments_level_cascade
   execute function public.equipment_level_cascade();
 
 -- =============================================================================
+-- 3d. EQUIPMENT — Usage theo Part Number: "chỉ In use khi có cha" (part_numbers.usage_needs_parent)
+--     Thiết bị loại này không có cha thì không thể In use (USAGE_NEEDS_PARENT) — dù Check-out, Swap hay
+--     script. Tách khỏi cha → Not in use (equipment_detach). Admin bật cờ cho part number → thiết bị đang
+--     In use mà không có cha về Not in use, lịch sử ghi chú via_part_number:<PN>.
+-- =============================================================================
+create or replace function public.equipment_usage_rule() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.usage = 'in_use' and new.parent_id is null and exists (
+    select 1 from public.part_numbers pn where pn.id = new.part_number_id and pn.usage_needs_parent
+  ) then
+    raise exception 'USAGE_NEEDS_PARENT';
+  end if;
+  return new;
+end;
+$$;
+-- Tên trigger xếp sau equipments_usage_from_parent → thấy giá trị cuối cùng.
+drop trigger if exists equipments_usage_rule on public.equipments;
+create trigger equipments_usage_rule before insert or update of usage, parent_id, part_number_id on public.equipments
+  for each row execute function public.equipment_usage_rule();
+
+-- Chạy trước part_numbers_write_history (theo thứ tự tên) → trả lại ghi chú cũ.
+create or replace function public.part_number_usage_rule_changed() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  v_note text := public.ctx('note');
+begin
+  perform public.set_ctx('note', 'via_part_number:' || new.display_name);
+  update public.equipments
+     set usage = 'not_in_use', updated_by = public.ctx('actor_id')::uuid
+   where part_number_id = new.id and parent_id is null and usage = 'in_use';
+  perform public.set_ctx('note', v_note);
+  return null;
+end;
+$$;
+drop trigger if exists part_numbers_usage_rule_changed on public.part_numbers;
+create trigger part_numbers_usage_rule_changed
+  after update of usage_needs_parent on public.part_numbers
+  for each row when (new.usage_needs_parent and not old.usage_needs_parent)
+  execute function public.part_number_usage_rule_changed();
+
+-- =============================================================================
+-- 3e. THẺ (tags) trong phần Remark của Equipment / Calibration / Golden sample
+--     Mỗi bản ghi chọn nhiều thẻ (cột tag_ids uuid[]). Database kiểm tra mọi lần ghi: bỏ trùng, thẻ phải
+--     có thật (VALIDATION_ERROR). Thẻ đang được dùng thì không xóa được (TAG_IN_USE).
+-- =============================================================================
+create or replace function public.tag_ids_check() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  -- Bỏ trùng, giữ thứ tự chọn đầu tiên.
+  select coalesce(array_agg(x order by ord), '{}') into new.tag_ids
+  from (select u.x, min(u.ord) as ord from unnest(coalesce(new.tag_ids, '{}')) with ordinality as u(x, ord) group by u.x) d;
+  if exists (select 1 from unnest(new.tag_ids) i where not exists (select 1 from public.tags t where t.id = i)) then
+    raise exception 'VALIDATION_ERROR' using detail = 'unknown tag';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists equipments_tags_check on public.equipments;
+create trigger equipments_tags_check before insert or update of tag_ids on public.equipments
+  for each row execute function public.tag_ids_check();
+drop trigger if exists calibration_equipments_tags_check on public.calibration_equipments;
+create trigger calibration_equipments_tags_check before insert or update of tag_ids on public.calibration_equipments
+  for each row execute function public.tag_ids_check();
+drop trigger if exists golden_samples_tags_check on public.golden_samples;
+create trigger golden_samples_tags_check before insert or update of tag_ids on public.golden_samples
+  for each row execute function public.tag_ids_check();
+
+create or replace function public.tag_delete_check() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if exists (select 1 from public.equipments where old.id = any (tag_ids))
+     or exists (select 1 from public.calibration_equipments where old.id = any (tag_ids))
+     or exists (select 1 from public.golden_samples where old.id = any (tag_ids)) then
+    raise exception 'TAG_IN_USE';
+  end if;
+  return old;
+end;
+$$;
+drop trigger if exists tags_delete_check on public.tags;
+create trigger tags_delete_check before delete on public.tags
+  for each row execute function public.tag_delete_check();
+
+-- =============================================================================
 -- 4. CALIBRATION — due_date = calibration_date + chu kỳ của part number
 -- =============================================================================
 create or replace function public.calibration_compute_due() returns trigger
@@ -703,7 +894,7 @@ create trigger calibration_equipments_compute_due before insert or update on pub
 -- Dashboard hiệu chuẩn tự đồng bộ với Configuration › Hiệu chuẩn › Setup:
 -- thiết bị có part number trong calibration_configurations luôn có đúng một dòng
 -- calibration_equipments; không còn thì dòng bị bỏ (lịch sử REMOVE vẫn giữ).
--- Trạng thái là của thiết bị (equipments.status_id). Người ghi lịch sử = người thao tác gốc (ctx).
+-- Người ghi lịch sử = người thao tác gốc (ctx).
 
 -- Thêm part number vào Setup → mọi thiết bị của PN lên Dashboard; xóa → rời Dashboard.
 create or replace function public.calibration_sync_configuration() returns trigger
@@ -819,6 +1010,7 @@ commit;
 -- Kiểm tra: history_triggers phải là 12, app_write, equipment_import và golden_import phải là 1,
 -- equipment_swap_args phải là 4 (có p_children — con đi theo / ở lại),
 -- type_triggers phải là 2 (Type theo Part Number), level_triggers phải là 2 (Level theo thiết bị cha).
+-- usage_functions phải là 1 (Check-out / Check-in), usage_rule_triggers phải là 2 (Usage cần cha), tag_triggers phải là 4 (Thẻ trong Remark).
 -- -----------------------------------------------------------------------------
 select
   (select count(*) from pg_trigger where tgname ~ '_write_history$') as history_triggers,
@@ -826,6 +1018,12 @@ select
     where tgname in ('equipments_type_from_part_number', 'part_numbers_type_changed')) as type_triggers,
   (select count(*) from pg_trigger
     where tgname in ('equipments_level_from_parent', 'equipments_level_cascade')) as level_triggers,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'equipment_set_usage') as usage_functions,
+  (select count(*) from pg_trigger
+    where tgname in ('equipments_usage_rule', 'part_numbers_usage_rule_changed')) as usage_rule_triggers,
+  (select count(*) from pg_trigger
+    where tgname in ('equipments_tags_check', 'calibration_equipments_tags_check', 'golden_samples_tags_check', 'tags_delete_check')) as tag_triggers,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'app_write') as app_write,
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

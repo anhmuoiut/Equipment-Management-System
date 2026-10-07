@@ -8,14 +8,14 @@ import 'server-only';
 import { appWrite, rpc, selectAll, selectOne } from './core/db';
 import { readHistory } from './core/history';
 import {
-  assertActive, assertStatus, auditOf, loadLookups, nameOf, partNumberType, statusColorOf, type Lookups,
+  assertActive, assertTags, auditOf, loadLookups, nameOf, partNumberType, tagItems, type Lookups,
 } from './core/lookups';
 import { AppError } from '@/lib/errors';
-import type { ChildrenMode, EquipmentRow, EquipmentTreeNode, HistoryEntry } from '@/lib/types';
+import type { ChildrenMode, EquipmentRow, EquipmentTreeNode, HistoryEntry, Usage } from '@/lib/types';
 
 type DbEquipment = {
   id: string; jabil_id: string | null; part_number_id: string | null; serial_number: string; asset: string | null;
-  type_id: string | null; status_id: string | null; level_id: string | null; location_id: string; remark: string | null;
+  type_id: string | null; usage: Usage; level_id: string | null; location_id: string; remark: string | null; tag_ids: string[];
   parent_id: string | null; created_at: string; created_by: string | null; updated_at: string; updated_by: string | null;
 };
 
@@ -25,7 +25,7 @@ type DbEquipment = {
  */
 export type EquipmentInput = {
   serial_number?: string; jabil_id?: string | null; part_number_id?: string | null; asset?: string | null;
-  type_id?: string | null; status_id?: string | null; level_id?: string | null; location_id?: string | null; remark?: string | null;
+  type_id?: string | null; level_id?: string | null; location_id?: string | null; remark?: string | null; tag_ids?: string[];
   parent_id?: string | null; children_mode?: ChildrenMode;
 };
 
@@ -37,10 +37,11 @@ function toRow(e: DbEquipment, lookups: Lookups, serials: Map<string, string>, p
     serial_number: e.serial_number,
     asset: e.asset,
     type_id: e.type_id, type: nameOf(lookups.types, e.type_id),
-    status_id: e.status_id, status: nameOf(lookups.statuses, e.status_id), status_color: statusColorOf(lookups, e.status_id),
+    usage: e.usage,
     level_id: e.level_id, level: nameOf(lookups.levels, e.level_id),
     location_id: e.location_id, location: nameOf(lookups.locations, e.location_id),
     remark: e.remark,
+    tag_ids: e.tag_ids ?? [], tags: tagItems(lookups, e.tag_ids),
     parent_id: e.parent_id, parent_serial: e.parent_id ? serials.get(e.parent_id) ?? null : null,
     has_children: parents.has(e.id),
     ...auditOf(lookups, e),
@@ -73,20 +74,15 @@ export async function getEquipment(id: string): Promise<EquipmentRow> {
 
 function validate(input: EquipmentInput, lookups: Lookups, before?: DbEquipment) {
   assertActive(lookups.part_numbers, input.part_number_id, 'part_number_id', before?.part_number_id);
-  // Type from the part number is the admin's choice — accepted even if that Type was hidden later.
-  const partNumber = input.part_number_id !== undefined ? input.part_number_id : before?.part_number_id;
-  if (!partNumberType(lookups, partNumber)) assertActive(lookups.types, input.type_id, 'type_id', before?.type_id);
   assertActive(lookups.levels, input.level_id, 'level_id', before?.level_id);
   assertActive(lookups.locations, input.location_id, 'location_id', before?.location_id);
-  const statusId = input.status_id !== undefined ? input.status_id : before?.status_id;
-  const remark = input.remark !== undefined ? input.remark : before?.remark;
-  if (!before || statusId !== before.status_id || input.remark !== undefined) assertStatus(lookups, statusId, remark);
+  assertTags(lookups, input.tag_ids);
 }
 
 /**
- * Type theo part number (Configuration › Part Number): có part number → Type của part number,
- * Type gửi lên bị bỏ qua (form khóa ô này). Database cũng tự đặt (04_functions.sql mục 3b) —
- * đây để kiểm tra và ghi đúng giá trị. Không đổi part number / Type thì không ghi thêm.
+ * Type luôn theo part number (Configuration › Part Number): Type gửi lên bị bỏ qua (form khóa ô này),
+ * kể cả khi Admin đã ẩn Type đó. Database cũng tự đặt (04_functions.sql mục 3b) — đây để ghi đúng giá trị.
+ * Không đổi part number / Type thì không ghi thêm.
  */
 function withPartNumberType(input: EquipmentInput, lookups: Lookups, before?: DbEquipment): EquipmentInput {
   const partNumber = input.part_number_id !== undefined ? input.part_number_id : before?.part_number_id;
@@ -104,6 +100,7 @@ async function duplicateSerial(serial: string, exceptId?: string): Promise<boole
 /** Thêm thiết bị. Có cha thì vị trí và Level lấy theo cha (bỏ qua giá trị gửi lên). */
 export async function createEquipment(input: EquipmentInput, actor: string) {
   if (!input.serial_number) throw new AppError('VALIDATION_ERROR', { fields: { serial_number: 'required' } });
+  if (!input.part_number_id) throw new AppError('VALIDATION_ERROR', { fields: { part_number_id: 'required' } });
   const { parent_id: parentId, children_mode: _unused, ...sent } = input;
   const [lookups, parent] = await Promise.all([
     loadLookups(),
@@ -202,6 +199,39 @@ export async function detachEquipment(id: string, actor: string, children: Child
 export async function swapEquipment(a: string, b: string, actor: string, children: ChildrenMode = 'follow') {
   await rpc('equipment_swap', { p_a: a, p_b: b, p_actor: actor, p_children: children });
   return getEquipment(a);
+}
+
+/**
+ * Check-out (usage = in_use) / Check-in (not_in_use) cho các thiết bị được chọn và toàn bộ con cháu —
+ * một giao dịch (equipment_set_usage). Không thiết bị nào đổi → USAGE_NO_CHANGE. Trả về số thiết bị đã đổi.
+ */
+export async function setEquipmentUsage(ids: string[], usage: Usage, note: string | null, actor: string): Promise<number> {
+  const unique = [...new Set(ids)];
+  const [rows, lookups] = await Promise.all([
+    selectAll<{ id: string; parent_id: string | null; usage: Usage; part_number_id: string | null; serial_number: string }>(
+      'equipments', 'id, parent_id, usage, part_number_id, serial_number'),
+    loadLookups(),
+  ]);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  if (unique.some((id) => !byId.has(id))) throw new AppError('EQUIPMENT_NOT_FOUND');
+  const children = new Map<string, string[]>();
+  rows.forEach((r) => { if (r.parent_id) children.set(r.parent_id, [...(children.get(r.parent_id) ?? []), r.id]); });
+  const affected = new Set<string>();
+  const stack = [...unique];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (affected.has(id)) continue;
+    affected.add(id);
+    stack.push(...(children.get(id) ?? []));
+  }
+  if (![...affected].some((id) => byId.get(id)!.usage !== usage)) throw new AppError('USAGE_NO_CHANGE');
+  // Part number "chỉ In use khi có cha": thiết bị được chọn mà chưa có cha thì không Check-out được (database cũng chặn).
+  if (usage === 'in_use') {
+    const blocked = unique.map((id) => byId.get(id)!).filter((e) => e.usage !== 'in_use' && !e.parent_id
+      && e.part_number_id && lookups.part_numbers.get(e.part_number_id)?.usage_needs_parent);
+    if (blocked.length) throw new AppError('USAGE_NEEDS_PARENT', { serials: blocked.map((e) => e.serial_number) });
+  }
+  return rpc<number>('equipment_set_usage', { p_ids: unique, p_usage: usage, p_actor: actor, p_note: note });
 }
 
 /** Xóa thật. follow: cả cây con bị xóa theo; stay: chỉ xóa thiết bị này. Trả về số thiết bị đã xóa. */

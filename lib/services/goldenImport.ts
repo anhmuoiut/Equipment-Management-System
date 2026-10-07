@@ -2,7 +2,7 @@ import 'server-only';
 
 /**
  * Import Excel cho Golden sample — cùng cách làm với Equipment (equipmentImport.ts):
- * file mẫu sinh lúc tải (Location, Status lấy từ Configuration ngay lúc đó),
+ * file mẫu sinh lúc tải (Location lấy từ Configuration ngay lúc đó),
  * kiểm tra từng dòng như form Thêm golden sample, tất cả hoặc không, ghi một
  * lần qua RPC golden_import (lịch sử CREATE với source = import).
  * Khác Equipment: Part number là chữ tự do (không phải Configuration), không có thiết bị cha.
@@ -30,14 +30,11 @@ export type GoldenInsertRow = Record<GoldenImportColumnKey, string | null>;
 // File mẫu
 // ---------------------------------------------------------------------------
 
-type Choices = Pick<ReturnType<typeof importChoices>, GoldenImportListKey | 'remark_statuses'>;
+type Choices = Pick<ReturnType<typeof importChoices>, GoldenImportListKey>;
 
 function extraRules(col: GoldenImportColumn, choices: Choices, t: Text): string[] {
-  const remark = choices.remark_statuses.join(', ');
   switch (col.key) {
     case 'serial_number': return [t('imp.tpl.serialDuplicate')];
-    case 'status_id': return remark ? [t('imp.tpl.needsRemark', { statuses: remark })] : [];
-    case 'remark': return remark ? [t('imp.tpl.remarkFor', { statuses: remark })] : [];
     default: return [];
   }
 }
@@ -146,7 +143,7 @@ export async function buildGoldenTemplate(lookups: Lookups, language: Language, 
     const rules: string[] = [];
     let values = '';
     if (col.list) {
-      rules.push(col.list === 'statuses' ? t('imp.tpl.pickStatus') : t('imp.tpl.pick', { page: col.page ?? col.header }));
+      rules.push(t('imp.tpl.pick', { page: col.page ?? col.header }));
       const list = choices[col.list];
       const joined = list.join(', ');
       values = !list.length ? t('imp.tpl.noValues')
@@ -211,7 +208,6 @@ export function checkGoldenTable(
 
   const lists: Record<GoldenImportListKey, Map<string, Entry>> = {
     locations: indexBy(lookups.locations, (r) => r.is_active),
-    statuses: indexBy(lookups.statuses, () => true, (r) => r.requires_remark),
   };
   const existing = new Set(existingSerials.map(serialKey));
   const firstRowOfSerial = new Map<string, number>();
@@ -223,7 +219,6 @@ export function checkGoldenTable(
   for (const source of table.rows) {
     const issues: ImportIssue[] = [];
     const data = {} as GoldenInsertRow;
-    let status: Entry | undefined;
     for (const col of GOLDEN_IMPORT_COLUMNS) {
       const index = columnIndex.get(col.key);
       const raw = index === undefined ? '' : source.cells[index] ?? '';
@@ -236,16 +231,12 @@ export function checkGoldenTable(
         else if (!entry.usable) issues.push({ column: col.key, code: 'inactive', value: raw });
         else {
           data[col.key] = entry.id;
-          if (col.list === 'statuses') status = entry;
         }
       } else if (col.max && raw.length > col.max) {
         issues.push({ column: col.key, code: 'too_long', max: col.max });
       } else {
         data[col.key] = raw;
       }
-    }
-    if (status?.requiresRemark && !data.remark && !issues.some((i) => i.column === 'remark')) {
-      issues.push({ column: 'remark', code: 'remark_required', value: status.name });
     }
 
     let duplicateOf: ImportRowReport['duplicate_of'] = null;

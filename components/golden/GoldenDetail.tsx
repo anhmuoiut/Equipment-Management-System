@@ -4,9 +4,10 @@
 import { useTranslation } from 'react-i18next';
 import { MapPin } from 'lucide-react';
 import { api, formatRelativeTime } from '@/lib/client/api';
-import { statusRequiresRemark, statusSelect, toSelect, useOptions } from '@/lib/client/options';
+import { toSelect, useOptions } from '@/lib/client/options';
 import { useCan } from '@/components/ViewerContext';
-import { StatusTag } from '@/components/ui/tags';
+import { TagChips } from '@/components/ui/tags';
+import { TagPicker } from '@/components/ui/TagPicker';
 import { RecordDetail, type SectionDef } from '@/components/ui/detail/RecordDetail';
 import type { PanelLayout } from '@/components/ui/detail/DetailPanel';
 import type { DetailCtx } from '@/components/ui/workspace/ModuleWorkspace';
@@ -31,8 +32,6 @@ export function GoldenDetail({ ctx, layout }: { ctx: DetailCtx<GoldenRow>; layou
       key: 'place', title: t('gs.groupPlace'), fields: [
         { key: 'location_id', label: t('fields.location'), kind: 'select', required: true, view: (r) => r.location,
           options: (_d, r) => toSelect(options?.locations, r?.location_id, hidden) },
-        { key: 'status_id', label: t('fields.status'), kind: 'select', view: (r) => <StatusTag name={r.status} color={r.status_color} />,
-          options: () => statusSelect(options?.statuses), required: true },
       ],
     },
     {
@@ -43,8 +42,10 @@ export function GoldenDetail({ ctx, layout }: { ctx: DetailCtx<GoldenRow>; layou
     },
     {
       key: 'notes', title: t('eq.groupNotes'), fields: [
-        { key: 'remark', label: t('fields.remark'), kind: 'textarea', wide: true, maxLength: 1000,
-          required: (d) => statusRequiresRemark(options?.statuses, d.status_id) },
+        { key: 'tag_ids', label: t('fields.tags'), wide: true, hint: t('tag.hint'),
+          view: (r) => (r.tags.length ? <TagChips items={r.tags} /> : <span className="dp-empty">{t('tag.none')}</span>),
+          editor: ({ id, value, onChange, label }) => <TagPicker id={id} value={value} onChange={onChange} tags={options?.tags} label={label} /> },
+        { key: 'remark', label: t('fields.remark'), kind: 'textarea', wide: true, maxLength: 1000 },
       ],
     },
   ];
@@ -60,7 +61,7 @@ export function GoldenDetail({ ctx, layout }: { ctx: DetailCtx<GoldenRow>; layou
       createTitle={t('gs.addTitle')}
       heading={(r) => ({
         title: r.serial_number,
-        tags: <StatusTag name={r.status} color={r.status_color} />,
+        tags: <TagChips items={r.tags} />,
         subtitle: r.part_number,
         meta: (
           <>

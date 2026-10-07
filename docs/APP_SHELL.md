@@ -47,7 +47,7 @@ Các danh sách cấu hình được chọn bằng **danh sách con bên trái t
 │     Part Number          │ [🔍 Tìm…] [Tùy chọn hiển thị] [Xuất Excel] [+ Thêm]│
 │   ▸ Location             │ ┌──────────────────────────────────────────────┐ │
 │     Type                 │ │ No  Tên     Thứ tự                            │ │
-│     Status               │ │ 1   B3F1    1                                 │ │
+│     Tag                  │ │ 1   B3F1    1                                 │ │
 │     Level                │ │ …                                             │ │
 │     Department           │ └──────────────────────────────────────────────┘ │
 │ ▸ HIỆU CHUẨN          (2)│                                                  │
@@ -60,7 +60,7 @@ Các danh sách cấu hình được chọn bằng **danh sách con bên trái t
 | DỮ LIỆU GỐC | Part Number | `/configuration/part-numbers` |
 | | Location | `/configuration/locations` |
 | | Type | `/configuration/types` |
-| | Status | `/configuration/statuses` |
+| | Tag | `/configuration/tags` |
 | | Level | `/configuration/levels` |
 | | Department | `/configuration/departments` |
 | HIỆU CHUẨN | Setup — part number phải hiệu chuẩn (trong các PN đang có thiết bị), chu kỳ, số ngày báo trước | `/configuration/calibration-setup` |

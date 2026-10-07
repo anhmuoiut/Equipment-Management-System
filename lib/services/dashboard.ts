@@ -6,11 +6,11 @@ import 'server-only';
  */
 import { db, selectAll } from './core/db';
 import { withActorNames } from './core/history';
-import { loadLookups, nameOf, statusColorOf, type Lookups } from './core/lookups';
+import { loadLookups, nameOf } from './core/lookups';
 import { listCalibration } from './calibration';
 import { mapRpcError } from '@/lib/errors';
 import type { Role } from '@/lib/permissions';
-import type { CountItem, DashboardData, HistoryModule, RecentActivity, StatusCountItem } from '@/lib/types';
+import type { CalibrationStatus, CountItem, DashboardData, HistoryModule, RecentActivity, StatusColor, StatusCountItem, Usage } from '@/lib/types';
 
 function countBy(rows: { key: string | null }[], label: (id: string | null) => string | null): CountItem[] {
   const counts = new Map<string | null, number>();
@@ -21,24 +21,29 @@ function countBy(rows: { key: string | null }[], label: (id: string | null) => s
 }
 
 /**
- * Đếm theo trạng thái, kèm màu. Xếp theo thứ tự của Configuration › Status
- * (không theo số lượng) để mỗi trạng thái luôn ở cùng một chỗ; chưa có trạng thái ở cuối.
+ * Đếm theo Status (do hệ thống quản, thứ tự và màu cố định): mỗi Status luôn ở cùng một chỗ, kể cả khi
+ * số lượng là 0. `label` để trống — màn hình dịch `id` ra chữ.
  */
-function countByStatus(rows: { status_id: string | null }[], lookups: Lookups): StatusCountItem[] {
-  const order = (id: string | null) => (id ? lookups.statuses.get(id)?.sort_order ?? Number.MAX_SAFE_INTEGER : Infinity);
-  return countBy(rows.map((r) => ({ key: r.status_id })), (id) => nameOf(lookups.statuses, id))
-    .sort((a, b) => order(a.id) - order(b.id) || (a.label ?? '').localeCompare(b.label ?? ''))
-    .map((item) => ({ ...item, color: statusColorOf(lookups, item.id) }));
+function countByStatus<K extends string>(keys: readonly { key: K; color: StatusColor }[], values: K[]): StatusCountItem[] {
+  return keys.map(({ key, color }) => ({ id: key, label: null, color, count: values.filter((v) => v === key).length }));
 }
+
+const USAGE_STATUSES: readonly { key: Usage; color: StatusColor }[] = [
+  { key: 'in_use', color: 'green' }, { key: 'not_in_use', color: 'gray' },
+];
+const CALIBRATION_STATUSES: readonly { key: CalibrationStatus; color: StatusColor }[] = [
+  { key: 'under_calibration', color: 'blue' }, { key: 'valid', color: 'green' },
+  { key: 'due_soon', color: 'yellow' }, { key: 'overdue', color: 'red' },
+];
 
 export async function getDashboard(role: Role): Promise<DashboardData> {
   // Dữ liệu gốc đọc một lần, dùng chung với danh sách hiệu chuẩn.
   const sharedLookups = loadLookups();
   const [equipment, calibration, lookups, golden, pending] = await Promise.all([
-    selectAll<{ status_id: string | null; location_id: string; type_id: string | null }>('equipments', 'id, status_id, location_id, type_id'),
+    selectAll<{ usage: Usage; location_id: string; type_id: string | null }>('equipments', 'id, usage, location_id, type_id'),
     listCalibration(sharedLookups),
     sharedLookups,
-    selectAll<{ status_id: string | null }>('golden_samples', 'id, status_id'),
+    selectAll<{ id: string }>('golden_samples', 'id'),
     role === 'admin'
       ? db().from('user_profiles').select('id', { count: 'exact', head: true }).eq('account_status', 'pending')
       : Promise.resolve(null),
@@ -52,9 +57,8 @@ export async function getDashboard(role: Role): Promise<DashboardData> {
     calibration_total: calibration.length,
     pending_users: pending ? pending.count ?? 0 : null,
     by_status: {
-      equipment: countByStatus(equipment, lookups),
-      calibration: countByStatus(calibration, lookups),
-      golden_sample: countByStatus(golden, lookups),
+      equipment: countByStatus(USAGE_STATUSES, equipment.map((e) => e.usage)),
+      calibration: countByStatus(CALIBRATION_STATUSES, calibration.map((c) => c.status)),
     },
     by_location: countBy(equipment.map((e) => ({ key: e.location_id })), (id) => nameOf(lookups.locations, id)),
     by_type: countBy(equipment.map((e) => ({ key: e.type_id })), (id) => nameOf(lookups.types, id)),

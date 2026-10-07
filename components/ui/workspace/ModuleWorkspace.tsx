@@ -75,7 +75,7 @@ export type WorkspaceTool = {
 };
 
 export function ModuleWorkspace<R extends { id: string }>({
-  title, list, columns, storageKey, exportName, quickFilters, leading, rowTone, canAdd, addLabel,
+  title, list, columns, storageKey, defaultColumns, exportName, quickFilters, leading, rowTone, canAdd, addLabel,
   tools, renderDetail, detailPath, beforeList, mobileCard,
 }: {
   title: string;
@@ -84,6 +84,8 @@ export function ModuleWorkspace<R extends { id: string }>({
   /** Thẻ dòng trên điện thoại (RowCard); mặc định dựng từ các cột. */
   mobileCard?: (row: R) => ReactNode;
   storageKey: string;
+  /** Cột hiện sẵn, theo thứ tự này; cột khác ẩn (mở ở Tùy chọn hiển thị). */
+  defaultColumns?: string[];
   exportName: string;
   quickFilters?: QuickFilter<R>[];
   leading?: { header: ReactNode; label: string; render: (row: R) => ReactNode };
@@ -193,7 +195,7 @@ export function ModuleWorkspace<R extends { id: string }>({
         <div className="ws-list">
           <Masterlist
             title={title} rows={list.rows} loading={list.loading} error={list.error} onRetry={list.reload}
-            columns={columns} mobileCard={mobileCard} storageKey={storageKey} exportName={exportName} quickFilters={quickFilters}
+            columns={columns} mobileCard={mobileCard} storageKey={storageKey} defaultColumns={defaultColumns} exportName={exportName} quickFilters={quickFilters}
             leading={leading} rowTone={rowTone} selectedId={selectedId} onSelect={select}
             onAdd={canAdd ? () => create() : undefined}
             addLabel={addLabel} onViewChange={setViewIds}

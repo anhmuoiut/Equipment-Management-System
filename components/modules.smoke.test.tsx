@@ -29,32 +29,33 @@ const audit = {
 };
 const opt = (id: string, name: string) => ({ id, display_name: name, sort_order: 0, is_active: true });
 const options = {
-  part_numbers: [{ ...opt('pn1', 'P12316'), type_id: 't1' }], locations: [opt('l1', 'B3F1'), opt('l2', 'B3F2')], types: [opt('t1', 'Tester')],
+  part_numbers: [{ ...opt('pn1', 'P12316'), type_id: 't1', usage_needs_parent: false }], locations: [opt('l1', 'B3F1'), opt('l2', 'B3F2')], types: [opt('t1', 'Tester')],
   levels: [opt('lv1', 'EOL')], departments: [opt('d1', 'TE')], calibration_vendors: [opt('v1', 'Internal')],
-  statuses: [
-    { id: 's1', display_name: 'Active', sort_order: 1, requires_remark: false, color: 'green' },
-    { id: 's2', display_name: 'Repair', sort_order: 2, requires_remark: true, color: 'yellow' },
+  tags: [
+    { id: 'tg1', display_name: 'Repair', sort_order: 1, color: 'yellow' },
+    { id: 'tg2', display_name: 'Spare', sort_order: 2, color: 'gray' },
   ],
 };
+const repairTag = { id: 'tg1', display_name: 'Repair', color: 'yellow' };
 const equipment = [
   { id: 'e1', jabil_id: 'J1', part_number_id: 'pn1', part_number: 'P12316', serial_number: 'SN-ROOT', asset: 'A1', type_id: 't1', type: 'Tester',
-    status_id: 's1', status: 'Active', status_color: 'green', level_id: 'lv1', level: 'EOL', location_id: 'l1', location: 'B3F1', remark: null,
-    parent_id: null, parent_serial: null, has_children: true, ...audit },
+    level_id: 'lv1', level: 'EOL', location_id: 'l1', location: 'B3F1', remark: null, tag_ids: ['tg1'], tags: [repairTag],
+    parent_id: null, parent_serial: null, has_children: true, usage: 'not_in_use', ...audit },
   { id: 'e2', jabil_id: null, part_number_id: null, part_number: null, serial_number: 'SN-CHILD', asset: null, type_id: null, type: null,
-    status_id: null, status: null, status_color: null, level_id: null, level: null, location_id: 'l1', location: 'B3F1', remark: 'x',
-    parent_id: 'e1', parent_serial: 'SN-ROOT', has_children: false, ...audit },
-  { id: 'e3', jabil_id: null, part_number_id: null, part_number: null, serial_number: 'SN-OTHER', asset: null, type_id: null, type: null,
-    status_id: null, status: null, status_color: null, level_id: null, level: null, location_id: 'l2', location: 'B3F2', remark: null,
-    parent_id: null, parent_serial: null, has_children: false, ...audit },
+    level_id: null, level: null, location_id: 'l1', location: 'B3F1', remark: 'x', tag_ids: [], tags: [],
+    parent_id: 'e1', parent_serial: 'SN-ROOT', has_children: false, usage: 'in_use', ...audit },
+  { id: 'e3', jabil_id: null, part_number_id: null, part_number: null, serial_number: 'SN-OTHER', asset: null, type_id: 't1', type: 'Tester',
+    level_id: null, level: null, location_id: 'l2', location: 'B3F2', remark: null, tag_ids: [], tags: [],
+    parent_id: null, parent_serial: null, has_children: false, usage: 'not_in_use', ...audit },
 ];
 const calibration = [{
   id: 'c1', equipment_id: 'e1', serial_number: 'SN-ROOT', part_number: 'P12316', type: 'Tester', location: 'B3F1',
-  status_id: 's1', status: 'Active', status_color: 'green', vendor_id: 'v1', vendor: 'Internal', calibration_date: '2025-10-01', due_date: '2026-09-30',
-  interval_months: 12, warning_days: 30, due_state: 'overdue', remark: null, ...audit,
+  status: 'overdue', vendor_id: 'v1', vendor: 'Internal', calibration_date: '2025-10-01', due_date: '2026-09-30',
+  interval_months: 12, warning_days: 30, due_state: 'overdue', remark: null, tag_ids: [], tags: [], ...audit,
 }];
 const golden = [{
   id: 'g1', part_number: 'PCBA-1', serial_number: 'GS-1', utd_part_number: 'UTD-1', location_id: 'l2', location: 'B3F2',
-  status_id: 's1', status: 'Active', status_color: 'green', origin: 'Customer', purpose: 'ICT', remark: null, ...audit,
+  origin: 'Customer', purpose: 'ICT', remark: null, tag_ids: [], tags: [], ...audit,
 }];
 const users = [{
   id: 'u2', username: 'bob', full_name: 'Bob', email: null, employee_id: '100', department_id: 'd1', department: 'TE',
@@ -62,8 +63,8 @@ const users = [{
   auth_provider: 'local', must_change_password: false, ...audit,
 }];
 const config = {
-  'part-numbers': [{ id: 'pn1', display_name: 'P12316', type_id: 't1', type: 'Tester', sort_order: 0, is_active: true, ...audit }],
-  statuses: [{ id: 's1', display_name: 'Active', sort_order: 1, is_active: true, requires_remark: false, color: 'green', ...audit }],
+  'part-numbers': [{ id: 'pn1', display_name: 'P12316', type_id: 't1', type: 'Tester', usage_needs_parent: false, sort_order: 0, is_active: true, ...audit }],
+  tags: [{ id: 'tg1', display_name: 'Repair', sort_order: 1, is_active: true, color: 'yellow', ...audit }],
   'calibration-setup': [{ id: 'cc1', display_name: 'P12316', sort_order: 0, is_active: true, part_number_id: 'pn1', interval_months: 12, warning_days: 30, ...audit }],
 };
 const errorLog = [{ id: 'x1', request_id: 'req_1', route: 'GET /api/x', user_id: null, user_name: null, error_code: 'SERVER_ERROR', message: 'boom', stack: 'at x', created_at: audit.created_at }];
@@ -72,6 +73,8 @@ function respond(url: string): unknown {
   const path = url.split('?')[0]!;
   if (path === '/api/options') return options;
   if (path === '/api/equipment') return equipment;
+  const one = path.match(/^\/api\/equipment\/([^/]+)$/);
+  if (one) return equipment.find((e) => e.id === one[1]);
   if (/^\/api\/equipment\/[^/]+\/tree$/.test(path)) return { root_id: 'e1', nodes: [
     { id: 'e1', parent_id: null, part_number: 'P12316', serial_number: 'SN-ROOT' },
     { id: 'e2', parent_id: 'e1', part_number: null, serial_number: 'SN-CHILD' },
@@ -179,12 +182,14 @@ describe('modules smoke', () => {
     expect(screen.queryByLabelText(/fields.type/)).toBeNull();
   });
 
-  it('Equipment without a part number: Type is chosen freely', async () => {
+  it('Equipment: Part Number is required and Type is never chosen by hand', async () => {
     await mount(<EquipmentPage />);
     await openRow('SN-OTHER');
     await clickEdit();
-    expect(screen.queryByText('eq.typeFromPartNumber')).toBeNull();
-    expect(screen.getByLabelText(/fields.type/)).toBeTruthy();
+    expect(screen.getByText('eq.typeFromPartNumber')).toBeTruthy();
+    expect(screen.queryByLabelText(/fields.type/)).toBeNull();
+    const pn = screen.getByLabelText(/fields.part_number/).closest('.dp-field') as HTMLElement;
+    expect(within(pn).getByText('*')).toBeTruthy();
   });
 
   it('Equipment parent: lists children; Actions → Add child opens the form with the parent filled in', async () => {
@@ -210,10 +215,81 @@ describe('modules smoke', () => {
     vi.mocked(api.post).mockClear();
     vi.mocked(api.post).mockResolvedValueOnce({ data: equipment[1], meta: {} });
     await act(async () => { fireEvent.change(screen.getByLabelText(/fields.serial_number/), { target: { value: 'SN-NEW' } }); });
-    await act(async () => { fireEvent.click(screen.getByLabelText(/fields.status/)); });
-    await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'Active' })); });
+    await act(async () => { fireEvent.click(screen.getByLabelText(/fields.part_number/)); });
+    await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'P12316' })); });
+    // Type follows the chosen part number and is shown, not picked.
+    const type = screen.getByText('eq.typeFromPartNumber').closest('.dp-field') as HTMLElement;
+    expect(within(type).getByText('Tester')).toBeTruthy();
+    // No Status field on the form: Status (In use / Not in use) is the system's. Tags are picked in the Remark section.
+    expect(screen.queryByLabelText(/fields.status/)).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Repair' })); });
     await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'common.save' })[0]!); });
-    expect(api.post).toHaveBeenCalledWith('/api/equipment', expect.objectContaining({ serial_number: 'SN-NEW', status_id: 's1', parent_id: 'e1' }));
+    expect(api.post).toHaveBeenCalledWith('/api/equipment', expect.objectContaining({ serial_number: 'SN-NEW', part_number_id: 'pn1', tag_ids: ['tg1'], parent_id: 'e1' }));
+    expect((api.post as ReturnType<typeof vi.fn>).mock.calls[0]![1]).not.toHaveProperty('status_id');
+  });
+
+  it('Remark section: tags are coloured toggles, saved as tag_ids; the list has no Status column of its own', async () => {
+    await mount(<EquipmentPage />);
+    expect(screen.queryByRole('columnheader', { name: /fields.status/ })).toBeNull();
+    await openRow('SN-ROOT');
+    expect(document.querySelector('.dp-body .tag-chips [data-status-color="yellow"]')?.textContent).toBe('Repair');
+    await clickEdit();
+    const repair = screen.getByRole('button', { name: 'Repair' });
+    const spare = screen.getByRole('button', { name: 'Spare' });
+    expect(repair.getAttribute('aria-pressed')).toBe('true');
+    expect(spare.getAttribute('aria-pressed')).toBe('false');
+    await act(async () => { fireEvent.click(spare); });
+    vi.mocked(api.put).mockClear();
+    vi.mocked(api.put).mockResolvedValueOnce({ data: equipment[0], meta: {} });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'common.save' })[0]!); });
+    expect(api.put).toHaveBeenCalledWith('/api/equipment/e1', { tag_ids: ['tg1', 'tg2'] });
+  });
+
+  it('Golden sample and Calibration: tags in Remark; Golden has no Status, Calibration Status is computed (read-only)', async () => {
+    await mount(<GoldenWorkspace />);
+    expect(screen.queryByRole('columnheader', { name: /fields.status/ })).toBeNull();
+    await openRow('GS-1');
+    await clickEdit();
+    expect(screen.queryByLabelText(/fields.status/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Repair' })).toBeTruthy();
+  });
+
+  it('Calibration: Status column shows the computed status', async () => {
+    await mount(<CalibrationWorkspace />);
+    expect(screen.getByRole('columnheader', { name: /fields.status/ })).toBeTruthy();
+    expect(document.querySelector('td .tag-status[data-status-color="red"]')?.textContent).toBe('cal.status.overdue');
+  });
+
+  it('Usage: Check-out is offered for Not in use (and counts the children), Check-in for In use; the note is sent', async () => {
+    await mount(<EquipmentPage />);
+    await openRow('SN-ROOT');
+    await openActions();
+    expect(screen.queryByRole('menuitem', { name: /eq.checkIn/ })).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /eq.checkOut/ })); });
+    // SN-ROOT is Not in use, its child SN-CHILD is already In use → only SN-ROOT changes.
+    expect(screen.getByText('eq.usageAffectsValue')).toBeTruthy();
+    await act(async () => { fireEvent.change(screen.getByLabelText(/eq.usageNote/), { target: { value: 'Line 3' } }); });
+    vi.mocked(api.post).mockClear();
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { changed: 1 }, meta: {} });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'eq.checkOut' }).pop()!); }); // the footer button, after the toolbar one
+    expect(api.post).toHaveBeenCalledWith('/api/equipment/usage', { ids: ['e1'], usage: 'in_use', note: 'Line 3' });
+  });
+
+  it('Usage: toolbar Check-out lists only Not in use equipment; Check-in only In use', async () => {
+    await mount(<EquipmentPage />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /eq.checkOut/ })); });
+    const out = screen.getByRole('group', { name: 'eq.usagePick' });
+    expect(within(out).getAllByRole('checkbox').map((c) => c.closest('label')!.querySelector('strong')!.textContent)).toEqual(['SN-OTHER', 'SN-ROOT']);
+    const confirm = screen.getAllByRole('button', { name: /eq.checkOut/ }).pop() as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    await act(async () => { fireEvent.click(within(out).getByRole('checkbox', { name: /SN-ROOT/ })); });
+    // SN-ROOT (Not in use) + its child SN-CHILD (already In use): the child is not counted.
+    expect(screen.getByText('eq.usageSelected')).toBeTruthy();
+    expect((screen.getAllByRole('button', { name: /eq.checkOut/ }).pop() as HTMLButtonElement).disabled).toBe(false);
+    vi.mocked(api.post).mockClear();
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { changed: 1 }, meta: {} });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /eq.checkOut/ }).pop()!); });
+    expect(api.post).toHaveBeenCalledWith('/api/equipment/usage', { ids: ['e1'], usage: 'in_use', note: null });
   });
 
   it('Equipment without a parent: Actions → Attach to a parent opens the picker of existing equipment', async () => {
@@ -251,12 +327,25 @@ describe('modules smoke', () => {
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: /eq.childrenStay/ })); });
     expect(confirm.disabled).toBe(false);
     expect(screen.getByText('eq.kidsStay')).toBeTruthy();
-    // Trạng thái đi theo chỗ: SN-OTHER nhận trạng thái của SN-ROOT (Active).
-    const preview = document.querySelector('.dp-preview') as HTMLElement;
-    expect(within(preview.children[1] as HTMLElement).getByText('Active')).toBeTruthy();
     vi.mocked(api.post).mockResolvedValueOnce({ data: equipment[0], meta: {} });
     await act(async () => { fireEvent.click(confirm); });
     expect(api.post).toHaveBeenCalledWith('/api/equipment/swap', { a: 'e1', b: 'e3', children: 'stay' });
+  });
+
+  it('Swap only offers equipment of the same Type', async () => {
+    const other = equipment.find((e) => e.id === 'e3')!;
+    other.type_id = 't2'; other.type = 'Base';
+    try {
+      await mount(<EquipmentPage />);
+      await openRow('SN-ROOT');
+      await openActions();
+      await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /eq.swap/ })); });
+      expect(screen.getByText('eq.swapNoSameType')).toBeTruthy();
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'eq.swapWith' })); });
+      expect(screen.queryByRole('option', { name: /SN-OTHER/ })).toBeNull();
+    } finally {
+      other.type_id = 't1'; other.type = 'Tester';
+    }
   });
 
   it('Delete of an equipment with children: its own screen asks delete the branch or keep the children', async () => {
@@ -314,9 +403,9 @@ describe('modules smoke', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(3);
   });
 
-  it.each(['part-numbers', 'statuses', 'calibration-setup'] as const)('Configuration %s: list → panel → edit', async (list) => {
+  it.each(['part-numbers', 'tags', 'calibration-setup'] as const)('Configuration %s: list → panel → edit', async (list) => {
     await mount(<ConfigWorkspace listKey={list} />);
-    await openRow(list === 'statuses' ? 'Active' : 'P12316');
+    await openRow(list === 'tags' ? 'Repair' : 'P12316');
     await clickEdit();
     // Setup hiệu chuẩn: part number khóa khi sửa (đổi PN = xóa rồi thêm lại).
     if (list === 'calibration-setup') expect(screen.getByText('cfg.partNumberFixed')).toBeTruthy();
@@ -325,12 +414,14 @@ describe('modules smoke', () => {
   it('Configuration part numbers: Type column in the list; Type is required when adding', async () => {
     await mount(<ConfigWorkspace listKey="part-numbers" />);
     expect(screen.getByRole('columnheader', { name: /fields.type/ })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: /fields.usage_needs_parent/ })).toBeTruthy();
     expect(screen.getAllByText('Tester').length).toBeGreaterThan(0);
 
     const { api } = await import('@/lib/client/api');
     vi.mocked(api.post).mockClear();
     await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /ml.add/ })[0]!); });
     expect(screen.getByText('cfg.partTypeHint')).toBeTruthy();
+    expect(screen.getByText('cfg.usageNeedsParentHint')).toBeTruthy();
     await act(async () => { fireEvent.change(screen.getByLabelText(/fields.display_name/), { target: { value: 'P99999' } }); });
     await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'common.save' })[0]!); });
     expect(api.post).not.toHaveBeenCalled();
@@ -342,14 +433,15 @@ describe('modules smoke', () => {
     expect(screen.queryByRole('button', { name: /ml.add/ })).toBeNull();
   });
 
-  it('Configuration statuses: color chip in list; 5-color picker, required when adding', async () => {
-    await mount(<ConfigWorkspace listKey="statuses" />);
-    expect(document.querySelector('td .tag-status[data-status-color="green"]')?.textContent).toBe('values.green');
-    await openRow('Active');
+  it('Configuration tags: color chip in list; 5-color picker, required when adding; no remark / calibration fields', async () => {
+    await mount(<ConfigWorkspace listKey="tags" />);
+    expect(document.querySelector('td .tag-status[data-status-color="yellow"]')?.textContent).toBe('values.yellow');
+    expect(screen.queryByRole('columnheader', { name: /fields.requires_remark|fields.calibration_role/ })).toBeNull();
+    await openRow('Repair');
     await clickEdit();
     const picker = screen.getByRole('radiogroup', { name: 'fields.color' });
     expect(within(picker).getAllByRole('radio').map((r) => (r as HTMLInputElement).value)).toEqual(['green', 'yellow', 'red', 'blue', 'gray']);
-    expect((within(picker).getByRole('radio', { checked: true }) as HTMLInputElement).value).toBe('green');
+    expect((within(picker).getByRole('radio', { checked: true }) as HTMLInputElement).value).toBe('yellow');
 
     const { api } = await import('@/lib/client/api');
     vi.mocked(api.post).mockClear();
@@ -372,9 +464,8 @@ describe('modules smoke', () => {
       if (url === '/api/dashboard') {
         return { data: { equipment_total: 2, golden_total: 1, calibration_total: 1, pending_users: 1,
           by_status: {
-            equipment: [{ id: 's1', label: 'Active', count: 1, color: 'green' }, { id: 's2', label: 'Repair', count: 1, color: 'yellow' }],
-            calibration: [{ id: 's1', label: 'Active', count: 1, color: 'green' }],
-            golden_sample: [],
+            equipment: [{ id: 'in_use', label: null, count: 1, color: 'green' }, { id: 'not_in_use', label: null, count: 1, color: 'gray' }],
+            calibration: [{ id: 'overdue', label: null, count: 1, color: 'red' }],
           },
           by_location: [], by_type: [],
           overdue: calibration, due_soon: [] }, meta: {} };
@@ -395,8 +486,10 @@ describe('modules smoke', () => {
     // Tổng quan trạng thái: mỗi trang một thanh màu, chú thích có tên + số.
     expect(screen.getByText('dash.byStatus')).toBeTruthy();
     expect(screen.getAllByRole('img').map((el) => el.getAttribute('aria-label'))).toEqual(['dash.statusOf', 'dash.statusOf']);
-    expect(document.querySelectorAll('.dash-stack-seg[data-status-color="yellow"]').length).toBe(1);
-    expect(screen.getByText('Repair')).toBeTruthy();
+    // Status do hệ thống quản: server gửi khóa, màn hình dịch ra chữ.
+    expect(document.querySelectorAll('.dash-stack-seg[data-status-color="red"]').length).toBe(1);
+    expect(screen.getByText('values.in_use')).toBeTruthy();
+    expect(screen.getByText('cal.status.overdue')).toBeTruthy();
     expect(screen.getAllByText('SN-ROOT').length).toBeGreaterThan(0);
     expect(screen.getByText('hist.action.UPDATE')).toBeTruthy();
     // Note của lịch sử hiện ở Dashboard; một lần import gộp thành một dòng, không liệt kê từng bản ghi.

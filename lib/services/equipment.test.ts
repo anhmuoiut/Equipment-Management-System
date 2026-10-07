@@ -14,8 +14,11 @@ const rows = [
   { id: 'leaf', parent_id: 'mid', serial_number: 'LEAF', location_id: 'l1' },
   { id: 'other', parent_id: null, serial_number: 'OTHER', location_id: 'l2' },
   { id: 'tagged', parent_id: null, serial_number: 'TAGGED', location_id: 'l2', part_number_id: 'pn-t', type_id: 't-tester' },
+  // Part number "chỉ In use khi có cha": một thiết bị đứng riêng, một đã gắn vào ROOT.
+  { id: 'needy', parent_id: null, serial_number: 'NEEDY', location_id: 'l2', part_number_id: 'pn-n', type_id: 't-tester' },
+  { id: 'mounted', parent_id: 'other', serial_number: 'MOUNTED', location_id: 'l2', part_number_id: 'pn-n', type_id: 't-tester' },
 ].map((r) => ({
-  jabil_id: null, part_number_id: null, asset: null, type_id: null, status_id: 'st', level_id: null, remark: null,
+  jabil_id: null, part_number_id: null, asset: null, type_id: null, usage: 'not_in_use', level_id: null, remark: null, tag_ids: [] as string[],
   created_at: '2026-10-01T00:00:00Z', created_by: null, updated_at: '2026-10-01T00:00:00Z', updated_by: null, ...r,
 }));
 
@@ -28,15 +31,22 @@ vi.mock('./core/lookups', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./core/lookups')>()),
   loadLookups: async () => ({
     // PN-T → Tester; PN-H → a Type the admin hid later.
-    part_numbers: new Map([named('pn-t', 'PN-T', { type_id: 't-tester' }), named('pn-h', 'PN-H', { type_id: 't-hidden' })]),
+    part_numbers: new Map([
+      named('pn-t', 'PN-T', { type_id: 't-tester', usage_needs_parent: false }),
+      named('pn-h', 'PN-H', { type_id: 't-hidden', usage_needs_parent: false }),
+      named('pn-n', 'PN-N', { type_id: 't-tester', usage_needs_parent: true }),
+    ]),
     types: new Map([named('t-tester', 'Tester'), named('t-base', 'Base'), named('t-hidden', 'Old', { is_active: false })]),
     levels: new Map([named('lv1', 'ICT'), named('lv2', 'FT')]), departments: new Map(), calibration_vendors: new Map(),
-    statuses: new Map([['st', { id: 'st', display_name: 'Active', sort_order: 0, requires_remark: false, color: 'green' }]]),
+    tags: new Map([
+      ['tg1', { id: 'tg1', display_name: 'Repair', sort_order: 1, color: 'yellow' }],
+      ['tg2', { id: 'tg2', display_name: 'Spare', sort_order: 2, color: 'gray' }],
+    ]),
     users: new Map(), locations: new Map([named('l1', 'B3F1'), named('l2', 'B3F2')]),
   }),
 }));
 
-import { createEquipment, updateEquipment } from './equipment';
+import { createEquipment, setEquipmentUsage, updateEquipment } from './equipment';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -107,10 +117,10 @@ describe('Type follows the part number (Configuration › Part Number)', () => {
     expect(writes()).toEqual([['app_write', { part_number_id: 'pn-h', type_id: 't-hidden' }]]);
   });
 
-  it('without a part number the Type is chosen freely (but must be in use)', async () => {
-    await updateEquipment('other', { type_id: 't-base' }, 'u1');
-    expect(writes()).toEqual([['app_write', { type_id: 't-base' }]]);
-    await expect(updateEquipment('other', { type_id: 't-hidden' }, 'u1')).rejects.toMatchObject({ code: 'INACTIVE_OPTION' });
+  it('Part Number is required when adding equipment — nothing is written without it', async () => {
+    await expect(createEquipment({ serial_number: 'NEW', location_id: 'l1' }, 'u1'))
+      .rejects.toMatchObject({ code: 'VALIDATION_ERROR', details: { fields: { part_number_id: 'required' } } });
+    expect(writes()).toEqual([]);
   });
 
   it('an edit that touches neither part number nor Type writes no Type', async () => {
@@ -120,8 +130,8 @@ describe('Type follows the part number (Configuration › Part Number)', () => {
 
   it('adding equipment with a part number saves the Type of that part number', async () => {
     db.appWrite.mockResolvedValueOnce({ id: 'tagged' });
-    await createEquipment({ serial_number: 'NEW', part_number_id: 'pn-t', type_id: 't-base', status_id: 'st', location_id: 'l1' }, 'u1');
-    expect(writes()).toEqual([['app_write', { serial_number: 'NEW', part_number_id: 'pn-t', type_id: 't-tester', status_id: 'st', location_id: 'l1' }]]);
+    await createEquipment({ serial_number: 'NEW', part_number_id: 'pn-t', type_id: 't-base', location_id: 'l1' }, 'u1');
+    expect(writes()).toEqual([['app_write', { serial_number: 'NEW', part_number_id: 'pn-t', type_id: 't-tester', location_id: 'l1' }]]);
   });
 });
 
@@ -151,7 +161,73 @@ describe('Level follows the parent equipment (like location)', () => {
 
   it('adding a child copies the location and Level of the parent', async () => {
     db.appWrite.mockResolvedValueOnce({ id: 'mid' });
-    await createEquipment({ serial_number: 'KID', parent_id: 'root', level_id: 'lv2', location_id: 'l2', status_id: 'st' }, 'u1');
-    expect(writes()).toEqual([['app_write', { serial_number: 'KID', status_id: 'st', location_id: 'l1', level_id: 'lv1', parent_id: 'root' }]]);
+    await createEquipment({ serial_number: 'KID', part_number_id: 'pn-t', parent_id: 'root', level_id: 'lv2', location_id: 'l2' }, 'u1');
+    expect(writes()).toEqual([['app_write', {
+      serial_number: 'KID', part_number_id: 'pn-t', type_id: 't-tester', location_id: 'l1', level_id: 'lv1', parent_id: 'root',
+    }]]);
+  });
+});
+
+describe('Check-out / Check-in (usage)', () => {
+  // ROOT ─ MID ─ LEAF (all Not in use); OTHER; TAGGED.
+  it('sends the chosen equipment to the database, which carries the whole tree', async () => {
+    db.rpc.mockResolvedValueOnce(3);
+    const changed = await setEquipmentUsage(['root', 'root', 'other'], 'in_use', ' Line 3 ', 'u1');
+    expect(changed).toBe(3);
+    expect(db.rpc).toHaveBeenCalledWith('equipment_set_usage', { p_ids: ['root', 'other'], p_usage: 'in_use', p_actor: 'u1', p_note: ' Line 3 ' });
+  });
+
+  it('nothing to change (everything already Not in use) → USAGE_NO_CHANGE, no database call', async () => {
+    await expect(setEquipmentUsage(['root'], 'not_in_use', null, 'u1')).rejects.toMatchObject({ code: 'USAGE_NO_CHANGE' });
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+
+  it('a branch with one device still in use can be checked in; unknown ids are refused', async () => {
+    db.selectAll.mockImplementation(async () => rows.map((r) => (r.id === 'leaf' ? { ...r, usage: 'in_use' } : r)));
+    db.rpc.mockResolvedValueOnce(1);
+    await setEquipmentUsage(['root'], 'not_in_use', null, 'u1');
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+    await expect(setEquipmentUsage(['nope'], 'in_use', null, 'u1')).rejects.toMatchObject({ code: 'EQUIPMENT_NOT_FOUND' });
+  });
+});
+
+describe('Usage needs a parent (part number rule)', () => {
+  it('a standalone device of such a part number cannot be checked out — nothing is sent', async () => {
+    await expect(setEquipmentUsage(['needy'], 'in_use', null, 'u1')).rejects.toMatchObject({
+      code: 'USAGE_NEEDS_PARENT', details: { serials: ['NEEDY'] },
+    });
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+
+  it('the same device can be checked out once it has a parent; Check-in is always allowed', async () => {
+    db.rpc.mockResolvedValue(1);
+    await setEquipmentUsage(['mounted'], 'in_use', null, 'u1');
+    await setEquipmentUsage(['needy'], 'not_in_use', null, 'u1').catch(() => undefined); // already Not in use → no change
+    expect(db.rpc).toHaveBeenCalledWith('equipment_set_usage', expect.objectContaining({ p_ids: ['mounted'], p_usage: 'in_use' }));
+  });
+});
+
+describe('Tags in Remark (Configuration › Tag)', () => {
+  it('known tags are saved as an array of ids, in the order picked', async () => {
+    await updateEquipment('other', { tag_ids: ['tg2', 'tg1'] }, 'u1');
+    expect(writes()).toEqual([['app_write', { tag_ids: ['tg2', 'tg1'] }]]);
+  });
+
+  it('an unknown tag id is refused on the tags field, nothing written', async () => {
+    await expect(updateEquipment('other', { tag_ids: ['tg1', 'nope'] }, 'u1'))
+      .rejects.toMatchObject({ code: 'VALIDATION_ERROR', details: { fields: { tag_ids: 'not_found' } } });
+    expect(writes()).toEqual([]);
+  });
+
+  it('clearing every tag is allowed (empty list)', async () => {
+    await updateEquipment('other', { tag_ids: [] }, 'u1');
+    expect(writes()).toEqual([['app_write', { tag_ids: [] }]]);
+  });
+
+  it('a row shows its tags sorted by the configured order, with colours', async () => {
+    db.selectOne.mockImplementation(async (_t: string, id: string) => (id === 'other' ? { ...rows.find((r) => r.id === 'other')!, tag_ids: ['tg2', 'tg1'] } : null));
+    db.selectAll.mockImplementation(async () => rows);
+    const { row } = await updateEquipment('other', {}, 'u1');
+    expect(row.tags).toEqual([{ id: 'tg1', display_name: 'Repair', color: 'yellow' }, { id: 'tg2', display_name: 'Spare', color: 'gray' }]);
   });
 });

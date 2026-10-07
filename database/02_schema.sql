@@ -110,7 +110,7 @@ create trigger user_histories_append_only before update or delete on public.user
 
 -- =============================================================================
 -- 2. CONFIGURATION — dữ liệu gốc dùng chung + cấu hình hiệu chuẩn
---    Xóa = ẩn (is_active = false), trừ statuses và calibration_configurations.
+--    Xóa = ẩn (is_active = false), trừ tags (xóa thật khi không còn dùng) và calibration_configurations.
 -- =============================================================================
 
 -- types — loại (tạo trước part_numbers: part number trỏ tới loại) ------------------
@@ -136,6 +136,7 @@ create table public.part_numbers (
   id           uuid primary key default gen_random_uuid(),
   display_name text not null,
   type_id      uuid not null references public.types (id),
+  usage_needs_parent boolean not null default false,
   sort_order   integer not null default 0,
   is_active    boolean not null default true,
   created_by   uuid references public.user_profiles (id),
@@ -149,6 +150,7 @@ create index part_numbers_type_idx on public.part_numbers (type_id);
 create trigger part_numbers_set_updated_at before update on public.part_numbers
   for each row execute function public.set_updated_at();
 
+comment on column public.part_numbers.usage_needs_parent is 'true: thiết bị mang part number này chỉ In use được khi đã gắn vào thiết bị cha (04_functions.sql mục 3d).';
 comment on column public.part_numbers.type_id is 'Loại của mọi thiết bị mang part number này — database tự đặt equipments.type_id theo.';
 
 -- locations — vị trí -------------------------------------------------------------
@@ -167,26 +169,26 @@ create index locations_sort_idx on public.locations (sort_order, display_name);
 create trigger locations_set_updated_at before update on public.locations
   for each row execute function public.set_updated_at();
 
--- statuses — trạng thái (xóa thật; đang dùng thì không xóa được) ------------------
-create table public.statuses (
+-- tags — thẻ (có màu) để người dùng chọn trong phần Remark của Equipment / Calibration / Golden sample.
+-- Xóa thật; đang được dùng thì không xóa được (04_functions.sql mục 3e). ------------
+create table public.tags (
   id              uuid primary key default gen_random_uuid(),
   display_name    text not null,
   sort_order      integer not null default 0,
-  requires_remark boolean not null default false,
   color           text not null default 'gray',
   created_by      uuid references public.user_profiles (id),
   created_at      timestamptz not null default now(),
   updated_by      uuid references public.user_profiles (id),
   updated_at      timestamptz not null default now(),
 
-  constraint statuses_color_check check (color in ('green', 'yellow', 'red', 'blue', 'gray'))
+  constraint tags_color_check check (color in ('green', 'yellow', 'red', 'blue', 'gray'))
 );
-create unique index statuses_display_name_key on public.statuses (lower(display_name));
-create index statuses_sort_idx on public.statuses (sort_order, display_name);
-create trigger statuses_set_updated_at before update on public.statuses
+create unique index tags_display_name_key on public.tags (lower(display_name));
+create index tags_sort_idx on public.tags (sort_order, display_name);
+create trigger tags_set_updated_at before update on public.tags
   for each row execute function public.set_updated_at();
 
-comment on column public.statuses.color is 'Màu hiển thị (5 màu hệ thống): green / yellow / red / blue / gray.';
+comment on column public.tags.color is 'Màu hiển thị (5 màu hệ thống): green / yellow / red / blue / gray.';
 
 -- levels — level trên dây chuyền -------------------------------------------------
 create table public.levels (
@@ -274,7 +276,7 @@ create table public.configuration_histories (
   created_by uuid references public.user_profiles (id),
 
   constraint configuration_histories_table_name_check check (table_name in (
-    'part_numbers', 'locations', 'types', 'statuses', 'levels', 'departments',
+    'part_numbers', 'locations', 'types', 'tags', 'levels', 'departments',
     'calibration_configurations', 'calibration_vendors')),
   constraint configuration_histories_action_check check (action in ('CREATE', 'UPDATE', 'DELETE')),
   constraint configuration_histories_source_check check (source in ('ui', 'import', 'script'))
@@ -292,36 +294,41 @@ create trigger configuration_histories_append_only before update or delete on pu
 create table public.equipments (
   id             uuid primary key default gen_random_uuid(),
   jabil_id       text,
-  part_number_id uuid references public.part_numbers (id),
+  part_number_id uuid not null references public.part_numbers (id),
   serial_number  text not null,
   asset          text,
-  type_id        uuid references public.types (id),
-  status_id      uuid not null references public.statuses (id) on delete restrict,
+  type_id        uuid not null references public.types (id),
   level_id       uuid references public.levels (id),
   location_id    uuid not null references public.locations (id),
+  usage          text not null default 'not_in_use',
   remark         text,
+  tag_ids        uuid[] not null default '{}',
   parent_id      uuid references public.equipments (id) on delete cascade,
   created_at     timestamptz not null default now(),
   created_by     uuid references public.user_profiles (id),
   updated_at     timestamptz not null default now(),
   updated_by     uuid references public.user_profiles (id),
 
-  constraint equipments_not_own_parent check (id <> parent_id)
+  constraint equipments_not_own_parent check (id <> parent_id),
+  constraint equipments_usage_check check (usage in ('in_use', 'not_in_use'))
 );
 create index equipments_part_number_idx   on public.equipments (part_number_id);
 create index equipments_serial_number_idx on public.equipments (serial_number);
 create index equipments_asset_idx         on public.equipments (asset);
 create index equipments_type_idx          on public.equipments (type_id);
-create index equipments_status_idx        on public.equipments (status_id);
+create index equipments_tags_idx          on public.equipments using gin (tag_ids);
 create index equipments_location_idx      on public.equipments (location_id);
 create index equipments_parent_idx        on public.equipments (parent_id);
+create index equipments_usage_idx         on public.equipments (usage);
 create trigger equipments_set_updated_at before update on public.equipments
   for each row execute function public.set_updated_at();
 
 comment on table public.equipments is 'Thiết bị. Xóa thật; xóa cha thì xóa cả cây con.';
 comment on column public.equipments.serial_number is 'Không UQ — trùng chỉ cảnh báo.';
 comment on column public.equipments.parent_id is 'Thiết bị cha; chỉ đổi qua Move / Swap / Detach.';
-comment on column public.equipments.type_id is 'Có part number → luôn bằng part_numbers.type_id (database tự đặt); không có part number → chọn tay.';
+comment on column public.equipments.usage is 'Status của thiết bị: đang dùng (in_use) / không dùng (not_in_use) — đổi bằng Check-out / Check-in và đổi theo chỗ khi Swap. Hệ thống tự quản, không có danh sách cấu hình.';
+comment on column public.equipments.tag_ids is 'Thẻ (tags.id) người dùng chọn trong phần Remark; database kiểm tra mọi lần ghi (04_functions.sql mục 3e).';
+comment on column public.equipments.type_id is 'Luôn bằng part_numbers.type_id của part number thiết bị mang (database tự đặt) — không chọn tay.';
 
 -- equipment_histories — lịch sử thiết bị --------------------------------------------
 create table public.equipment_histories (
@@ -336,7 +343,7 @@ create table public.equipment_histories (
   created_by   uuid references public.user_profiles (id),
 
   constraint equipment_histories_action_check check (action in (
-    'CREATE', 'UPDATE', 'CHANGE_LOCATION', 'MOVE', 'SWAP', 'DETACH', 'DELETE')),
+    'CREATE', 'UPDATE', 'CHANGE_LOCATION', 'MOVE', 'SWAP', 'DETACH', 'CHECK_OUT', 'CHECK_IN', 'DELETE')),
   constraint equipment_histories_source_check check (source in ('ui', 'import', 'script'))
 );
 create index equipment_histories_object_idx  on public.equipment_histories (equipment_id, created_at desc);
@@ -356,6 +363,7 @@ create table public.calibration_equipments (
   calibration_date date,
   due_date         date,
   remark           text,
+  tag_ids          uuid[] not null default '{}',
   created_by       uuid references public.user_profiles (id),
   created_at       timestamptz not null default now(),
   updated_by       uuid references public.user_profiles (id),
@@ -365,9 +373,11 @@ create table public.calibration_equipments (
   constraint calibration_equipments_due_after_calibration check (due_date >= calibration_date)
 );
 create index calibration_equipments_due_idx    on public.calibration_equipments (due_date);
+create index calibration_equipments_tags_idx   on public.calibration_equipments using gin (tag_ids);
 create trigger calibration_equipments_set_updated_at before update on public.calibration_equipments
   for each row execute function public.set_updated_at();
 
+comment on column public.calibration_equipments.tag_ids is 'Thẻ (tags.id) người dùng chọn trong phần Remark; database kiểm tra mọi lần ghi (04_functions.sql mục 3e).';
 comment on column public.calibration_equipments.due_date is 'Tự tính: calibration_date + interval_months của part number thiết bị.';
 
 -- calibration_histories — lịch sử hiệu chuẩn ----------------------------------------
@@ -400,11 +410,11 @@ create table public.golden_samples (
   part_number     text not null,
   serial_number   text not null,
   location_id     uuid not null references public.locations (id),
-  status_id       uuid not null references public.statuses (id) on delete restrict,
   utd_part_number text,
   origin          text,
   purpose         text,
   remark          text,
+  tag_ids         uuid[] not null default '{}',
   created_by      uuid references public.user_profiles (id),
   created_at      timestamptz not null default now(),
   updated_by      uuid references public.user_profiles (id),
@@ -413,7 +423,7 @@ create table public.golden_samples (
 create index golden_samples_part_number_idx   on public.golden_samples (part_number);
 create index golden_samples_serial_number_idx on public.golden_samples (serial_number);
 create index golden_samples_location_idx      on public.golden_samples (location_id);
-create index golden_samples_status_idx        on public.golden_samples (status_id);
+create index golden_samples_tags_idx          on public.golden_samples using gin (tag_ids);
 create trigger golden_samples_set_updated_at before update on public.golden_samples
   for each row execute function public.set_updated_at();
 

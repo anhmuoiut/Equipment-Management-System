@@ -3,7 +3,7 @@
 /**
  * Một danh sách của Configuration (Part Number, Location, …): Masterlist +
  * Detail Panel như mọi module (docs/DETAIL_MODEL.md 4.4). Chỉ Admin.
- * Bảng có is_active: "Xóa" = Ẩn / Hiện lại. Status, Hiệu chuẩn › Setup: xóa thật.
+ * Bảng có is_active: "Xóa" = Ẩn / Hiện lại. Tag (thẻ chọn trong Remark), Hiệu chuẩn › Setup: xóa thật.
  * Part Number: Type bắt buộc — thiết bị mang part number tự lấy Type đó (database).
  * Setup hiệu chuẩn: PN (trong các PN đang có thiết bị) + chu kỳ + status mặc định; thiết bị
  * của PN tự lên Dashboard hiệu chuẩn (database).
@@ -44,14 +44,16 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
     { key: 'display_name', label: t('fields.part_number'), value: (r) => r.display_name, render: (r) => <strong>{r.display_name}</strong> },
     { key: 'interval_months', label: t('fields.interval_months'), value: (r) => r.interval_months ?? null },
     { key: 'warning_days', label: t('fields.warning_days'), value: (r) => r.warning_days ?? null },
-  ] : def.isStatus ? [
+  ] : def.isTag ? [
     { key: 'display_name', label: t('fields.display_name'), value: (r) => r.display_name, render: (r) => <strong>{r.display_name}</strong> },
-    { key: 'requires_remark', label: t('fields.requires_remark'), value: (r) => (r.requires_remark ? t('common.yes') : t('common.no')), filter: true },
     { key: 'color', label: t('fields.color'), value: (r) => colorLabel(r.color), render: (r) => colorChip(r.color), filter: true },
     { key: 'sort_order', label: t('fields.sort_order'), value: (r) => r.sort_order },
   ] : [
     { key: 'display_name', label: t('fields.display_name'), value: (r) => r.display_name, render: (r) => <strong>{r.display_name}</strong> },
-    ...(def.hasType ? [{ key: 'type', label: t('fields.type'), value: (r: ConfigRow) => r.type ?? null, filter: true }] : []),
+    ...(def.hasType ? [
+      { key: 'type', label: t('fields.type'), value: (r: ConfigRow) => r.type ?? null, filter: true },
+      { key: 'usage_needs_parent', label: t('fields.usage_needs_parent'), value: (r: ConfigRow) => (r.usage_needs_parent ? t('common.yes') : t('common.no')), filter: true },
+    ] : []),
     ...(def.hasDescription ? [{ key: 'description', label: t('fields.description'), value: (r: ConfigRow) => r.description ?? null, wrap: true, width: 200 }] : []),
     { key: 'sort_order', label: t('fields.sort_order'), value: (r) => r.sort_order },
     { key: 'is_active', label: t('fields.is_active'), value: (r) => (r.is_active ? t('cfg.active') : t('cfg.hidden')),
@@ -68,10 +70,9 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
         view: (r) => t('cal.months', { count: r.interval_months ?? 0 }) },
       { key: 'warning_days', label: t('fields.warning_days'), kind: 'number', required: true, min: 1, max: 3650,
         hint: t('cfg.warningHint'), view: (r) => t('cal.days', { count: r.warning_days ?? 0 }) },
-    ] : def.isStatus ? [
+    ] : def.isTag ? [
       { key: 'display_name', label: t('fields.display_name'), required: true, maxLength: 100 },
       { key: 'sort_order', label: t('fields.sort_order'), kind: 'number', required: true, min: 0 },
-      { key: 'requires_remark', label: t('fields.requires_remark'), kind: 'boolean' },
       { key: 'color', label: t('fields.color'), kind: 'radio', required: true, hint: t('cfg.colorHint'),
         options: () => STATUS_COLORS.map((c) => ({ value: c, label: t(`values.${c}`) })),
         optionView: (o) => colorChip(o.value as StatusColor), view: (r) => colorChip(r.color) },
@@ -80,7 +81,10 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
       // Part Number → Type: equipment with this part number always gets this Type (the database keeps them in step).
       ...(def.hasType ? [{ key: 'type_id', label: t('fields.type'), kind: 'select' as const, required: true, view: (r: ConfigRow) => r.type,
         options: (_d: unknown, r: ConfigRow | null) => toSelect(options?.types, r?.type_id, ` (${t('cfg.hidden')})`),
-        editHint: t('cfg.partTypeHint') }] : []),
+        editHint: t('cfg.partTypeHint') },
+      // Usage cần cha: thiết bị loại này chỉ In use được khi đã gắn vào thiết bị cha (database, mục 3d).
+      { key: 'usage_needs_parent', label: t('fields.usage_needs_parent'), kind: 'boolean' as const, hint: t('cfg.usageNeedsParentHint'),
+        view: (r: ConfigRow) => (r.usage_needs_parent ? t('common.yes') : t('common.no')) }] : []),
       ...(def.hasDescription ? [{ key: 'description', label: t('fields.description'), kind: 'textarea' as const, wide: true, maxLength: 1000 }] : []),
       { key: 'sort_order', label: t('fields.sort_order'), kind: 'number', required: true, min: 0 },
       { key: 'is_active', label: t('fields.is_active'), kind: 'boolean', hint: t('cfg.activeHint'),
@@ -88,9 +92,9 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
     ],
   }];
 
-  const defaults = def.isCalibration ? { warning_days: 30 } : def.isStatus
-    ? { sort_order: 0, requires_remark: false }
-    : { sort_order: 0, is_active: true };
+  const defaults = def.isCalibration ? { warning_days: 30 } : def.isTag
+    ? { sort_order: 0 }
+    : { sort_order: 0, is_active: true, ...(def.hasType ? { usage_needs_parent: false } : {}) };
 
   // Dữ liệu gốc vừa đổi → mọi form cần danh sách chọn mới. Thay đổi đã lưu; chỉ báo nếu chưa tải lại được.
   const refresh = () => { refreshOptions().catch(() => toast.warning(t('cfg.optionsStale'))); };
@@ -126,7 +130,7 @@ export function ConfigWorkspace({ listKey }: { listKey: ConfigList }) {
           heading={(r) => ({
             title: r.display_name,
             tags: <>
-              {def.isStatus && <StatusTag name={r.display_name} color={r.color} />}
+              {def.isTag && <StatusTag name={r.display_name} color={r.color} />}
               {def.hideable && <ToneTag text={r.is_active ? t('cfg.active') : t('cfg.hidden')} tone={r.is_active ? 'ok' : 'neutral'} />}
               <ToneTag text={listName} tone="info" />
             </>,

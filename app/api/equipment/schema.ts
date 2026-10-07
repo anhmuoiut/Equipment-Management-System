@@ -4,11 +4,11 @@ import { z, childrenMode, optText, optId, reqText, reqId } from '@/lib/services/
 const fields = {
   serial_number: reqText(200),
   jabil_id: optText(200),
-  part_number_id: optId,
+  // Part Number bắt buộc; Type không gửi — luôn theo part number (database + server tự đặt).
+  part_number_id: reqId,
   asset: optText(200),
-  type_id: optId,
   level_id: optId,
-  status_id: reqId,
+  tag_ids: z.array(reqId).max(50),
   location_id: reqId,
   remark: optText(1000),
 };

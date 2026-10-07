@@ -21,18 +21,20 @@ export function schemaFor(list: ConfigListDef, mode: 'create' | 'update') {
     return mode === 'create' ? z.object({ part_number_id: reqId, ...fields }).strict() : z.object(fields).partial().strict();
   }
   let shape: z.ZodRawShape;
-  if (list.isStatus) {
+  if (list.isTag) {
     shape = {
       display_name: reqText(100),
       sort_order: order,
-      requires_remark: z.boolean(),
       color: z.enum(STATUS_COLORS),
     };
   } else {
     shape = { display_name: reqText(200), sort_order: order, is_active: z.boolean() };
     if (list.hasDescription) shape.description = optText(1000);
     // Bắt buộc, không xóa trống được (sửa: chỉ gửi khi đổi).
-    if (list.hasType) shape.type_id = reqId;
+    if (list.hasType) {
+      shape.type_id = reqId;
+      shape.usage_needs_parent = z.boolean();
+    }
   }
   const schema = z.object(shape).strict();
   return mode === 'create' ? schema : schema.partial();

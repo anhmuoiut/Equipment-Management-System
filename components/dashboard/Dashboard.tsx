@@ -2,7 +2,7 @@
 
 /**
  * Dashboard (docs/DATABASE_MODIFIED.md mục 1): số liệu tổng, tổng quan trạng
- * thái của Equipment / Calibration / Golden (tô bằng màu trạng thái admin chọn),
+ * thái của Equipment (In use / Not in use) và Calibration (Calibration Status tự tính),
  * thiết bị quá hạn / sắp đến hạn hiệu chuẩn, phân bố theo vị trí / loại, và
  * "Thay đổi gần đây" (view recent_activities) có bộ lọc.
  */
@@ -29,7 +29,6 @@ const MODULE_PATH: Record<HistoryModule, string | null> = {
 const STATUS_PAGES: { page: StatusPage; href: string }[] = [
   { page: 'equipment', href: '/equipment' },
   { page: 'calibration', href: '/calibration' },
-  { page: 'golden_sample', href: '/golden' },
 ];
 
 export function Dashboard() {
@@ -126,7 +125,8 @@ function StatusBreakdown({ page, href, items }: { page: StatusPage; href: string
   const { t } = useTranslation();
   const moduleName = t(`dash.moduleName.${page}`);
   const total = items.reduce((sum, item) => sum + item.count, 0);
-  const label = (item: StatusCountItem) => item.label ?? t('dash.unset');
+  // Status do hệ thống quản: server gửi khóa (id), màn hình dịch ra chữ.
+  const label = (item: StatusCountItem) => (page === 'equipment' ? t(`values.${item.id}`) : t(`cal.status.${item.id}`));
   const percent = (count: number) => (total ? Math.round((count / total) * 100) : 0);
   return (
     <div className="dash-status-module">

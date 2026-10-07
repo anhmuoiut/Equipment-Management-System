@@ -23,12 +23,11 @@ insert into public.levels (display_name, sort_order) values
   ('Function Test', 5)
 on conflict do nothing;
 
-insert into public.statuses (display_name, sort_order, requires_remark, color) values
-  ('Active',            1, false, 'green'),
-  ('Inactive',          2, false, 'gray'),
-  ('Repair',            3, true,  'yellow'),
-  ('Wait Registration', 4, false, 'blue'),
-  ('Wait Calibration',  5, false, 'blue')
+insert into public.tags (display_name, sort_order, color) values
+  ('Repair',            1, 'yellow'),
+  ('Wait Registration', 2, 'blue'),
+  ('Wait Calibration',  3, 'blue'),
+  ('Spare',             4, 'gray')
 on conflict do nothing;
 
 insert into public.calibration_vendors (display_name, sort_order) values

@@ -9,10 +9,10 @@ export const IMPORT_MAX_FILE_MB = 5;
 
 export type ImportColumnKey =
   | 'serial_number' | 'part_number_id' | 'jabil_id' | 'asset' | 'type_id'
-  | 'level_id' | 'status_id' | 'location_id' | 'parent_serial' | 'parent_part_number' | 'remark';
+  | 'level_id' | 'location_id' | 'parent_serial' | 'parent_part_number' | 'remark';
 
 /** Danh sách Configuration mà cột chọn từ đó. */
-export type ImportListKey = 'part_numbers' | 'types' | 'levels' | 'statuses' | 'locations';
+export type ImportListKey = 'part_numbers' | 'types' | 'levels' | 'locations';
 
 export type ImportColumn<K extends string = ImportColumnKey> = {
   key: K;
@@ -37,12 +37,11 @@ export type ImportColumn<K extends string = ImportColumnKey> = {
  */
 export const IMPORT_COLUMNS: readonly ImportColumn[] = [
   { key: 'serial_number', header: 'Serial number', required: true, max: 200, width: 24 },
-  { key: 'part_number_id', header: 'Part number', list: 'part_numbers', page: 'Part Number', width: 22 },
+  { key: 'part_number_id', header: 'Part number', required: true, list: 'part_numbers', page: 'Part Number', width: 22 },
   { key: 'jabil_id', header: 'Jabil ID', max: 200, width: 16 },
   { key: 'asset', header: 'Asset', max: 200, width: 16 },
   { key: 'type_id', header: 'Type', list: 'types', page: 'Type', width: 18 },
   { key: 'level_id', header: 'Level', list: 'levels', page: 'Level', width: 16 },
-  { key: 'status_id', header: 'Status', required: true, list: 'statuses', page: 'Status', width: 20 },
   { key: 'location_id', header: 'Location', requiredUnlessParent: true, list: 'locations', page: 'Location', width: 20 },
   { key: 'parent_serial', header: 'Parent serial number', max: 200, width: 24 },
   { key: 'parent_part_number', header: 'Parent part number', list: 'part_numbers', page: 'Part Number', width: 22 },
@@ -50,13 +49,12 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
 ];
 
 export type ImportIssueCode =
-  | 'required' | 'too_long' | 'not_found' | 'inactive' | 'remark_required'
+  | 'required' | 'too_long' | 'not_found' | 'inactive'
   | 'parent_not_found' | 'parent_ambiguous' | 'parent_cycle' | 'location_follows_parent' | 'level_follows_parent'
   | 'type_follows_part_number';
 
 /**
- * Lỗi của một ô. `value`: chữ trong ô (remark_required: tên trạng thái;
- * location_follows_parent / level_follows_parent: vị trí / Level của thiết bị cha;
+ * Lỗi của một ô. `value`: chữ trong ô (location_follows_parent / level_follows_parent: vị trí / Level của thiết bị cha;
  * type_follows_part_number: Type của part number). `count`: parent_ambiguous.
  */
 export type ImportIssue = { column: string; code: ImportIssueCode; value?: string; max?: number; count?: number };

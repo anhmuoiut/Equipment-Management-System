@@ -6,9 +6,9 @@
 import type { ImportColumn } from './equipmentImport';
 
 export type GoldenImportColumnKey =
-  | 'part_number' | 'serial_number' | 'utd_part_number' | 'location_id' | 'status_id' | 'origin' | 'purpose' | 'remark';
+  | 'part_number' | 'serial_number' | 'utd_part_number' | 'location_id' | 'origin' | 'purpose' | 'remark';
 
-export type GoldenImportListKey = 'locations' | 'statuses';
+export type GoldenImportListKey = 'locations';
 
 export type GoldenImportColumn = ImportColumn<GoldenImportColumnKey> & { list?: GoldenImportListKey };
 
@@ -18,7 +18,6 @@ export const GOLDEN_IMPORT_COLUMNS: readonly GoldenImportColumn[] = [
   { key: 'serial_number', header: 'Serial number', required: true, max: 200, width: 24 },
   { key: 'utd_part_number', header: 'UTD part number', max: 200, width: 22 },
   { key: 'location_id', header: 'Location', required: true, list: 'locations', page: 'Location', width: 20 },
-  { key: 'status_id', header: 'Status', required: true, list: 'statuses', page: 'Status', width: 20 },
   { key: 'origin', header: 'Origin', max: 200, width: 20 },
   { key: 'purpose', header: 'Purpose', max: 500, width: 36 },
   { key: 'remark', header: 'Remark', max: 1000, width: 44 },

@@ -39,8 +39,8 @@ Không bao giờ hiện: mật khẩu đã băm, mã phiên đăng nhập và c�
 | Import | Chỉ trang có import (Equipment, Golden) — Admin, User. Mở trong khung bên phải như `+ Thêm` (`?tool=import`): 1. tải file mẫu, 2. chọn file → kiểm tra (chưa ghi), 3. hết lỗi → Import. Xem mục 7 |
 | `+ Thêm` | Admin, User (Configuration, User Management: chỉ Admin). Mở Detail Panel ở chế độ Thêm mới |
 | Cột đầu | `No` (số thứ tự theo bộ lọc / sắp xếp hiện tại). Equipment thêm cột quan hệ cha–con trước `No` |
-| Cột Status | Đứng ngay sau `No` ở mọi module có trạng thái; tag có chữ + màu |
-| Cột định danh | Ngay sau Status là serial (chữ đậm), rồi part number và vị trí, cột phụ (Jabil ID, Asset, Level, Remark…) ở cuối. Khi Detail Panel mở, danh sách chỉ còn chỗ cho vài cột đầu — những cột đó phải đủ để nhận ra thiết bị |
+| Cột Status | Equipment: Status (In use / Not in use) đứng đầu danh sách; Calibration: Calibration Status (Under calibration / Valid / Due soon / Overdue, tự tính); Golden sample **không có** cột Status. Tag có chữ + màu (Equipment: chấm tròn, chữ đậm) |
+| Cột định danh | Ngay sau cột Status là serial (chữ đậm), rồi part number và vị trí, cột phụ (Jabil ID, Asset, Level, Remark…) ở cuối. Khi Detail Panel mở, danh sách chỉ còn chỗ cho vài cột đầu — những cột đó phải đủ để nhận ra thiết bị |
 | Sắp xếp | Bấm tiêu đề cột để sắp xếp tăng / giảm |
 | Bấm dòng | Mở Detail Panel của dòng đó; dòng đang mở được tô nền chọn |
 | Trống / đang tải / lỗi | Dùng trạng thái chung: khung xương khi tải; chưa có bản ghi nào → thông báo + nút `+ Thêm` (nếu có quyền); không khớp bộ lọc → thông báo + `Xóa bộ lọc`; tải lỗi → thông báo lỗi + `Thử lại` |
@@ -253,7 +253,9 @@ Mỗi module gồm: **Masterlist** (các cột, mặc định hiện đủ) và 
 
 **Masterlist:**
 
-| | No | Status | Serial number | Part number | Location | Type | Jabil ID | Asset | Level | Parent | Remark |
+| | No | Usage | Serial number | Part number | Location | Type | Jabil ID | Asset | Level | Parent | Status | Remark |
+
+**Cột hiện sẵn mặc định** (cột khác ẩn, mở ở Tùy chọn hiển thị; ai đã tự chỉnh thì giữ theo trình duyệt của người đó): Usage · Serial number · Part number · Type · Location · Jabil ID · Asset · Level · Status.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | ⊟ | 1 | ● Active | SN-001 | P12316 | B3F1 | Tester | J-100201 | A-00045 | EOL | | |
 | └ | 2 | ● Active | SN-002 | P20001 | B3F1 | Base | J-100202 | A-00046 | EOL | SN-001 | |
@@ -267,11 +269,11 @@ Cột đầu (⊟ / └) cho biết thiết bị có con / là con của thiết
 | Header | **Serial number** · tag Status / P/N · Type / 📍 Location · Cha: `SN-…` · Cập nhật |
 | Tab | Thông tin · **Cây thiết bị** · Lịch sử |
 | Nhóm **Định danh** | Serial number `*` · Part number · Jabil ID · Asset |
-| Nhóm **Phân loại** | Type (chọn part number → theo part number, khóa) · Level (có cha → theo cha, khóa; khi xem ghi nhỏ "theo thiết bị cha") · Status |
+| Nhóm **Phân loại** | Type (bắt buộc, luôn theo part number — ô khóa, không chọn tay) · Level (có cha → theo cha, khóa; khi xem ghi nhỏ "theo thiết bị cha") · Status |
 | Nhóm **Vị trí & quan hệ** | Location `*` (đã chọn cha thì khóa, hiện vị trí của cha — "Theo thiết bị cha, bỏ chọn cha để đặt vị trí riêng"; khi xem ghi nhỏ "theo thiết bị cha") · Thiết bị cha (không bắt buộc; chọn được cả khi thêm lẫn khi sửa, tìm theo serial / part number / vị trí; không chọn được chính nó và con cháu; khi xem: chip SN · PN bấm để mở, chưa có cha thì "Không có cha" + thao tác chữ **Gắn vào thiết bị cha**) · Thiết bị con (cả dòng; khi xem: chip SN · PN của con trực tiếp, bấm để mở, + thao tác chữ **Thêm thiết bị con**). Thao tác trong ô là nút dạng chữ (không viền) và chỉ hiện khi xem, với người sửa được. Sửa cha: chọn cha mới = Đổi cha (vị trí theo cha mới, cả cây con đi theo); bỏ trống = Tách khỏi cha (giữ vị trí hiện tại, rồi đổi vị trí nếu có chọn) |
-| Nhóm **Ghi chú** | Remark (bắt buộc khi trạng thái yêu cầu) |
-| Nhóm **Hiệu chuẩn** (chỉ đọc, từ module Calibration) | Có trong Dashboard hiệu chuẩn: Status · Calibration date · Due date (màu đỏ / vàng) · Vendor · Chu kỳ · nút "Mở chi tiết hiệu chuẩn". Không có: "Chưa theo dõi hiệu chuẩn" + lý do (chưa có part number / part number chưa có trong Configuration › Hiệu chuẩn › Setup) |
-| `[Thao tác ▾]` (màn hình thao tác) | Thêm thiết bị con (mở form Thêm thiết bị, cha điền sẵn và **khóa** — hiện SN · PN · vị trí của cha; muốn cha khác thì lưu xong rồi Đổi cha; Location ghi "Theo thiết bị cha.") · Đổi vị trí · Gắn vào thiết bị cha (khi chưa có cha) / Đổi cha (khi đã có cha) · Swap (đổi cha, vị trí và trạng thái; xem trước ghi rõ mỗi bên nhận chỗ nào, trạng thái nào) · Tách khỏi cha · Xóa (Admin; thiết bị có con mở màn hình Xóa riêng, không có con thì xác nhận ở footer). Đổi cha / Tách khỏi cha cũng làm được ngay trong form Sửa |
+| Nhóm **Ghi chú** | **Thẻ** (chọn nhiều, tô màu admin chọn ở Configuration › Tag) · Remark. Danh sách hiện thẻ + chữ ở cột Remark |
+| Nhóm **Hiệu chuẩn** (chỉ đọc, từ module Calibration) | Có trong Dashboard hiệu chuẩn: Calibration status (tự tính) · Calibration date · Due date (màu đỏ / vàng) · Vendor · Chu kỳ · nút "Mở chi tiết hiệu chuẩn". Không có: "Chưa theo dõi hiệu chuẩn" + lý do (chưa có part number / part number chưa có trong Configuration › Hiệu chuẩn › Setup) |
+| `[Thao tác ▾]` (màn hình thao tác) | Thêm thiết bị con (mở form Thêm thiết bị, cha điền sẵn và **khóa** — hiện SN · PN · vị trí của cha; muốn cha khác thì lưu xong rồi Đổi cha; Location ghi "Theo thiết bị cha.") · Đổi vị trí · Gắn vào thiết bị cha (khi chưa có cha) / Đổi cha (khi đã có cha) · Swap (chỉ với thiết bị cùng Type; đổi cha, vị trí và Usage; Status giữ nguyên) · **Check-out** (khi Not in use) / **Check-in** (khi In use): thiết bị và con cháu đổi Usage, có ô ghi chú (lưu vào lịch sử). Part number "chỉ In use khi có cha" mà chưa gắn cha: Check-out bị khóa, hiện hướng dẫn gắn cha trước. Tách khỏi cha khi In use: được, thiết bị về Not in use · Tách khỏi cha · Xóa (Admin; thiết bị có con mở màn hình Xóa riêng, không có con thì xác nhận ở footer). Đổi cha / Tách khỏi cha cũng làm được ngay trong form Sửa |
 | Thiết bị có con | Mọi thao tác trên làm thiết bị di chuyển / bị xóa (và đổi cha / vị trí trong form Sửa) hiện cảnh báo vàng "A có n thiết bị con: …" và **bắt buộc chọn** (không có mặc định, nút Xác nhận khóa đến khi chọn): **Đi theo** — cả nhánh đi cùng; **Ở lại chỗ cũ** — con giữ vị trí, gắn vào thiết bị đến thay (Swap) hoặc thiết bị cha cũ (không có thì đứng riêng). Mỗi lựa chọn ghi rõ kết quả; mục Kết quả liệt kê con đi đâu. Xóa: "Xóa cả thiết bị con" / "Giữ lại thiết bị con". Swap hai thiết bị cùng cha + cùng vị trí mà chọn Đi theo (hoặc không bên nào có con) → báo "không thay đổi gì", khóa Xác nhận |
 | Sau thao tác | Tải lại cả masterlist (thiết bị đổi chỗ, thiết bị con, cờ "có con", cột Thiết bị cha đều cập nhật), không chỉ dòng đang xem |
 
@@ -309,6 +311,8 @@ Không hiện trong cây: icon / tên loại, trạng thái, vị trí, dòng t�
 **Masterlist:**
 
 | No | Status | Serial number | Part number | Type | Location | Vendor | Calibration date | Due date | Chu kỳ | Remark |
+
+**Cột hiện sẵn mặc định:** Status · Serial number · Part number · Location · Calibration date · Due date.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | ● Active | SN-001 | P12316 | Tester | B3F1 | ABC Lab | 15/12/2025 | **15/12/2026** | 12 tháng | |
 
@@ -322,13 +326,13 @@ Cột Due date tô đỏ (quá hạn) / vàng (sắp đến hạn). Serial, Part
 | Nút chính | **`[Ghi nhận hiệu chuẩn]`** (Admin, User) |
 | Tab | Thông tin · Lịch sử (có bộ lọc "Chỉ lần hiệu chuẩn") |
 | Nhóm **Thiết bị** (chỉ đọc) | Serial · Part number · Type · Location · nút "Mở thiết bị" |
-| Nhóm **Hiệu chuẩn** | Vendor · Calibration date · Due date (Tự tính; Over Due / Due Soon theo số ngày báo trước). Status nằm ở nhóm Thiết bị, chỉ đọc — là status của thiết bị |
+| Nhóm **Hiệu chuẩn** | Vendor · Calibration date · Due date (Tự tính). **Status** (nhóm Thiết bị, chỉ đọc) do hệ thống tự tính: chưa có ngày hiệu chuẩn = Under calibration; có ngày thì Valid / Due soon / Overdue theo hạn |
 | Nhóm **Chu kỳ** (chỉ đọc, từ Configuration) | Chu kỳ (tháng) · Báo trước (ngày) |
 | Nhóm **Ghi chú** | Remark |
 
 | Nút | Dùng khi | Màn hình | Ghi lịch sử |
 | --- | --- | --- | --- |
-| `[Ghi nhận hiệu chuẩn]` | Vừa hiệu chuẩn xong | Màn hình thao tác: Ngày hiệu chuẩn `*` · Status `*` · Vendor · Remark · xem trước "Hạn mới: dd/mm/yyyy" | `CALIBRATE` |
+| `[Ghi nhận hiệu chuẩn]` | Vừa hiệu chuẩn xong | Màn hình thao tác: Ngày hiệu chuẩn `*` · Vendor · Remark · xem trước "Hạn mới: dd/mm/yyyy" | `CALIBRATE` |
 | `[Sửa]` | Sửa thông tin nhập sai (kể cả ngày) | Sửa tại chỗ trong tab Thông tin | `UPDATE` |
 
 Không có `+ Thêm` và không xóa: thiết bị tự lên / rời Dashboard theo Configuration › Hiệu chuẩn › Setup.
@@ -338,6 +342,8 @@ Không có `+ Thêm` và không xóa: thiết bị tự lên / rời Dashboard t
 **Masterlist:**
 
 | No | Status | Part number | Serial number | UTD part number | Location | Origin | Purpose | Remark |
+
+**Cột hiện sẵn mặc định:** Status · Serial number · Part number · Location · Purpose · UTD part number.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | ● Active | PCBA-7781 | GS-0001 | UTD-7781-A | B3F2 | Customer | ICT check | |
 
@@ -348,14 +354,14 @@ Không có `+ Thêm` và không xóa: thiết bị tự lên / rời Dashboard t
 | Header | **Serial number** · tag Status / P/N / 📍 Location · Cập nhật |
 | Tab | Thông tin · Lịch sử |
 | Nhóm **Định danh** | Part number `*` · Serial number `*` · UTD part number |
-| Nhóm **Vị trí & trạng thái** | Location `*` · Status |
+| Nhóm **Vị trí** | Location `*` (Golden sample không có Status — ghi chú bằng thẻ / Remark) |
 | Nhóm **Thông tin thêm** | Origin · Purpose |
 | Nhóm **Ghi chú** | Remark |
 | `[Thao tác ▾]` | Xóa (Admin) |
 
 ### 4.4 Configuration
 
-Mỗi trang cấu hình (Part Number, Location, Type, Status, Level, Department; Hiệu chuẩn: Setup, Vendor) dùng cùng Masterlist + Detail Panel.
+Mỗi trang cấu hình (Part Number, Location, Type, Tag, Level, Department; Hiệu chuẩn: Setup, Vendor) dùng cùng Masterlist + Detail Panel.
 
 **Masterlist:** `No` + các cột của bảng đó.
 
@@ -363,8 +369,8 @@ Mỗi trang cấu hình (Part Number, Location, Type, Status, Level, Department;
 | --- | --- |
 | Location / Part Number / Level / Department / Vendor | No · Tên · Thứ tự · Đang dùng |
 | Type | No · Tên · Mô tả · Thứ tự · Đang dùng |
-| Status | No · Tên · Bắt buộc remark · Màu · Thứ tự (một danh sách chung cho cả project) |
-| Setup | No · Part number · Chu kỳ (tháng) · Báo trước (ngày) · Status mặc định. Part number chỉ chọn khi thêm (trong các PN đang có thiết bị) |
+| Tag | No · Tên · Màu · Thứ tự (danh sách thẻ chung cho cả project, chọn trong phần Remark; Status của Equipment và Calibration do hệ thống quản, không cấu hình) |
+| Setup | No · Part number · Chu kỳ (tháng) · Báo trước (ngày). Part number chỉ chọn khi thêm (trong các PN đang có thiết bị) |
 
 **Detail Panel:**
 
@@ -373,7 +379,7 @@ Mỗi trang cấu hình (Part Number, Location, Type, Status, Level, Department;
 | Header | **`display_name`** (Setup: part number) · tag Đang dùng / Đã ẩn / Tên trang cấu hình |
 | Tab | Thông tin · Lịch sử |
 | Nhóm **Thông tin** | Đủ các trường như cột masterlist |
-| `[Thao tác ▾]` | Ẩn / Hiện lại (bảng có `is_active`) · Xóa (`statuses`, `calibration_configurations`) |
+| `[Thao tác ▾]` | Ẩn / Hiện lại (bảng có `is_active`) · Xóa (`tags`, `calibration_configurations`) |
 
 ### 4.5 User Management
 
@@ -426,15 +432,15 @@ Bổ sung khi làm:
 - **Lọc nhanh** cạnh Bộ lọc: Calibration có "Quá hạn" / "Sắp đến hạn"; User Management có "Chờ duyệt (n)". Dòng quá hạn / sắp đến hạn có vạch màu ở mép trái.
 - Trường chọn từ Configuration chỉ hiện giá trị **đang dùng**. Giá trị đã ẩn mà bản ghi đang giữ vẫn hiện, kèm chữ "(Đã ẩn)".
 - Serial trùng: vẫn lưu, thông báo "serial này đã có ở bản ghi khác".
-- Tag trạng thái tô theo màu Admin chọn ở Configuration › Status (5 màu, `statuses.color`), luôn kèm chữ.
+- Thẻ tô theo màu Admin chọn ở Configuration › Tag (5 màu, `tags.color`), luôn kèm chữ. Status của Equipment (In use / Not in use) và Calibration Status có màu cố định.
 - Đang tải / lỗi: mọi vùng tải dữ liệu dùng `useFetch` ([lib/client/useFetch.ts](../lib/client/useFetch.ts)) — giữ dữ liệu cũ khi tải lại, bỏ qua phản hồi cũ, lỗi hiện kèm nút Thử lại. Màn hình thao tác (`ActionScreen`) tự khóa khi đang gửi; lỗi luôn là câu theo mã lỗi (`errorMessage()`), không có thao tác nào im lặng.
 
 **Import Excel (Equipment):**
 
 - **File mẫu** sinh lúc bấm tải (`GET /api/equipment/import/template`), nên luôn khớp Configuration lúc đó — ví dụ Admin có Level 1–5 thì file ghi "Chọn: 1, 2, 3, 4, 5". Sheet `Equipment`: dòng 1 ghi chú từng cột nhận gì (bắt buộc, độ dài, danh sách, Status nào cần Remark), dòng 2 tiêu đề (`*` = bắt buộc), nhập từ dòng 3. Cột chọn có ô thả xuống; bấm vào ô hiện chú thích; ô dạng chữ (giữ số 0 đầu serial). Thêm sheet Hướng dẫn và Giá trị hợp lệ (nguồn của ô thả xuống, khóa sửa). Configuration đổi thì tải lại mẫu.
-- **Cột** theo thứ tự form Thêm thiết bị: Serial number ✔, Part number, Jabil ID, Asset, Type, Level, Status, Location ✔ (trừ khi có cha), Parent serial number, Parent part number, Remark.
+- **Cột** theo thứ tự form Thêm thiết bị: Serial number ✔, Part number, Jabil ID, Asset, Type, Level, Location ✔ (trừ khi có cha), Parent serial number, Parent part number, Remark.
 - **Thiết bị cha**: `Parent serial number` tìm trong thiết bị đã có **và** các dòng khác của file (không phân biệt hoa / thường, thứ tự dòng không quan trọng — dòng con đứng trước dòng cha vẫn được). `Parent part number` chỉ cần khi serial đó trùng ở nhiều thiết bị (tìm cả mã đã ẩn). Có cha thì để trống Location: vị trí theo cha (cả chuỗi cha – con trong file); ghi Location khác vị trí của cha → lỗi. Không tìm thấy / khớp nhiều thiết bị / vòng lặp trong file → lỗi dòng đó.
-- **Kiểm tra** (`POST /api/equipment/import`) cùng quy tắc với form: giá trị chọn tìm theo tên, không phân biệt hoa / thường; chưa có / đã ẩn / trạng thái không dùng cho Equipment → lỗi; Remark bắt buộc theo Status. Serial trùng (trong hệ thống hoặc trong file) chỉ cảnh báo. Báo lỗi theo số dòng Excel.
+- **Kiểm tra** (`POST /api/equipment/import`) cùng quy tắc với form: giá trị chọn tìm theo tên, không phân biệt hoa / thường; chưa có / đã ẩn → lỗi. File không có cột Status (Status do hệ thống quản; thẻ chọn trong app). Serial trùng (trong hệ thống hoặc trong file) chỉ cảnh báo. Báo lỗi theo số dòng Excel.
 - **Tất cả hoặc không**: còn dòng lỗi thì nút Import tắt; Import kiểm tra lại từ đầu rồi ghi qua `equipment_import` trong một giao dịch, lịch sử `CREATE` nguồn `import`. Tối đa 1000 dòng, 5 MB, chỉ `.xlsx`.
 
 **Import Excel (Golden):** cùng cách làm và giao diện ([ImportPanel](../components/ui/ImportPanel.tsx)) — `GET /api/golden/import/template`, `POST /api/golden/import`, ghi qua `golden_import`. Sheet `Golden`, cột: Part number ✔, Serial number ✔, UTD part number, Location ✔, Status ✔, Origin, Purpose, Remark. Khác Equipment: Part number là chữ tự do (không phải Configuration) và không có thiết bị cha. Mã: [lib/goldenImport.ts](../lib/goldenImport.ts), [lib/services/goldenImport.ts](../lib/services/goldenImport.ts). Cần chạy lại `database/04_functions.sql` để có `golden_import`.

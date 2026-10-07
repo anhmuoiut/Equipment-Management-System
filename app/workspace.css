@@ -15,7 +15,7 @@
 .tag[data-tone='warn'] { color: var(--warn); border-color: var(--warn); background: var(--warn-tint); border-style: dashed; }
 .tag[data-tone='alert'] { color: var(--alert); border-color: var(--alert); background: var(--alert-tint); }
 .tag[data-tone='info'] { color: var(--ink); border-color: var(--rule); background: var(--machine-tint); }
-/* Màu trạng thái (statuses.color): đặt data-status-color lên phần tử, con dùng --sc-*. */
+/* Màu thẻ (tags.color): đặt data-status-color lên phần tử, con dùng --sc-*. */
 [data-status-color='green']  { --sc-mark: var(--status-green);  --sc-ink: var(--success); --sc-tint: var(--success-tint); }
 [data-status-color='yellow'] { --sc-mark: var(--status-yellow); --sc-ink: var(--warn);    --sc-tint: var(--warn-tint); }
 [data-status-color='red']    { --sc-mark: var(--status-red);    --sc-ink: var(--alert);   --sc-tint: var(--alert-tint); }
@@ -505,3 +505,32 @@ li[data-match] > .tree-row .tree-sn, li[data-match] > .tree-row .tree-pn { backg
   .dash-activity-date input { width: 100%; min-width: 0; }
   .dash-activity-head { align-items: stretch; }
 }
+
+/* Check-out / Check-in: chọn nhiều thiết bị */
+.use-search { width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: var(--radius-control); font: inherit; background: var(--panel); color: var(--ink); }
+.use-all { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; cursor: pointer; }
+.use-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 340px; overflow: auto; border: 1px solid var(--rule); border-radius: var(--radius-control); }
+.use-list li + li { border-top: 1px solid var(--rule); }
+.use-list label { display: flex; align-items: center; gap: 8px; padding: 7px 10px; min-height: 36px; font-size: 14px; cursor: pointer; }
+.use-list label:hover { background: var(--machine-tint); }
+.use-list input, .use-all input { margin: 0; accent-color: var(--machine); }
+.use-meta { color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.use-blocked { color: var(--warn); font-weight: 600; }
+.use-list label:has(input:disabled) { cursor: not-allowed; opacity: 0.75; }
+@media (max-width: 767px) { .use-list label, .use-all { min-height: 44px; } }
+/* Usage: In use = xanh lá tươi đặc, chấm trắng có quầng (nổi bật); Not in use = xám nhạt, chấm xám. Khác tag Status (không chấm). */
+.tag-usage { font-weight: 700; letter-spacing: 0.1px; }
+.tag-usage[data-usage='in_use'] { color: #fff; background: linear-gradient(180deg, #22c55e, #16a34a); border-color: #15803d; box-shadow: 0 1px 2px rgba(22, 163, 74, 0.35); }
+.tag-usage[data-usage='in_use'] .tag-dot { background: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35); }
+.tag-usage[data-usage='not_in_use'] { color: var(--ink-3); font-weight: 600; background: color-mix(in srgb, var(--ink-3) 10%, var(--panel)); border-color: color-mix(in srgb, var(--ink-3) 35%, var(--panel)); }
+.tag-usage[data-usage='not_in_use'] .tag-dot { background: color-mix(in srgb, var(--ink-3) 55%, var(--panel)); box-shadow: none; }
+
+/* Thẻ trong Remark */
+.tag-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: middle; }
+.remark-cell { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.tag-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-pick { cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; opacity: 0.55; }
+.tag-pick:hover { opacity: 0.85; }
+.tag-pick[aria-pressed='true'] { opacity: 1; box-shadow: 0 0 0 1.5px var(--sc-ink, var(--ink)); }
+.tag-pick:focus-visible { outline: 3px solid var(--jabil-picton); outline-offset: 2px; }
+@media (max-width: 767px) { .tag-pick { min-height: 36px; padding-inline: 12px; } }

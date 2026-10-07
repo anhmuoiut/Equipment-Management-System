@@ -17,7 +17,7 @@ const TIME_RE = /^\d{4}-\d{2}-\d{2}T/;
 function useFormatHistoryValue() {
   const { t } = useTranslation();
   return (value: unknown): string => {
-    if (value === null || value === undefined || value === '') return '—';
+    if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return '—';
     if (typeof value === 'boolean') return value ? t('common.yes') : t('common.no');
     if (Array.isArray(value)) return value.map((v) => t(`values.${v}`, { defaultValue: String(v) })).join(', ');
     if (typeof value === 'string' && DATE_RE.test(value)) return formatDate(value);
@@ -29,7 +29,7 @@ function useFormatHistoryValue() {
 
 /**
  * Ghi chú do database đặt: via_parent:SN, swap_with:SN, stayed:SN, stayed_swap:SN, parent_deleted:SN,
- * via_part_number:PN (Admin đổi Type của part number).
+ * via_part_number:PN (Admin đổi Type của part number), via_calibration (Status đổi sau khi nhập ngày hiệu chuẩn).
  */
 export function useFormatNote() {
   const { t } = useTranslation();
@@ -43,6 +43,7 @@ export function useFormatNote() {
     if (kind === 'stayed_swap') return t('hist.stayedSwap', { serial: value });
     if (kind === 'parent_deleted') return t('hist.parentDeleted', { serial: value });
     if (kind === 'via_part_number') return t('hist.viaPartNumber', { pn: value });
+    if (kind === 'via_calibration') return t('hist.viaCalibration');
     return note;
   };
 }

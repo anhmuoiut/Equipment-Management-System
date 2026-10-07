@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Danh sách chọn dùng chung (Part Number, Location, Type, Status, …) — tải
+ * Danh sách chọn dùng chung (Part Number, Location, Type, Tag, …) — tải
  * một lần, dùng lại cho mọi form; refreshOptions() sau khi Configuration đổi.
  */
 import { useEffect, useState } from 'react';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { api, errorMessage } from '@/lib/client/api';
 import { toast } from '@/components/ui';
 import type { SelectOption } from '@/components/ui/SearchableSelect';
-import type { OptionItem, Options, StatusOption } from '@/lib/types';
+import type { OptionItem, Options } from '@/lib/types';
 
 let cache: Options | null = null;
 let inflight: Promise<Options> | null = null;
@@ -49,13 +49,4 @@ export function toSelect(items: OptionItem[] | undefined, current?: string | nul
   return (items ?? [])
     .filter((o) => o.is_active || o.id === current)
     .map((o) => ({ value: o.id, label: o.is_active ? o.display_name : `${o.display_name}${hiddenSuffix}` }));
-}
-
-/** Một danh sách trạng thái chung cho Equipment và Golden (Calibration dùng trạng thái của thiết bị). */
-export function statusSelect(statuses: StatusOption[] | undefined): SelectOption[] {
-  return (statuses ?? []).map((s) => ({ value: s.id, label: s.display_name }));
-}
-
-export function statusRequiresRemark(statuses: StatusOption[] | undefined, id: unknown): boolean {
-  return !!statuses?.find((s) => s.id === id)?.requires_remark;
 }

@@ -12,7 +12,7 @@ import { formatDate } from '@/lib/client/api';
 import { useFetch } from '@/lib/client/useFetch';
 import { ErrorState, Spinner } from '@/components/ui';
 import { DetailValue } from '@/components/ui/detail/DetailPanel';
-import { DueDate, StatusTag } from '@/components/ui/tags';
+import { CalibrationStatusTag, DueDate } from '@/components/ui/tags';
 import type { SectionDef } from '@/components/ui/detail/RecordDetail';
 import type { CalibrationRow, EquipmentRow } from '@/lib/types';
 
@@ -32,7 +32,7 @@ function EquipmentCalibrationGroup({ equipment }: { equipment: EquipmentRow }) {
   }
   return (
     <>
-      <DetailValue label={t('fields.status')}><StatusTag name={row.status} color={row.status_color} /></DetailValue>
+      <DetailValue label={t('cal.calibrationStatus')}><CalibrationStatusTag status={row.status} /></DetailValue>
       <DetailValue label={t('fields.calibration_date')}>{row.calibration_date ? formatDate(row.calibration_date) : null}</DetailValue>
       <DetailValue label={t('fields.due_date')}><DueDate date={row.due_date} state={row.due_state} /></DetailValue>
       <DetailValue label={t('fields.vendor')}>{row.vendor}</DetailValue>

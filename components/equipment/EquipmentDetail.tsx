@@ -6,16 +6,18 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowRightLeft, GitBranch, Link2, MapPin, Plus, Trash2, Unlink } from 'lucide-react';
+import { ArrowRightLeft, GitBranch, Link2, LogIn, LogOut, MapPin, Plus, Trash2, Unlink } from 'lucide-react';
 import { api, formatRelativeTime } from '@/lib/client/api';
 import { useFetch } from '@/lib/client/useFetch';
-import { statusRequiresRemark, statusSelect, toSelect, useOptions } from '@/lib/client/options';
+import { toSelect, useOptions } from '@/lib/client/options';
 import { useCan } from '@/components/ViewerContext';
-import { StatusTag } from '@/components/ui/tags';
+import { TagChips, UsageTag } from '@/components/ui/tags';
+import { TagPicker } from '@/components/ui/TagPicker';
 import { RecordDetail, type ActionDef, type Draft, type SectionDef } from '@/components/ui/detail/RecordDetail';
 import type { PanelLayout } from '@/components/ui/detail/DetailPanel';
 import type { DetailCtx } from '@/components/ui/workspace/ModuleWorkspace';
 import { EquipmentTree } from './EquipmentTree';
+import { UsageScreen } from './EquipmentUsage';
 import { ChangeLocationScreen, DeleteScreen, DetachScreen, MoveScreen, SwapScreen, equipmentFamily } from './EquipmentActions';
 import type { EquipmentRow } from '@/lib/types';
 
@@ -75,7 +77,7 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
     {
       key: 'identity', title: t('eq.groupIdentity'), fields: [
         { key: 'serial_number', label: t('fields.serial_number'), required: true, maxLength: 200 },
-        { key: 'part_number_id', label: t('fields.part_number'), kind: 'select', view: (r) => r.part_number,
+        { key: 'part_number_id', label: t('fields.part_number'), kind: 'select', required: true, view: (r) => r.part_number,
           options: (_d, r) => toSelect(options?.part_numbers, r?.part_number_id, hidden) },
         { key: 'jabil_id', label: t('fields.jabil_id'), maxLength: 200 },
         { key: 'asset', label: t('fields.asset'), maxLength: 200 },
@@ -84,18 +86,21 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
     {
       key: 'classification', title: t('eq.groupClassification'), fields: [
         { key: 'type_id', label: t('fields.type'), kind: 'select',
-          view: (r) => (r.part_number_id ? <>{r.type}<span className="eq-note">{t('eq.fromPartNumber')}</span></> : r.type),
+          // Type luôn theo part number (bắt buộc cả hai): ô chỉ hiển thị, không chọn tay.
+          view: (r) => <>{r.type}<span className="eq-note">{t('eq.fromPartNumber')}</span></>,
           options: (_d, r) => toSelect(options?.types, r?.type_id, hidden),
-          lock: (_r, d) => (partType(d.part_number_id) ? t('eq.typeFromPartNumber') : null),
-          draftView: (d) => typeName(partType(d.part_number_id)) },
+          lock: () => t('eq.typeFromPartNumber'),
+          draftView: (d) => typeName(partType(d.part_number_id)) ?? '—' },
         // Level theo thiết bị cha (như vị trí) — database giữ cả cây cùng Level.
         { key: 'level_id', label: t('fields.level'), kind: 'select',
           view: (r) => (r.parent_id ? <>{r.level ?? '—'}<span className="eq-note">{t('eq.fromParent')}</span></> : r.level),
           options: (_d, r) => toSelect(options?.levels, r?.level_id, hidden),
           lock: (_r, d) => (d.parent_id ? t(fixedParent ? 'eq.followsFixedParent' : 'eq.levelFromParent') : null),
           draftView: (d) => fromParent(d, 'level') ?? '—' },
-        { key: 'status_id', label: t('fields.status'), kind: 'select', view: (r) => <StatusTag name={r.status} color={r.status_color} />,
-          options: () => statusSelect(options?.statuses), required: true },
+        // Status của thiết bị (In use / Not in use) không sửa trong form: đổi bằng Check-out / Check-in (Thao tác)
+        // và đổi theo chỗ khi Swap.
+        { key: 'usage', label: t('fields.usage'), readOnly: true, hideInCreate: true, hint: t('eq.usageHint'),
+          view: (r) => <UsageTag usage={r.usage} /> },
       ],
     },
     {
@@ -140,8 +145,11 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
     },
     {
       key: 'notes', title: t('eq.groupNotes'), fields: [
-        { key: 'remark', label: t('fields.remark'), kind: 'textarea', wide: true, maxLength: 1000,
-          required: (d) => statusRequiresRemark(options?.statuses, d.status_id) },
+        // Thẻ (Configuration › Tag) chọn ngay trong phần Remark.
+        { key: 'tag_ids', label: t('fields.tags'), wide: true, hint: t('tag.hint'),
+          view: (r) => (r.tags.length ? <TagChips items={r.tags} /> : <span className="dp-empty">{t('tag.none')}</span>),
+          editor: ({ id, value, onChange, label }) => <TagPicker id={id} value={value} onChange={onChange} tags={options?.tags} label={label} /> },
+        { key: 'remark', label: t('fields.remark'), kind: 'textarea', wide: true, maxLength: 1000 },
       ],
     },
     ...extensions,
@@ -149,6 +157,10 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
 
   const actions: ActionDef<EquipmentRow>[] = [
     ...(addChild ? [{ key: 'add-child', label: t('eq.addChild'), icon: <Plus size={14} aria-hidden="true" />, onClick: addChild }] : []),
+    { key: 'check-out', label: t('eq.checkOut'), icon: <LogOut size={14} aria-hidden="true" />,
+      visible: (r) => r.usage === 'not_in_use', screen: (a) => <UsageScreen ctx={a} rows={all ?? null} mode="checkout" /> },
+    { key: 'check-in', label: t('eq.checkIn'), icon: <LogIn size={14} aria-hidden="true" />,
+      visible: (r) => r.usage === 'in_use', screen: (a) => <UsageScreen ctx={a} rows={all ?? null} mode="checkin" /> },
     { key: 'location', label: t('eq.changeLocation'), icon: <MapPin size={14} aria-hidden="true" />,
       visible: (r) => !r.parent_id, screen: (a) => <ChangeLocationScreen ctx={a} rows={all} /> },
     // Chưa có cha: "Gắn vào thiết bị cha"; đã có cha: "Đổi cha" — cùng màn hình chọn thiết bị có sẵn.
@@ -180,7 +192,7 @@ export function EquipmentDetail({ ctx, layout, extensions = [], rows }: {
       defaults={ctx.defaults}
       heading={(r) => ({
         title: r.serial_number,
-        tags: <StatusTag name={r.status} color={r.status_color} />,
+        tags: <><UsageTag usage={r.usage} /><TagChips items={r.tags} /></>,
         subtitle: [r.part_number, r.type].filter(Boolean).join(' · ') || undefined,
         meta: (
           <>

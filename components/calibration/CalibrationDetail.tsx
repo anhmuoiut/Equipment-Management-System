@@ -8,7 +8,8 @@ import { ClipboardCheck } from 'lucide-react';
 import { addMonths, api, formatDate, todayVN } from '@/lib/client/api';
 import { toSelect, useOptions } from '@/lib/client/options';
 import { useCan } from '@/components/ViewerContext';
-import { DueDate, StatusTag } from '@/components/ui/tags';
+import { CalibrationStatusTag, DueDate, TagChips } from '@/components/ui/tags';
+import { TagPicker } from '@/components/ui/TagPicker';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { ActionField, ActionScreen, RecordDetail, type ActionCtx, type SectionDef } from '@/components/ui/detail/RecordDetail';
 import type { PanelLayout } from '@/components/ui/detail/DetailPanel';
@@ -29,9 +30,9 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
         { key: 'part_number', label: t('fields.part_number'), readOnly: true },
         { key: 'type', label: t('fields.type'), readOnly: true },
         { key: 'location', label: t('fields.location'), readOnly: true },
-        // Trạng thái là của thiết bị (một nguồn) — sửa ở Equipment.
-        { key: 'status', label: t('fields.status'), readOnly: true, hint: t('cal.statusFromEquipment'),
-          view: (r) => <StatusTag name={r.status} color={r.status_color} /> },
+        // Calibration Status do hệ thống tự tính: chưa có ngày hiệu chuẩn = Under calibration; có ngày thì theo hạn.
+        { key: 'status', label: t('fields.status'), readOnly: true, hint: t('cal.statusAuto'),
+          view: (r) => <CalibrationStatusTag status={r.status} /> },
         { key: 'equipment_link', label: t('cal.equipmentRecord'), readOnly: true,
           view: (r) => <Link className="link" href={`/equipment?id=${r.equipment_id}`}>{t('cal.openEquipment')}</Link> },
       ],
@@ -55,6 +56,9 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
     },
     {
       key: 'notes', title: t('eq.groupNotes'), fields: [
+        { key: 'tag_ids', label: t('fields.tags'), wide: true, hint: t('tag.hint'),
+          view: (r) => (r.tags.length ? <TagChips items={r.tags} /> : <span className="dp-empty">{t('tag.none')}</span>),
+          editor: ({ id, value, onChange, label }) => <TagPicker id={id} value={value} onChange={onChange} tags={options?.tags} label={label} /> },
         { key: 'remark', label: t('fields.remark'), kind: 'textarea', wide: true, maxLength: 1000 },
       ],
     },
@@ -69,7 +73,7 @@ export function CalibrationDetail({ ctx, layout }: { ctx: DetailCtx<CalibrationR
       onRetry={ctx.onRetry}
       heading={(r) => ({
         title: r.serial_number,
-        tags: <StatusTag name={r.status} color={r.status_color} />,
+        tags: <><CalibrationStatusTag status={r.status} /><TagChips items={r.tags} /></>,
         subtitle: [r.part_number, r.type].filter(Boolean).join(' · ') || undefined,
         meta: (
           <>

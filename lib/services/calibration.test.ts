@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => { throw new Error('no database in unit tests'); } }));
 
-import { dueState } from './calibration';
+import { calibrationStatus, dueState } from './calibration';
 
 describe('dueState — tô màu cột Due date (docs/DATABASE_MODIFIED.md mục 3)', () => {
   beforeEach(() => {
@@ -33,5 +33,21 @@ describe('dueState — tô màu cột Due date (docs/DATABASE_MODIFIED.md mục 
     // 2026-10-01 23:30 UTC = 2026-10-02 06:30 giờ Việt Nam → hạn 2026-10-01 đã quá.
     vi.setSystemTime(new Date('2026-10-01T23:30:00Z'));
     expect(dueState('2026-10-01', 30, true)).toBe('overdue');
+  });
+});
+
+describe('calibrationStatus — Status của trang Calibration, hệ thống tự tính', () => {
+  it('is Under calibration while there is no calibration date, whatever the due state', () => {
+    expect(calibrationStatus(null, 'none')).toBe('under_calibration');
+    expect(calibrationStatus(null, 'no_interval')).toBe('under_calibration');
+    expect(calibrationStatus(null, 'overdue')).toBe('under_calibration');
+  });
+  it('follows the due date once a calibration date is entered', () => {
+    expect(calibrationStatus('2026-10-01', 'ok')).toBe('valid');
+    expect(calibrationStatus('2026-10-01', 'due_soon')).toBe('due_soon');
+    expect(calibrationStatus('2025-01-01', 'overdue')).toBe('overdue');
+  });
+  it('is Valid when the part number has no interval but a date was entered (nothing to be late for)', () => {
+    expect(calibrationStatus('2026-10-01', 'no_interval')).toBe('valid');
   });
 });

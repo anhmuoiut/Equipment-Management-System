@@ -19,29 +19,46 @@ export type ColumnPrefs = {
   reset: () => void;
 };
 
-export function useColumnPrefs(storageKey: string, keys: string[]): ColumnPrefs {
+/**
+ * Mặc định của module: `defaults` = các cột hiện sẵn, theo đúng thứ tự này; các cột còn lại ẩn (xếp sau,
+ * ai cần thì mở ở Tùy chọn hiển thị). Không khai báo `defaults` → hiện hết theo thứ tự của module.
+ */
+function defaultPrefs(keys: string[], defaults?: string[]): { order: string[]; hidden: string[] } {
+  if (!defaults?.length) return { order: keys, hidden: [] };
+  const shown = defaults.filter((k) => keys.includes(k));
+  const rest = keys.filter((k) => !shown.includes(k));
+  return { order: [...shown, ...rest], hidden: rest };
+}
+
+export function useColumnPrefs(storageKey: string, keys: string[], defaults?: string[]): ColumnPrefs {
   const storage = `masterlist-columns:${storageKey}`;
-  const [order, setOrder] = useState<string[]>(keys);
-  const [hidden, setHidden] = useState<string[]>([]);
+  const initial = defaultPrefs(keys, defaults);
+  const [order, setOrder] = useState<string[]>(initial.order);
+  const [hidden, setHidden] = useState<string[]>(initial.hidden);
   const keySig = keys.join('|');
+  const defaultSig = (defaults ?? []).join('|');
 
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storage) ?? 'null') as { order?: string[]; hidden?: string[] } | null;
+      const fallback = defaultPrefs(keys, defaults);
       if (saved?.order) {
-        // Cột mới thêm sau này vẫn hiện (nối vào cuối).
+        // Cột mới thêm sau này nối vào cuối; hiện hay ẩn theo mặc định của module.
         const known = saved.order.filter((k) => keys.includes(k));
-        setOrder([...known, ...keys.filter((k) => !known.includes(k))]);
+        const added = keys.filter((k) => !known.includes(k));
+        setOrder([...known, ...added]);
+        setHidden([...(saved.hidden ?? []).filter((k) => keys.includes(k)), ...added.filter((k) => fallback.hidden.includes(k))]);
       } else {
-        setOrder(keys);
+        setOrder(fallback.order);
+        setHidden(fallback.hidden);
       }
-      setHidden((saved?.hidden ?? []).filter((k) => keys.includes(k)));
     } catch {
-      setOrder(keys);
-      setHidden([]);
+      const fallback = defaultPrefs(keys, defaults);
+      setOrder(fallback.order);
+      setHidden(fallback.hidden);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storage, keySig]);
+  }, [storage, keySig, defaultSig]);
 
   const persist = useCallback((nextOrder: string[], nextHidden: string[]) => {
     try { localStorage.setItem(storage, JSON.stringify({ order: nextOrder, hidden: nextHidden })); } catch {}
@@ -65,8 +82,9 @@ export function useColumnPrefs(storageKey: string, keys: string[]): ColumnPrefs 
       persist(next, hidden);
     },
     reset: () => {
-      setOrder(keys);
-      setHidden([]);
+      const fallback = defaultPrefs(keys, defaults);
+      setOrder(fallback.order);
+      setHidden(fallback.hidden);
       try { localStorage.removeItem(storage); } catch {}
     },
   };

@@ -10,11 +10,11 @@ Ký hiệu: **✔** = bắt buộc (`not null`) · **PK** = khóa chính · **FK
 
 | Menu | Bảng | Mục |
 | --- | --- | --- |
-| Dashboard | Không có bảng riêng. Đọc `equipments`, `calibration_equipments`, `golden_samples`, `statuses` và view `recent_activities` (thay đổi gần đây) | [1](#1-dashboard) |
+| Dashboard | Không có bảng riêng. Đọc `equipments`, `calibration_equipments`, `golden_samples` và view `recent_activities` (thay đổi gần đây) | [1](#1-dashboard) |
 | Equipment | `equipments`, `equipment_histories` | [2](#2-equipment) |
 | Calibration | `calibration_equipments`, `calibration_histories` | [3](#3-calibration) |
 | Golden | `golden_samples`, `golden_sample_histories` | [4](#4-golden-sample) |
-| Configuration | `part_numbers`, `locations`, `types`, `statuses`, `levels`, `departments`, `calibration_configurations`, `calibration_vendors`, `configuration_histories` | [5](#5-configuration) |
+| Configuration | `part_numbers`, `locations`, `types`, `tags`, `levels`, `departments`, `calibration_configurations`, `calibration_vendors`, `configuration_histories` | [5](#5-configuration) |
 | User Management | `user_profiles`, `user_histories` | [6](#6-user-management) |
 | *(hệ thống, không có menu)* | `notifications`, `error_log` | [7](#7-bảng-hệ-thống) |
 
@@ -22,14 +22,14 @@ Ký hiệu: **✔** = bắt buộc (`not null`) · **PK** = khóa chính · **FK
 
 | Quy ước | Thiết kế |
 | --- | --- |
-| Tên bảng | `snake_case`, số nhiều. Bảng dữ liệu gốc dùng chung không có tiền tố (`part_numbers`, `locations`, `types`, `statuses`, `levels`, `departments`). Bảng của một module có tiền tố module (`equipment_`, `calibration_`, `golden_sample_`, `user_`) |
+| Tên bảng | `snake_case`, số nhiều. Bảng dữ liệu gốc dùng chung không có tiền tố (`part_numbers`, `locations`, `types`, `tags`, `levels`, `departments`). Bảng của một module có tiền tố module (`equipment_`, `calibration_`, `golden_sample_`, `user_`) |
 | Khóa chính | **Mọi bảng** có cột `id uuid` riêng làm PK, tự sinh bằng `gen_random_uuid()` — kể cả khi bảng đã có cột UQ khác |
 | Định danh | Mọi liên kết và logic dựa vào `id`, không dựa vào chữ. Bảng dữ liệu gốc không có cột mã (`code`). |
 | Tên hiển thị | `display_name` — chữ người dùng thấy, admin đặt sao hiển thị vậy, sửa thoải mái |
 | Thứ tự | `sort_order` |
 | Thời gian | `created_at`, `updated_at` kiểu `timestamptz`; `updated_at` tự cập nhật bằng trigger `set_updated_at` |
 | Người tạo/sửa | `created_by`, `updated_by` → FK `user_profiles.id` |
-| Dữ liệu gốc | Admin tạo **một lần** ở Configuration, mọi trang cần thì trỏ tới. Xóa = ẩn (`is_active = false`). **Trừ** `statuses`: admin sửa / xóa thật; đang được dùng thì không xóa được |
+| Dữ liệu gốc | Admin tạo **một lần** ở Configuration, mọi trang cần thì trỏ tới. Xóa = ẩn (`is_active = false`). **Trừ** `tags`: admin sửa / xóa thật; đang được dùng thì không xóa được |
 | Màu trạng thái | Không lưu trong database — dùng màu hệ thống, thiết kế chung cho toàn project (bàn sau) |
 | Xóa dữ liệu | Thiết bị và golden sample xóa thật (không có Archive). Xóa thiết bị có con: chọn xóa cả cây con hoặc giữ con (con gắn vào cha cũ) |
 | FK | Mọi cột FK phải trỏ tới một bảng có trang thêm / sửa / xóa. Trường không có bảng để trỏ tới thì là chữ gõ tự do (`text`) |
@@ -43,7 +43,7 @@ Ký hiệu: **✔** = bắt buộc (`not null`) · **PK** = khóa chính · **FK
 
 ```
 Configuration (dữ liệu gốc dùng chung + cấu hình hiệu chuẩn)
-  part_numbers   locations   types   statuses   levels   departments
+  part_numbers   locations   types   tags       levels   departments
   part_numbers ──► types       (type_id — Type của mọi thiết bị mang part number)
   calibration_configurations ──► part_numbers  (part_number_id, UQ)
   calibration_vendors
@@ -52,7 +52,7 @@ Configuration (dữ liệu gốc dùng chung + cấu hình hiệu chuẩn)
 Equipment
   equipments ──► part_numbers  (part_number_id)
              ──► types         (type_id)
-             ──► statuses      (status_id)
+             ··· tags          (tag_ids — mảng id thẻ, database kiểm tra)
              ──► levels        (level_id)
              ──► locations     (location_id)
              ──► equipments    (parent_id — cây cha–con)
@@ -60,13 +60,13 @@ Equipment
 
 Calibration  (phụ thuộc một chiều vào Equipment)
   calibration_equipments ──► equipments           (equipment_id, UQ — mỗi thiết bị một dòng)
-                         ──► statuses             (status_id)
+                         ··· tags                 (tag_ids — mảng id thẻ)
                          ──► calibration_vendors  (vendor_id)
   calibration_histories                           (equipment_id, không FK)
 
 Golden sample
   golden_samples ──► locations  (location_id)
-                 ──► statuses   (status_id)
+                 ··· tags       (tag_ids — mảng id thẻ)
   golden_sample_histories       (golden_sample_id, không FK)
 
 User Management
@@ -100,7 +100,7 @@ Mỗi tài khoản thuộc **một** nhóm (`user_profiles.role`). Quyền của
 
 Tóm tắt: **Admin** làm được mọi thứ · **User** thêm / sửa / cập nhật, không xóa, không vào Configuration và User Management · **Readonly** chỉ xem, tìm kiếm và xuất Excel (xem được thì xuất được).
 
-User nhập sai thì sửa lại (cập nhật), không xóa. Muốn đánh dấu một dòng không còn dùng thì đổi trạng thái (ví dụ Inactive) — danh sách trạng thái admin tạo ở Configuration › Status.
+User nhập sai thì sửa lại (cập nhật), không xóa. Muốn ghi chú một dòng (ví dụ đang sửa chữa, để dự phòng) thì gắn **thẻ** trong phần Remark — danh sách thẻ admin tạo ở Configuration › Tag.
 
 ## Khuôn bảng lịch sử
 
@@ -135,7 +135,7 @@ Không có bảng riêng — chỉ đọc từ các module.
 
 | Khối trên Dashboard | Đọc từ | Ai thấy |
 | --- | --- | --- |
-| Số lượng theo trạng thái — Equipment, Calibration, Golden, mỗi trạng thái tô bằng `statuses.color` | `equipments`, `calibration_equipments`, `golden_samples`, `statuses` | Mọi nhóm |
+| Số lượng theo Status — Equipment (In use / Not in use) và Calibration (Calibration Status tự tính); thanh màu cố định | `equipments`, `calibration_equipments` | Mọi nhóm |
 | Số lượng thiết bị theo vị trí / loại | `equipments` | Mọi nhóm |
 | Thiết bị quá hạn / sắp đến hạn hiệu chuẩn | `calibration_equipments` (`due_date` so với hôm nay và `warning_days`) | Mọi nhóm |
 | **Thay đổi gần đây** | view `recent_activities` | Mọi nhóm; dòng của Configuration và User Management chỉ Admin thấy |
@@ -171,14 +171,15 @@ View nằm ở `04_functions.sql` (chạy lại được, không cần dựng l�
 | --- | --- | --- | --- | --- | --- |
 | `id` | uuid | ✔ | tự sinh | PK | Mã bất biến; dùng trong link QR `/equipment/{id}` |
 | `jabil_id` | text | | | | Mã nội bộ Jabil, ví dụ P12316 |
-| `part_number_id` | uuid | | | FK `part_numbers`; index | Mã part |
+| `part_number_id` | uuid | ✔ | | FK `part_numbers`; index | Mã part — **bắt buộc** |
 | `serial_number` | text | ✔ | | index; **không** UQ — trùng chỉ cảnh báo | Số serial in trên thiết bị |
 | `asset` | text | | | index | Mã tài sản kiểm kê |
-| `type_id` | uuid | | | FK `types`; index | Loại thiết bị. Có part number → **luôn bằng Type của part number** (database tự đặt khi thêm / sửa / import; form khóa ô, ghi "theo part number"). Không có part number → chọn tay |
-| `status_id` | uuid | ✔ | | FK `statuses` (`on delete restrict`); index | Trạng thái vận hành — bắt buộc. Trang Calibration hiện trạng thái này (một nguồn) |
+| `type_id` | uuid | ✔ | | FK `types`; index | Loại thiết bị — **bắt buộc và luôn bằng Type của part number** (database tự đặt khi thêm / sửa / import; form khóa ô, ghi "theo part number"; người dùng không chọn tay) |
+| `usage` | text | ✔ | `not_in_use` | check `in_use` / `not_in_use`; index | **Status** của thiết bị (giao diện gọi là Status; tên cột và các quy tắc bên dưới vẫn là `usage`): đang hoạt động (`in_use`) hay không (`not_in_use`). **Hệ thống tự quản, không có danh sách cấu hình**: đổi bằng Check-out / Check-in và đi theo chỗ khi Swap. Không sửa trong form |
 | `level_id` | uuid | | | FK `levels` | Level trên dây chuyền. Có cha → **luôn bằng Level của cha** (database tự đặt khi thêm / sửa / Đổi cha / Swap / import; form khóa ô, ghi "theo thiết bị cha"). Không có cha → chọn tay; Tách khỏi cha giữ Level đang có |
 | `location_id` | uuid | ✔ | | FK `locations`; index | Vị trí hiện tại; có cha thì tự theo vị trí của cha |
-| `remark` | text | | | form giới hạn 1000 ký tự | Ghi chú; bắt buộc khi trạng thái có `requires_remark` |
+| `remark` | text | | | form giới hạn 1000 ký tự | Ghi chú tự do |
+| `tag_ids` | uuid[] | ✔ | `{}` | Mỗi phần tử là `tags.id`; GIN index. Database kiểm tra mọi lần ghi (`04_functions.sql` mục 3e): bỏ trùng, thẻ phải có thật. Xóa thẻ đang gắn → `TAG_IN_USE` | **Thẻ** người dùng chọn trong phần Remark, nhiều thẻ cùng lúc; rỗng = chưa gắn thẻ. Độc lập với Status |
 | `parent_id` | uuid | | | FK `equipments` (`on delete cascade` — xóa cha thì xóa cả cây con); check `id <> parent_id`; index | Thiết bị cha; đặt khi thêm (form, import Excel), đổi trong form Sửa hoặc qua Move / Swap / Detach |
 | `created_at` | timestamptz | ✔ | now() | | |
 | `created_by` | uuid | | | FK `user_profiles` | |
@@ -186,15 +187,17 @@ View nằm ở `04_functions.sql` (chạy lại được, không cần dựng l�
 | `updated_by` | uuid | | | FK `user_profiles` | |
 
 Quy tắc nghiệp vụ:
+- **Usage** (`usage`): mặc định Not in use. **Check-out** (Thao tác của một thiết bị, hoặc nút Check-out trên thanh công cụ để tick nhiều thiết bị) → In use; **Check-in** → Not in use. Thiết bị được chọn **và toàn bộ con cháu** đổi cùng lúc, một giao dịch (`equipment_set_usage`); chọn riêng một thiết bị con thì cha không đổi. Thiết bị con **thêm mới** (form, Thêm thiết bị con, Import) lấy Usage của cha tại thời điểm thêm. Lịch sử ghi `CHECK_OUT` / `CHECK_IN` kèm ghi chú. Thiết bị (hoặc con cháu của nó) đang In use thì **không Xóa, Đổi vị trí, Đổi cha được** (`EQUIPMENT_IN_USE`) — phải Check-in trước; Swap vẫn được.
+- **Usage cần cha** (`part_numbers.usage_needs_parent`, `04_functions.sql` mục 3d): thiết bị loại này không có cha thì không In use được (`USAGE_NEEDS_PARENT`) — chặn ở Check-out, Swap và mọi đường ghi. **Tách khỏi cha** luôn được, kể cả khi In use: thiết bị tách ra và con cháu đi theo về Not in use (một dòng lịch sử `DETACH` kèm thay đổi Usage). **Gắn vào cha / Đổi cha**: thiết bị và nhánh con lấy Usage của cha lúc gắn. Admin bật cờ cho part number đang dùng → thiết bị đứng một mình đang In use về Not in use (ghi chú `via_part_number:<PN>`).
 - Thiết bị con luôn cùng vị trí và cùng Level với thiết bị cha (`04_functions.sql` mục 3c cho Level). Cha đổi Level → cả cây con đổi theo, lịch sử của con ghi chú `via_parent:<SN>`.
 - Thao tác cây trên thiết bị **có con** — Đổi vị trí, Gắn vào / Đổi cha (Move), Tách khỏi cha (Detach), Swap, Xóa, và đổi cha / vị trí trong form Sửa — bắt buộc người dùng chọn cách xử lý thiết bị con (`p_children` của các hàm trong `04_functions.sql`, mặc định `follow`):
   - **Đi theo** (`follow`): cả nhánh con đi cùng thiết bị (Xóa: xóa cả nhánh).
   - **Ở lại chỗ cũ** (`stay`): con trực tiếp giữ nguyên vị trí và gắn vào thiết bị **đến thay** (Swap: con của A → B, con của B → A) hoặc thiết bị **cha cũ** (Move / Detach / Xóa); không có cha cũ, hoặc Đổi vị trí, thì con đứng riêng. Cháu luôn đi cùng con của nó.
-- Swap: hai thiết bị đổi cho nhau thiết bị cha, vị trí và **trạng thái** (`status_id` — trạng thái đi theo chỗ: thiết bị vào chỗ đang chạy nhận Active, thiết bị ra dự phòng nhận Inactive; thiết bị tháo ra bị hỏng thì sửa tay sau đó). Level theo cha mới. Thiết bị con không đổi trạng thái. Không swap với cha / con của chính nó; chặn swap không thay đổi gì (cùng cha, cùng vị trí, trừ khi chọn con ở lại — khi đó hai bên đổi con cho nhau).
+- Swap: **chỉ hai thiết bị cùng Type** (Fixture với Fixture, Base với Base…; khác Type → `SWAP_TYPE_MISMATCH`; màn hình chỉ liệt kê thiết bị cùng Type). Hai thiết bị đổi cho nhau thiết bị cha, vị trí và **Usage** (đi theo chỗ: thiết bị vào chỗ đang chạy thành In use, thiết bị ra thành Not in use; con đi theo cha mới cũng lấy Usage mới, con ở lại giữ Usage của chính nó). **Status giữ nguyên** (là của thiết bị, theo SN). Level theo cha mới. Không swap với cha / con của chính nó; chặn swap không thay đổi gì (cùng cha, cùng vị trí, trừ khi chọn con ở lại — khi đó hai bên đổi con cho nhau).
 - Lịch sử thiết bị bị xóa cùng cây ghi đúng serial của thiết bị cha (lấy từ lịch sử khi cha đã bị xóa).
 - Serial trùng chỉ cảnh báo, không chặn.
 
-Trường trên form thiết bị (theo thứ tự): Serial Number ✔, Part Number, Jabil ID, Asset, Type (chọn part number → tự điền theo part number và khóa), Level (có cha → theo cha và khóa), Status, Thiết bị cha (Thêm thiết bị con: điền sẵn và khóa), Location ✔ (trừ khi có cha), Remark. Import Excel: có Part number thì để trống cột Type, có Parent thì để trống cột Level (ghi đúng giá trị đó cũng được; ghi khác → lỗi dòng). Có cha thì `location_id`, `level_id` = của cha (server tự đặt, bỏ qua giá trị gửi lên). Sửa `parent_id` trong form: cha mới → server gọi `equipment_move` (lịch sử `MOVE`), bỏ trống → `equipment_detach` (`DETACH`); server kiểm tra cha tồn tại và không nằm trong cây con trước khi ghi. Thiết bị có con mà đổi cha / vị trí: form hỏi thêm `children_mode` (đi theo / ở lại), truyền xuống `p_children`. Import Excel: cột Parent serial number + Parent part number (tìm cha trong hệ thống hoặc trong cùng file); hàm `equipment_import` nhận sẵn `id` + `parent_id` của từng dòng do server đặt.
+Trường trên form thiết bị (theo thứ tự): Serial Number ✔, Part Number ✔, Jabil ID, Asset, Type ✔ (tự điền theo part number và khóa), Level (có cha → theo cha và khóa), Status, Thiết bị cha (Thêm thiết bị con: điền sẵn và khóa), Location ✔ (trừ khi có cha), Remark. Import Excel: cột Part number bắt buộc, cột Type để trống (ghi đúng Type của part number cũng được), có Parent thì để trống cột Level (ghi đúng giá trị đó cũng được; ghi khác → lỗi dòng). Có cha thì `location_id`, `level_id` = của cha (server tự đặt, bỏ qua giá trị gửi lên). Sửa `parent_id` trong form: cha mới → server gọi `equipment_move` (lịch sử `MOVE`), bỏ trống → `equipment_detach` (`DETACH`); server kiểm tra cha tồn tại và không nằm trong cây con trước khi ghi. Thiết bị có con mà đổi cha / vị trí: form hỏi thêm `children_mode` (đi theo / ở lại), truyền xuống `p_children`. Import Excel: cột Parent serial number + Parent part number (tìm cha trong hệ thống hoặc trong cùng file); hàm `equipment_import` nhận sẵn `id` + `parent_id` của từng dòng do server đặt.
 
 ### `equipment_histories` — lịch sử thiết bị
 
@@ -208,6 +211,8 @@ Theo [khuôn bảng lịch sử](#khuôn-bảng-lịch-sử), cột trỏ về l
 | `MOVE` | Đổi cha |
 | `SWAP` | Đổi chỗ với thiết bị khác |
 | `DETACH` | Tách khỏi cha |
+| `CHECK_OUT` | Check-out: Not in use → In use (ghi cho thiết bị được chọn và từng con cháu) |
+| `CHECK_IN` | Check-in: In use → Not in use |
 | `DELETE` | Xóa (ghi cho **từng** thiết bị trong cây khi xóa cha) |
 
 Tab History của thiết bị đọc bảng này. Thiết bị đã xóa: tra cứu lịch sử theo serial (đọc `changes` của dòng `DELETE`).
@@ -220,11 +225,11 @@ Tab History của thiết bị đọc bảng này. Thiết bị đã xóa: tra c
 | --- | --- | --- |
 | Calibration (Dashboard hiệu chuẩn) | Không thêm tay: thiết bị có part number trong Configuration › Hiệu chuẩn › Setup tự có mặt. Theo dõi: mỗi thiết bị một dòng; mỗi lần hiệu chuẩn, user cập nhật ngày / trạng thái / vendor / ghi chú ngay trên dòng đó | `calibration_equipments` |
 
-Chu kỳ và vendor cấu hình ở [Configuration](#5-configuration). Trạng thái là của thiết bị (`equipments.status_id`) — trang Calibration chỉ hiện, sửa ở Equipment. Quá hạn / sắp đến hạn (Over Due / Due Soon) tự tính từ `due_date` và `warning_days`, không phải trạng thái nhập tay. Lần hiệu chuẩn trước không mất: mỗi lần cập nhật ghi giá trị cũ → mới vào `calibration_histories`. Xóa thiết bị thì dòng hiệu chuẩn xóa theo; lịch sử vẫn còn.
+Chu kỳ và vendor cấu hình ở [Configuration](#5-configuration). **Calibration Status** do hệ thống tự tính (`calibrationStatus` trong `lib/services/calibration.ts`), không ai chọn, không lưu: chưa có ngày hiệu chuẩn = **Under calibration**; có ngày thì theo hạn — **Valid** (còn xa hạn), **Due soon** (còn ≤ `warning_days` ngày), **Overdue** (quá hạn). Ngày đến hạn tự tính từ `calibration_date` + chu kỳ. Lần hiệu chuẩn trước không mất: mỗi lần cập nhật ghi giá trị cũ → mới vào `calibration_histories`. Xóa thiết bị thì dòng hiệu chuẩn xóa theo; lịch sử vẫn còn.
 
 ### `calibration_equipments` — Dashboard hiệu chuẩn
 
-Mỗi thiết bị có part number trong Setup hiệu chuẩn là một dòng, luôn giữ trạng thái **hiện tại**. Database tự thêm / bỏ dòng (04_functions.sql mục 4): thêm PN vào Setup, thêm thiết bị (kể cả import), đổi part number. Không ai thêm / xóa tay. User không xóa: nhập sai thì sửa lại, thiết bị tạm không hiệu chuẩn thì đổi `status_id` (ví dụ Inactive).
+Mỗi thiết bị có part number trong Setup hiệu chuẩn là một dòng. Database tự thêm / bỏ dòng (04_functions.sql mục 4): thêm PN vào Setup, thêm thiết bị (kể cả import), đổi part number. Không ai thêm / xóa tay. User không xóa: nhập sai thì sửa lại; thiết bị chưa hiệu chuẩn tự hiện Under calibration.
 
 | Trường | Kiểu | ✔ | Mặc định | Ràng buộc / liên kết | Ai nhập | Ý nghĩa |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -234,6 +239,7 @@ Mỗi thiết bị có part number trong Setup hiệu chuẩn là một dòng, l
 | `calibration_date` | date | | | | User | Ngày hiệu chuẩn gần nhất; trống = chưa hiệu chuẩn |
 | `due_date` | date | | | check ≥ `calibration_date`; index | **Tự tính** | `calibration_date` + `interval_months` của part number thiết bị; tính lại khi `calibration_date` đổi, admin đổi chu kỳ, hoặc thiết bị đổi part number |
 | `remark` | text | | | | User | Ghi chú của lần hiệu chuẩn |
+| `tag_ids` | uuid[] | ✔ | `{}` | Mỗi phần tử là `tags.id`; kiểm tra như `equipments.tag_ids` | User | Thẻ chọn trong phần Remark |
 | `created_by` | uuid | | | FK `user_profiles` | | |
 | `created_at` | timestamptz | ✔ | now() | | | |
 | `updated_by` | uuid | | | FK `user_profiles` | | |
@@ -253,7 +259,7 @@ Theo [khuôn bảng lịch sử](#khuôn-bảng-lịch-sử), cột trỏ về l
 | `ADD` | Thiết bị lên Dashboard (PN vào Setup, thêm thiết bị, đổi PN) | `equipment_id`, part number, `interval_months` lúc thêm |
 | `REMOVE` | Rời Dashboard (PN bỏ khỏi Setup, đổi PN, xóa thiết bị) | Toàn bộ dòng trước khi xóa |
 | `UPDATE` | Sửa vendor, trạng thái, ghi chú (không phải lần hiệu chuẩn mới); `due_date` đổi do đổi chu kỳ / part number | Trường đổi: cũ → mới |
-| `CALIBRATE` | Nhập lần hiệu chuẩn mới (đổi `calibration_date`) | `calibration_date`, `due_date`, `status`, `vendor`, `remark`: cũ → mới |
+| `CALIBRATE` | Nhập lần hiệu chuẩn mới (đổi `calibration_date`) | `calibration_date`, `due_date`, `vendor`, `remark`: cũ → mới |
 
 Xem lại các lần hiệu chuẩn của một thiết bị = lọc `action = 'CALIBRATE'` theo `equipment_id`.
 
@@ -277,11 +283,11 @@ Xóa golden sample là xóa thật; lịch sử vẫn còn trong `golden_sample_
 | `part_number` | text | ✔ | | index; gõ tự do | Part number của PCBA |
 | `serial_number` | text | ✔ | | index; gõ tự do; **không** UQ — trùng chỉ cảnh báo | Số serial của PCBA |
 | `location_id` | uuid | ✔ | | FK `locations.id`; index | Vị trí hiện tại |
-| `status_id` | uuid | ✔ | | FK `statuses` (`on delete restrict`); index | Trạng thái — bắt buộc, ví dụ Active / Inactive — User đánh dấu hỏng / ngừng dùng bằng trạng thái thay vì xóa |
 | `utd_part_number` | text | | | gõ tự do | UTD part number |
 | `origin` | text | | | gõ tự do | Nguồn gốc |
 | `purpose` | text | | | gõ tự do | Mục đích sử dụng |
-| `remark` | text | | | form giới hạn 1000 ký tự | Ghi chú; bắt buộc khi trạng thái có `requires_remark` |
+| `remark` | text | | | form giới hạn 1000 ký tự | Ghi chú tự do |
+| `tag_ids` | uuid[] | ✔ | `{}` | Mỗi phần tử là `tags.id`; kiểm tra như `equipments.tag_ids` | Thẻ chọn trong phần Remark. Golden sample **không có Status** — cần ghi chú gì thì gắn thẻ / viết Remark |
 | `created_by` | uuid | | | FK `user_profiles` | |
 | `created_at` | timestamptz | ✔ | now() | | |
 | `updated_by` | uuid | | | FK `user_profiles` | |
@@ -309,14 +315,14 @@ Mọi trang cấu hình nằm ở menu **Configuration**, chỉ **Admin** vào �
 | Configuration › Part Number | `part_numbers` | `equipments`, `calibration_configurations` |
 | Configuration › Location | `locations` | `equipments`, `golden_samples` |
 | Configuration › Type | `types` | `part_numbers`, `equipments` |
-| Configuration › Status | `statuses` | `equipments`, `calibration_equipments`, `golden_samples` |
+| Configuration › Tag | `tags` | `equipments`, `calibration_equipments`, `golden_samples` (cột `tag_ids`) |
 | Configuration › Level | `levels` | `equipments` |
 | Configuration › Department | `departments` | `user_profiles` |
 | Configuration › Hiệu chuẩn › Setup | `calibration_configurations` | `calibration_equipments` |
 | Configuration › Hiệu chuẩn › Vendor | `calibration_vendors` | `calibration_equipments` |
 
 Quy tắc:
-- **Xóa** = ẩn (`is_active = false`): dòng đang dùng giữ nguyên, nhưng không chọn được cho dữ liệu mới. Riêng `statuses` (bị chặn khi đang được dùng) và `calibration_configurations` (thiết bị của part number rời Dashboard hiệu chuẩn) xóa thật.
+- **Xóa** = ẩn (`is_active = false`): dòng đang dùng giữ nguyên, nhưng không chọn được cho dữ liệu mới. Riêng `tags` (bị chặn khi đang được dùng) và `calibration_configurations` (thiết bị của part number rời Dashboard hiệu chuẩn) xóa thật.
 - `display_name` không được trùng trong cùng bảng.
 - Import Excel: tìm theo `display_name` (không phân biệt hoa/thường). Giá trị chưa có (hoặc đã ẩn) → báo lỗi dòng đó là "chưa có", không tự tạo mới.
 
@@ -327,6 +333,7 @@ Quy tắc:
 | `id` | uuid | ✔ | tự sinh | PK | |
 | `display_name` | text | ✔ | | UQ (không phân biệt hoa/thường) | Mã part |
 | `type_id` | uuid | ✔ | | FK `types`; index | Loại thiết bị của part number — Admin chọn khi thêm part number |
+| `usage_needs_parent` | boolean | ✔ | `false` | | `true`: thiết bị mang part number này **chỉ In use được khi đã gắn vào thiết bị cha** (đứng một mình thì luôn Not in use). Xem quy tắc Usage ở mục Equipment |
 | `sort_order` | integer | ✔ | `0` | index (`sort_order`, `display_name`) | Thứ tự hiển thị |
 | `is_active` | boolean | ✔ | `true` | | `false` = ngừng dùng cho dữ liệu mới |
 | `created_by` | uuid | | | FK `user_profiles` | |
@@ -368,26 +375,25 @@ Quy tắc Type theo part number (`04_functions.sql` mục 3b):
 
 Dữ liệu mẫu: Tester, Base, Fixture, Equipment. *Bàn sau:* icon theo loại trên UI.
 
-### `statuses` — trạng thái
+### `tags` — thẻ trong phần Remark
 
-Một danh sách trạng thái chung cho cả project: thiết bị (cũng là trạng thái trên trang Calibration) và golden sample chọn trong cùng danh sách.
+Danh sách thẻ (có màu) dùng chung cho cả project: người dùng chọn **nhiều thẻ** trong phần Remark của Equipment, Calibration và Golden sample (cột `tag_ids` của từng bảng). Thẻ **không phải Status**: Status của Equipment (In use / Not in use) và Calibration Status (Under calibration / Valid / Due soon / Overdue) do hệ thống tự quản, admin không cấu hình.
 
 | Trường | Kiểu | ✔ | Mặc định | Ràng buộc / liên kết | Ý nghĩa |
 | --- | --- | --- | --- | --- | --- |
 | `id` | uuid | ✔ | tự sinh | PK | |
-| `display_name` | text | ✔ | | UQ (không phân biệt hoa/thường) | Tên trạng thái |
-| `sort_order` | integer | ✔ | `0` | index (`sort_order`, `display_name`) | Thứ tự hiển thị |
-| `requires_remark` | boolean | ✔ | `false` | | Chọn trạng thái này thì Remark thành bắt buộc (ở mọi trang dùng trạng thái này) |
-| `color` | text | ✔ | `gray` | `green` / `yellow` / `red` / `blue` / `gray` | Màu hiển thị của trạng thái trên toàn hệ thống (tag, Dashboard). Admin bắt buộc chọn khi thêm |
+| `display_name` | text | ✔ | | UQ (không phân biệt hoa/thường) | Tên thẻ |
+| `sort_order` | integer | ✔ | `0` | index (`sort_order`, `display_name`) | Thứ tự hiển thị (thẻ của một bản ghi xếp theo thứ tự này) |
+| `color` | text | ✔ | `gray` | `green` / `yellow` / `red` / `blue` / `gray` | Màu hiển thị của thẻ trên toàn hệ thống. Admin bắt buộc chọn khi thêm |
 | `created_by` | uuid | | | FK `user_profiles` | |
 | `created_at` | timestamptz | ✔ | now() | | |
 | `updated_by` | uuid | | | FK `user_profiles` | |
 | `updated_at` | timestamptz | ✔ | now() | | |
 
 Quy tắc:
-- Thiết bị và golden sample luôn có trạng thái (`status_id` bắt buộc). Trạng thái đang được dùng thì không xóa được.
-- Over Due / Due Soon không phải trạng thái: hệ thống tự tính trên trang Calibration và Dashboard.
-- `color` chỉ là một trong 5 màu hệ thống bên dưới, không nhập mã màu tự do. Database lưu tên màu; mã màu sáng / tối nằm ở giao diện (docs/JABIL_UI.md), nên đổi sắc độ một màu thì mọi trạng thái dùng màu đó đổi theo.
+- Thẻ đang được gắn trên bản ghi nào thì không xóa được (`TAG_IN_USE`); xóa thật khi không còn dùng.
+- Lịch sử của bản ghi ghi **tên** thẻ (trường `tags`: cũ → mới, theo thứ tự cấu hình); đổi thứ tự chọn mà cùng tập thẻ thì không ghi.
+- `color` chỉ là một trong 5 màu hệ thống bên dưới, không nhập mã màu tự do. Database lưu tên màu; mã màu sáng / tối nằm ở giao diện (docs/JABIL_UI.md), nên đổi sắc độ một màu thì mọi thẻ dùng màu đó đổi theo.
 
 5 màu hệ thống (đỏ, xanh lá, vàng là bắt buộc; thêm xanh dương và xám):
 
@@ -399,15 +405,14 @@ Quy tắc:
 | `blue` | Xanh dương | Đang chờ, thông tin, chưa bắt đầu | Wait Registration |
 | `gray` | Xám | Ngừng dùng, trung tính | Inactive |
 
-Dữ liệu mẫu (admin tự tạo):
+Dữ liệu mẫu (`03_seed_sample.sql`):
 
 | `display_name` | `color` |
 | --- | --- |
-| Active | green |
-| Inactive | gray |
-| Repair (bắt buộc remark) | yellow |
+| Repair | yellow |
 | Wait Registration | blue |
 | Wait Calibration | blue |
+| Spare | gray |
 
 ### `levels` — level trên dây chuyền
 
@@ -479,7 +484,7 @@ Theo [khuôn bảng lịch sử](#khuôn-bảng-lịch-sử), cột trỏ về l
 | --- | --- |
 | `CREATE` | Thêm dòng |
 | `UPDATE` | Sửa dòng (kể cả ẩn / hiện lại qua `is_active`) |
-| `DELETE` | Xóa thật (chỉ `statuses`, `calibration_configurations`) |
+| `DELETE` | Xóa thật (chỉ `tags`, `calibration_configurations`) |
 
 ---
 

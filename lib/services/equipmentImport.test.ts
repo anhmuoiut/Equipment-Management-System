@@ -5,30 +5,24 @@ vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => { throw new Error(
 import ExcelJS from 'exceljs';
 import { buildTemplate, cellText, checkTable, readWorkbook, type ExistingEquipment } from './equipmentImport';
 import type { Lookups } from './core/lookups';
-import type { StatusOption } from '@/lib/types';
 import { AppError } from '@/lib/errors';
 
 type Named = { id: string; display_name: string; sort_order: number; is_active: boolean };
 const named = (prefix: string, names: [string, boolean?][]): Map<string, Named> =>
   new Map(names.map(([name, active = true], i) => [`${prefix}-${i}`, { id: `${prefix}-${i}`, display_name: name, sort_order: i, is_active: active }]));
-const status = (id: string, name: string, remark = false): [string, StatusOption] =>
-  [id, { id, display_name: name, sort_order: 0, requires_remark: remark, color: 'gray' }];
 
 // Mỗi part number có Type (Configuration › Part Number): P12316 → Tester, P20001 → Fixture, OLD-PN → Tester.
 const PN_TYPES: Record<string, string> = { 'pn-0': 'type-0', 'pn-1': 'type-1', 'pn-2': 'type-0' };
 
 const lookups: Lookups = {
   part_numbers: new Map([...named('pn', [['P12316'], ['P20001'], ['OLD-PN', false]])]
-    .map(([id, pn]) => [id, { ...pn, type_id: PN_TYPES[id]! }])),
+    .map(([id, pn]) => [id, { ...pn, type_id: PN_TYPES[id]!, usage_needs_parent: false }])),
   types: named('type', [['Tester'], ['Fixture']]),
   levels: named('level', [['1'], ['2'], ['3'], ['4'], ['5']]),
   locations: named('loc', [['B3F1'], ['B3F2'], ['Closed', false]]),
   departments: new Map(),
   calibration_vendors: new Map(),
-  statuses: new Map([
-    status('st-active', 'Active'),
-    status('st-repair', 'Repair', true),
-  ]),
+  tags: new Map(),
   users: new Map(),
 };
 
@@ -55,17 +49,17 @@ const check = async (rows: (string | number | null)[][], existing: ExistingEquip
 const eq = (id: string, serial: string, part: string | null, location: string, level: string | null = null): ExistingEquipment =>
   ({ id, serial_number: serial, part_number_id: part, location_id: location, level_id: level });
 
-/** Một dòng file mẫu; mặc định chỉ có Serial + Status (Active, bắt buộc) + Location. */
+/** Một dòng file mẫu; mặc định chỉ có Serial + Part number (P12316) + Location. */
 type Cells = {
-  sn?: string | null; pn?: string; jabil?: string; asset?: string; type?: string; level?: string | number;
-  status?: string | null; loc?: string | null; parent?: string; parentPn?: string; remark?: string;
+  sn?: string | null; pn?: string | null; jabil?: string; asset?: string; type?: string; level?: string | number;
+  loc?: string | null; parent?: string; parentPn?: string; remark?: string;
 };
 const line = (c: Cells): (string | number | null)[] => [
-  c.sn === undefined ? 'SN-X' : c.sn, c.pn ?? null, c.jabil ?? null, c.asset ?? null, c.type ?? null, c.level ?? null,
-  c.status === undefined ? 'Active' : c.status, c.loc === undefined ? 'B3F1' : c.loc, c.parent ?? null, c.parentPn ?? null, c.remark ?? null,
+  c.sn === undefined ? 'SN-X' : c.sn, c.pn === undefined ? 'P12316' : c.pn, c.jabil ?? null, c.asset ?? null, c.type ?? null, c.level ?? null,
+  c.loc === undefined ? 'B3F1' : c.loc, c.parent ?? null, c.parentPn ?? null, c.remark ?? null,
 ];
 
-const GOOD = () => line({ sn: 'SN-001', pn: 'P12316', jabil: 'J1', asset: 'A-01', type: 'Tester', level: '3', status: 'Active' });
+const GOOD = () => line({ sn: 'SN-001', pn: 'P12316', jabil: 'J1', asset: 'A-01', type: 'Tester', level: '3' });
 
 describe('equipment import template — ghi chú theo Configuration lúc tải', () => {
   it('has the entry sheet first, then guide and valid values', async () => {
@@ -77,22 +71,21 @@ describe('equipment import template — ghi chú theo Configuration lúc tải',
   it('row 1 tells what each column accepts, row 2 is the header with * on required columns', async () => {
     const ws = (await loadTemplate()).getWorksheet('Equipment')!;
     const header = (c: number) => cellText(ws.getCell(2, c).value);
-    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(header)).toEqual([
-      'Serial number *', 'Part number', 'Jabil ID', 'Asset', 'Type', 'Level', 'Status *', 'Location *',
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(header)).toEqual([
+      'Serial number *', 'Part number *', 'Jabil ID', 'Asset', 'Type', 'Level', 'Location *',
       'Parent serial number', 'Parent part number', 'Remark',
     ]);
     expect(cellText(ws.getCell('F1').value)).toBe('Chọn: 1, 2, 3, 4, 5 · có Parent thì để trống: Level theo thiết bị cha');
     expect(cellText(ws.getCell('A1').value)).toContain('Bắt buộc');
     expect(cellText(ws.getCell('A1').value)).toContain('200');
-    // Status: bắt buộc, một danh sách trạng thái chung; Repair cần Remark.
-    expect(cellText(ws.getCell('G1').value)).toBe('Bắt buộc · Chọn: Active, Repair · Repair cần Remark');
-    expect(cellText(ws.getCell('K1').value)).toContain('bắt buộc khi Status là Repair');
+    // Không còn cột Status (Status của thiết bị do hệ thống quản); thẻ chọn trong phần Remark của app.
+    expect(ws.getCell('K2').value).toBeNull();
     // Giá trị đã ẩn không có trong danh sách chọn.
-    expect(cellText(ws.getCell('B1').value)).toBe('Chọn: P12316, P20001');
+    expect(cellText(ws.getCell('B1').value)).toBe('Bắt buộc · Chọn: P12316, P20001');
     // Location: bắt buộc trừ khi có thiết bị cha; cột cha giải thích cách tìm.
-    expect(cellText(ws.getCell('H1').value)).toBe('Bắt buộc khi không có Parent (có Parent thì để trống) · Chọn: B3F1, B3F2');
-    expect(cellText(ws.getCell('I1').value)).toContain('một dòng khác trong file này');
-    expect(cellText(ws.getCell('J1').value)).toContain('Chỉ cần khi serial cha trùng');
+    expect(cellText(ws.getCell('G1').value)).toBe('Bắt buộc khi không có Parent (có Parent thì để trống) · Chọn: B3F1, B3F2');
+    expect(cellText(ws.getCell('H1').value)).toContain('một dòng khác trong file này');
+    expect(cellText(ws.getCell('I1').value)).toContain('Chỉ cần khi serial cha trùng');
   });
 
   it('list columns get a drop-down from the valid values sheet, text columns a length limit', async () => {
@@ -104,9 +97,9 @@ describe('equipment import template — ghi chú theo Configuration lúc tải',
     expect(level.prompt).toBe('Chọn: 1, 2, 3, 4, 5 · có Parent thì để trống: Level theo thiết bị cha');
     expect(ws.getCell('F1002').dataValidation.type).toBe('list');
     expect(ws.getCell('A3').dataValidation).toMatchObject({ type: 'textLength', operator: 'lessThanOrEqual', formulae: [200] });
-    expect(ws.getCell('K3').dataValidation.formulae).toEqual([1000]);
+    expect(ws.getCell('J3').dataValidation.formulae).toEqual([1000]);
     // Part number của cha dùng chung danh sách Part number, chỉ cảnh báo (mã đã ẩn vẫn tìm được).
-    expect(ws.getCell('J3').dataValidation).toMatchObject({
+    expect(ws.getCell('I3').dataValidation).toMatchObject({
       type: 'list', formulae: ["'Giá trị hợp lệ'!$A$2:$A$3"], errorStyle: 'warning',
     });
 
@@ -114,7 +107,7 @@ describe('equipment import template — ghi chú theo Configuration lúc tải',
     const column = (c: number) => (values.getColumn(c).values as ExcelJS.CellValue[]).slice(1).map((v) => cellText(v));
     expect(column(1)).toEqual(['Part number', 'P12316', 'P20001']);
     expect(column(3)).toEqual(['Level', '1', '2', '3', '4', '5']);
-    expect(column(4)).toEqual(['Status', 'Active', 'Repair']);
+    expect(column(4)).toEqual(['Location', 'B3F1', 'B3F2']);
   });
 
   it('follows Configuration at download time — a new level shows up in the next template', async () => {
@@ -129,30 +122,28 @@ describe('equipment import template — ghi chú theo Configuration lúc tải',
 describe('equipment import check — cùng quy tắc với form Thêm thiết bị', () => {
   it('maps every column of a valid row to ids, matching names case-insensitively', async () => {
     const { report, inserts } = await check([
-      GOOD(), line({ sn: 'SN-002', pn: 'p20001', type: 'fixture', level: 5, status: 'active', loc: 'b3f2', remark: 'ok' }),
+      GOOD(), line({ sn: 'SN-002', pn: 'p20001', type: 'fixture', level: 5, loc: 'b3f2', remark: 'ok' }),
     ]);
     expect(report).toMatchObject({ total: 2, valid: 2, invalid: 0, duplicates: 0, rows: [], ignored_columns: [] });
     expect(inserts).toEqual([
-      { id: 'new-1', serial_number: 'SN-001', part_number_id: 'pn-0', jabil_id: 'J1', asset: 'A-01', type_id: 'type-0', level_id: 'level-2', status_id: 'st-active', location_id: 'loc-0', parent_id: null, remark: null },
-      { id: 'new-2', serial_number: 'SN-002', part_number_id: 'pn-1', jabil_id: null, asset: null, type_id: 'type-1', level_id: 'level-4', status_id: 'st-active', location_id: 'loc-1', parent_id: null, remark: 'ok' },
+      { id: 'new-1', serial_number: 'SN-001', part_number_id: 'pn-0', jabil_id: 'J1', asset: 'A-01', type_id: 'type-0', level_id: 'level-2', location_id: 'loc-0', parent_id: null, remark: null },
+      { id: 'new-2', serial_number: 'SN-002', part_number_id: 'pn-1', jabil_id: null, asset: null, type_id: 'type-1', level_id: 'level-4', location_id: 'loc-1', parent_id: null, remark: 'ok' },
     ]);
   });
 
   it('reports each bad cell with its Excel row number', async () => {
     const { report, inserts } = await check([
       GOOD(),
-      line({ sn: null, pn: 'P12316', level: '6', status: null, loc: null }),
-      line({ sn: 'SN-003', pn: 'OLD-PN', status: 'Pass', loc: 'Closed' }),
-      line({ sn: 'SN-004', status: 'Repair' }),
+      line({ sn: null, pn: 'P12316', level: '6', loc: null }),
+      line({ sn: 'SN-003', pn: 'OLD-PN', loc: 'Closed' }),
       line({ sn: 'x'.repeat(201) }),
     ]);
-    expect(report).toMatchObject({ total: 5, valid: 1, invalid: 4 });
+    expect(report).toMatchObject({ total: 4, valid: 1, invalid: 3 });
     expect(inserts).toHaveLength(1);
     expect(report.rows.map((r) => [r.row, r.issues])).toEqual([
-      [4, [{ column: 'serial_number', code: 'required' }, { column: 'level_id', code: 'not_found', value: '6' }, { column: 'status_id', code: 'required' }, { column: 'location_id', code: 'required' }]],
-      [5, [{ column: 'part_number_id', code: 'inactive', value: 'OLD-PN' }, { column: 'status_id', code: 'not_found', value: 'Pass' }, { column: 'location_id', code: 'inactive', value: 'Closed' }]],
-      [6, [{ column: 'remark', code: 'remark_required', value: 'Repair' }]],
-      [7, [{ column: 'serial_number', code: 'too_long', max: 200 }]],
+      [4, [{ column: 'serial_number', code: 'required' }, { column: 'level_id', code: 'not_found', value: '6' }, { column: 'location_id', code: 'required' }]],
+      [5, [{ column: 'part_number_id', code: 'inactive', value: 'OLD-PN' }, { column: 'location_id', code: 'inactive', value: 'Closed' }]],
+      [6, [{ column: 'serial_number', code: 'too_long', max: 200 }]],
     ]);
   });
 
@@ -166,10 +157,10 @@ describe('equipment import check — cùng quy tắc với form Thêm thiết b�
   it('skips blank rows and accepts a file whose header is on row 1', async () => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Data');
-    ws.addRow(['SERIAL NUMBER', 'status', 'location', 'Note']);
-    ws.addRow(['SN-1', 'Active', 'B3F1', 'x']);
+    ws.addRow(['SERIAL NUMBER', 'PART NUMBER', 'location', 'Note']);
+    ws.addRow(['SN-1', 'P12316', 'B3F1', 'x']);
     ws.addRow([]);
-    ws.addRow(['SN-2', 'active', 'B3F2', '']);
+    ws.addRow(['SN-2', 'p12316', 'B3F2', '']);
     const table = await readWorkbook(Buffer.from(await wb.xlsx.writeBuffer()));
     const { report, inserts } = checkTable(table, lookups, []);
     expect(report).toMatchObject({ total: 2, valid: 2, ignored_columns: ['Note'] });
@@ -184,7 +175,7 @@ describe('equipment import check — cùng quy tắc với form Thêm thiết b�
     const table = await readWorkbook(Buffer.from(await wb.xlsx.writeBuffer()));
     expect(() => checkTable(table, lookups, [])).toThrow(AppError);
     try { checkTable(table, lookups, []); } catch (e) {
-      expect(fileCode(e)).toEqual({ fields: { file: 'missing_columns' }, columns: ['Status', 'Location'] });
+      expect(fileCode(e)).toEqual({ fields: { file: 'missing_columns' }, columns: ['Location'] });
     }
     const empty = await readWorkbook(await filledTemplate([]));
     try { checkTable(empty, lookups, []); throw new Error('expected empty'); } catch (e) {
@@ -261,9 +252,9 @@ describe('equipment import — thiết bị cha', () => {
   it('a file without a Location column is fine when every row has a parent', async () => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Data');
-    ws.addRow(['Serial number', 'Status', 'Parent serial number']);
-    ws.addRow(['CH-1', 'Active', 'RACK-01']);
-    ws.addRow(['CH-2', 'Active', '']);
+    ws.addRow(['Serial number', 'Part number', 'Parent serial number']);
+    ws.addRow(['CH-1', 'P12316', 'RACK-01']);
+    ws.addRow(['CH-2', 'P12316', '']);
     const { report } = checkTable(await readWorkbook(Buffer.from(await wb.xlsx.writeBuffer())), lookups, [RACK], ids());
     expect(report.rows.map((r) => [r.row, r.issues])).toEqual([[3, [{ column: 'location_id', code: 'required' }]]]);
   });
@@ -275,12 +266,14 @@ describe('equipment import — Type theo part number', () => {
       line({ sn: 'A', pn: 'P12316' }),
       line({ sn: 'B', pn: 'P12316', type: 'tester' }),
       line({ sn: 'C', pn: 'P12316', type: 'Fixture' }),
-      line({ sn: 'D', type: 'Fixture' }),
+      line({ sn: 'D', pn: 'P20001', type: 'Fixture' }),
+      line({ sn: 'E', pn: null }),
     ]);
+    // Part number bắt buộc: dòng không có part number báo lỗi "bắt buộc"; Type luôn theo part number.
     expect(report.rows.map((r) => [r.row, r.issues])).toEqual([
       [5, [{ column: 'type_id', code: 'type_follows_part_number', value: 'Tester' }]],
+      [7, [{ column: 'part_number_id', code: 'required' }]],
     ]);
-    // Không có part number → Type tự chọn như trước.
     expect(inserts.map((r) => [r.serial_number, r.type_id])).toEqual([['A', 'type-0'], ['B', 'type-0'], ['D', 'type-1']]);
   });
 

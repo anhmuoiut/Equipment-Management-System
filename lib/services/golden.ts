@@ -3,25 +3,25 @@ import 'server-only';
 /** Module Golden sample — bảng golden_samples, golden_sample_histories. */
 import { appWrite, selectAll, selectOne } from './core/db';
 import { readHistory } from './core/history';
-import { assertActive, assertStatus, auditOf, loadLookups, nameOf, statusColorOf, type Lookups } from './core/lookups';
+import { assertActive, assertTags, auditOf, loadLookups, nameOf, tagItems, type Lookups } from './core/lookups';
 import { AppError } from '@/lib/errors';
 import type { GoldenRow, HistoryEntry } from '@/lib/types';
 
 type DbGolden = {
   id: string; part_number: string; serial_number: string; utd_part_number: string | null; location_id: string;
-  status_id: string | null; origin: string | null; purpose: string | null; remark: string | null;
+  origin: string | null; purpose: string | null; remark: string | null; tag_ids: string[];
   created_at: string; created_by: string | null; updated_at: string; updated_by: string | null;
 };
 
 export type GoldenInput = Partial<Pick<DbGolden,
-  'part_number' | 'serial_number' | 'utd_part_number' | 'location_id' | 'status_id' | 'origin' | 'purpose' | 'remark'>>;
+  'part_number' | 'serial_number' | 'utd_part_number' | 'location_id' | 'origin' | 'purpose' | 'remark' | 'tag_ids'>>;
 
 function toRow(g: DbGolden, lookups: Lookups): GoldenRow {
   return {
     id: g.id, part_number: g.part_number, serial_number: g.serial_number, utd_part_number: g.utd_part_number,
     location_id: g.location_id, location: nameOf(lookups.locations, g.location_id),
-    status_id: g.status_id, status: nameOf(lookups.statuses, g.status_id), status_color: statusColorOf(lookups, g.status_id),
     origin: g.origin, purpose: g.purpose, remark: g.remark,
+    tag_ids: g.tag_ids ?? [], tags: tagItems(lookups, g.tag_ids),
     ...auditOf(lookups, g),
   };
 }
@@ -39,9 +39,7 @@ export async function getGolden(id: string): Promise<GoldenRow> {
 
 function validate(input: GoldenInput, lookups: Lookups, before?: DbGolden) {
   assertActive(lookups.locations, input.location_id, 'location_id', before?.location_id);
-  const statusId = input.status_id !== undefined ? input.status_id : before?.status_id;
-  const remark = input.remark !== undefined ? input.remark : before?.remark;
-  if (!before || statusId !== before.status_id || input.remark !== undefined) assertStatus(lookups, statusId, remark);
+  assertTags(lookups, input.tag_ids);
 }
 
 async function duplicateSerial(serial: string, exceptId?: string): Promise<boolean> {

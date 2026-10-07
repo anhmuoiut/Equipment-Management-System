@@ -6,11 +6,11 @@ import 'server-only';
  */
 import { selectAll } from './db';
 import { AppError } from '@/lib/errors';
-import type { OptionItem, Options, PartNumberOption, StatusColor, StatusOption } from '@/lib/types';
+import type { OptionItem, Options, PartNumberOption, TagItem, TagOption } from '@/lib/types';
 
 type Named = { id: string; display_name: string; sort_order: number; is_active: boolean };
 /** `type_id`: Type của mọi thiết bị mang part number này. */
-type PartNumber = Named & { type_id: string };
+type PartNumber = Named & { type_id: string; usage_needs_parent: boolean };
 
 export type Lookups = {
   part_numbers: Map<string, PartNumber>;
@@ -19,7 +19,7 @@ export type Lookups = {
   levels: Map<string, Named>;
   departments: Map<string, Named>;
   calibration_vendors: Map<string, Named>;
-  statuses: Map<string, StatusOption>;
+  tags: Map<string, TagOption>;
   users: Map<string, string>;
 };
 
@@ -30,19 +30,19 @@ const toMap = <T extends { id: string }>(rows: T[]) => new Map(rows.map((r) => [
 const BASIC = 'id, display_name, sort_order, is_active';
 
 export async function loadLookups(): Promise<Lookups> {
-  const [part_numbers, locations, types, levels, departments, calibration_vendors, statuses, users] = await Promise.all([
-    selectAll<PartNumber>('part_numbers', `${BASIC}, type_id`),
+  const [part_numbers, locations, types, levels, departments, calibration_vendors, tags, users] = await Promise.all([
+    selectAll<PartNumber>('part_numbers', `${BASIC}, type_id, usage_needs_parent`),
     selectAll<Named>('locations', BASIC),
     selectAll<Named>('types', BASIC),
     selectAll<Named>('levels', BASIC),
     selectAll<Named>('departments', BASIC),
     selectAll<Named>('calibration_vendors', BASIC),
-    selectAll<StatusOption>('statuses', 'id, display_name, sort_order, requires_remark, color'),
+    selectAll<TagOption>('tags', 'id, display_name, sort_order, color'),
     selectAll<{ id: string; full_name: string }>('user_profiles', 'id, full_name'),
   ]);
   return {
     part_numbers: toMap(part_numbers), locations: toMap(locations), types: toMap(types), levels: toMap(levels),
-    departments: toMap(departments), calibration_vendors: toMap(calibration_vendors), statuses: toMap(statuses),
+    departments: toMap(departments), calibration_vendors: toMap(calibration_vendors), tags: toMap(tags),
     users: new Map(users.map((u) => [u.id, u.full_name])),
   };
 }
@@ -51,9 +51,18 @@ export function nameOf(map: Map<string, { display_name: string }>, id: string | 
   return id ? map.get(id)?.display_name ?? null : null;
 }
 
-/** Màu của trạng thái (statuses.color) — đi kèm tên trạng thái trên mọi dòng. */
-export function statusColorOf(lookups: Lookups, id: string | null | undefined): StatusColor | null {
-  return id ? lookups.statuses.get(id)?.color ?? null : null;
+/** Thẻ đang gắn (tên + màu) theo thứ tự Configuration › Tag; id không còn tồn tại bị bỏ. */
+export function tagItems(lookups: Lookups, ids: readonly string[] | null | undefined): TagItem[] {
+  return (ids ?? [])
+    .map((id) => lookups.tags.get(id))
+    .filter((t): t is TagOption => !!t)
+    .sort(byOrder)
+    .map(({ id, display_name, color }) => ({ id, display_name, color }));
+}
+
+/** Thẻ gửi lên phải có thật (database cũng kiểm tra). */
+export function assertTags(lookups: Lookups, ids: readonly string[] | undefined): void {
+  if (ids?.some((id) => !lookups.tags.has(id))) throw new AppError('VALIDATION_ERROR', { fields: { tag_ids: 'not_found' } });
 }
 
 /** Type của part number (Configuration › Part Number) — thiết bị mang part number đó luôn có Type này. */
@@ -84,7 +93,7 @@ export function toOptions(lookups: Lookups): Options {
     levels: list(lookups.levels),
     departments: list(lookups.departments),
     calibration_vendors: list(lookups.calibration_vendors),
-    statuses: [...lookups.statuses.values()].sort(byOrder),
+    tags: [...lookups.tags.values()].sort(byOrder),
   };
 }
 
@@ -99,14 +108,4 @@ export function assertActive(
   const row = map.get(id);
   if (!row) throw new AppError('VALIDATION_ERROR', { fields: { [field]: 'not_found' } });
   if (!row.is_active) throw new AppError('INACTIVE_OPTION', { fields: { [field]: 'inactive' } });
-}
-
-/** Thiết bị / golden sample luôn có trạng thái (một danh sách chung); remark bắt buộc khi trạng thái yêu cầu. */
-export function assertStatus(lookups: Lookups, statusId: string | null | undefined, remark: string | null | undefined): void {
-  if (!statusId) throw new AppError('VALIDATION_ERROR', { fields: { status_id: 'required' } });
-  const status = lookups.statuses.get(statusId);
-  if (!status) throw new AppError('VALIDATION_ERROR', { fields: { status_id: 'not_found' } });
-  if (status.requires_remark && !remark?.trim()) {
-    throw new AppError('REMARK_REQUIRED_FOR_STATUS', { fields: { remark: 'required' } });
-  }
 }

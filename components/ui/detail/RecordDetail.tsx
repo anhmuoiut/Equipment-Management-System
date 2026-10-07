@@ -34,6 +34,8 @@ export type FieldDef<R> = {
   optionView?: (option: SelectOption) => ReactNode;
   /** Hiển thị khi xem (mặc định: giá trị / nhãn lựa chọn). */
   view?: (record: R) => ReactNode;
+  /** Ô nhập tuỳ biến thay cho `kind` (ví dụ chọn thẻ có màu); giá trị lưu vào draft như các ô khác. */
+  editor?: (props: { id: string; value: unknown; onChange: (value: unknown) => void; label: string }) => ReactNode;
   /** Hiển thị khi đang thêm / sửa mà ô bị khóa — theo giá trị đang nhập (ví dụ vị trí theo thiết bị cha đang chọn). */
   draftView?: (draft: Draft) => ReactNode;
   /** Khóa khi sửa — trả về lý do (hiện dưới ô). */
@@ -516,7 +518,9 @@ function FieldEditor<R>({ field, record, draft, required, error, onChange }: {
   const id = `f-${field.key}`;
   const kind = field.kind ?? 'text';
   let input: ReactNode;
-  if (kind === 'select') {
+  if (field.editor) {
+    input = field.editor({ id, value, onChange, label: field.label });
+  } else if (kind === 'select') {
     input = (
       <SearchableSelect value={(value as string | null) ?? ''} onChange={(v) => onChange(v || null)}
         options={optionsOf(field, draft, record)} clearable={!required} placeholder={t('dp.selectPlaceholder')} ariaLabel={field.label} />

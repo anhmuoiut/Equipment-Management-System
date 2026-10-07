@@ -3,7 +3,7 @@ import 'server-only';
 /**
  * Import Excel cho Equipment (docs/DETAIL_MODEL.md mục 6, DATABASE_MODIFIED.md mục 2 + 5).
  *
- * - File mẫu sinh lúc tải: danh sách chọn (Part number, Type, Level, Status,
+ * - File mẫu sinh lúc tải: danh sách chọn (Part number, Type, Level,
  *   Location) lấy từ Configuration ngay lúc đó nên luôn khớp với app. Dòng 1
  *   ghi chú từng cột nhận gì, dòng 2 là tiêu đề; cột chọn có ô thả xuống, bấm
  *   vào ô hiện chú thích; sheet Hướng dẫn + sheet Giá trị hợp lệ.
@@ -31,24 +31,18 @@ import {
 // Giá trị chọn được
 // ---------------------------------------------------------------------------
 
-export type ImportChoices = Record<ImportListKey, string[]> & {
-  /** Trạng thái Equipment bắt buộc Remark. */
-  remark_statuses: string[];
-};
+export type ImportChoices = Record<ImportListKey, string[]>;
 
 /** Giá trị chọn được cho thiết bị mới — đang dùng, đúng thứ tự Configuration. */
 export function importChoices(lookups: Lookups): ImportChoices {
   const options = toOptions(lookups);
   const active = (items: { display_name: string; is_active: boolean }[]) =>
     items.filter((i) => i.is_active).map((i) => i.display_name);
-  const statuses = options.statuses;
   return {
     part_numbers: active(options.part_numbers),
     types: active(options.types),
     levels: active(options.levels),
-    statuses: statuses.map((s) => s.display_name),
     locations: active(options.locations),
-    remark_statuses: statuses.filter((s) => s.requires_remark).map((s) => s.display_name),
   };
 }
 
@@ -74,13 +68,10 @@ const LIST_KEYS = [...new Set(IMPORT_COLUMNS.flatMap((c) => (c.list ? [c.list] :
 
 /** Quy tắc riêng của từng cột (ngoài bắt buộc / độ dài / danh sách). */
 function extraRules(col: ImportColumn, choices: ImportChoices, t: Text): string[] {
-  const remark = choices.remark_statuses.join(', ');
   switch (col.key) {
     case 'serial_number': return [t('imp.tpl.serialDuplicate')];
     case 'type_id': return [t('imp.tpl.typeFromPart')];
     case 'level_id': return [t('imp.tpl.levelParent')];
-    case 'status_id': return remark ? [t('imp.tpl.needsRemark', { statuses: remark })] : [];
-    case 'remark': return remark ? [t('imp.tpl.remarkFor', { statuses: remark })] : [];
     default: return [];
   }
 }
@@ -208,7 +199,7 @@ export async function buildTemplate(lookups: Lookups, language: Language, now = 
     if (col.key === 'parent_part_number') rules.push(t('imp.tpl.parentPart'));
     if (col.list) {
       if (col.key !== 'parent_part_number') {
-        rules.push(col.list === 'statuses' ? t('imp.tpl.pickStatus') : t('imp.tpl.pick', { page: col.page ?? col.header }));
+        rules.push(t('imp.tpl.pick', { page: col.page ?? col.header }));
       }
       const list = choices[col.list];
       const joined = list.join(', ');
@@ -346,7 +337,7 @@ export type ExistingEquipment = {
 /** Một dòng sẽ ghi — đúng tên cột của bảng equipments. */
 export type InsertRow = {
   id: string; serial_number: string | null; part_number_id: string | null; jabil_id: string | null; asset: string | null;
-  type_id: string | null; level_id: string | null; status_id: string | null; location_id: string | null;
+  type_id: string | null; level_id: string | null; location_id: string | null;
   parent_id: string | null; remark: string | null;
 };
 
@@ -361,7 +352,7 @@ type Work = {
   parent: Parent | null;
 };
 
-const DB_KEYS = ['serial_number', 'part_number_id', 'jabil_id', 'asset', 'type_id', 'level_id', 'status_id', 'location_id', 'remark'] as const;
+const DB_KEYS = ['serial_number', 'part_number_id', 'jabil_id', 'asset', 'type_id', 'level_id', 'location_id', 'remark'] as const;
 
 /** Kiểm tra từng dòng như form Thêm thiết bị; trả báo cáo + các dòng sẽ ghi. */
 export function checkTable(
@@ -387,7 +378,6 @@ export function checkTable(
     types: indexBy(lookups.types, (r) => r.is_active),
     levels: indexBy(lookups.levels, (r) => r.is_active),
     locations: indexBy(lookups.locations, (r) => r.is_active),
-    statuses: indexBy(lookups.statuses, () => true, (r) => r.requires_remark),
   };
 
   // ---- 1. Từng ô như form Thêm thiết bị.
@@ -398,7 +388,6 @@ export function checkTable(
     };
     const issues: ImportIssue[] = [];
     const data = { id: newId(), parent_id: null } as InsertRow;
-    let status: Entry | undefined;
     for (const key of DB_KEYS) {
       const col = IMPORT_COLUMNS.find((c) => c.key === key)!;
       const raw = cell(key);
@@ -413,16 +402,12 @@ export function checkTable(
         else if (!entry.usable) issues.push({ column: key, code: 'inactive', value: raw });
         else {
           data[key] = entry.id;
-          if (col.list === 'statuses') status = entry;
         }
       } else if (col.max && raw.length > col.max) {
         issues.push({ column: key, code: 'too_long', max: col.max });
       } else {
         data[key] = raw;
       }
-    }
-    if (status?.requiresRemark && !data.remark && !issues.some((i) => i.column === 'remark')) {
-      issues.push({ column: 'remark', code: 'remark_required', value: status.name });
     }
     // Type theo part number (như Location theo cha): ô trống hoặc đúng Type đó (kể cả Type đã ẩn) → lấy
     // theo part number; ghi Type khác → một lỗi duy nhất cho ô này.

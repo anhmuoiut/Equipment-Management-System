@@ -117,6 +117,20 @@ describe('Masterlist — docs/DETAIL_MODEL.md mục 2', () => {
     expect(screen.getByRole('button', { name: 'ml.clearFilters' })).toBeTruthy();
   });
 
+  it('defaultColumns: only those show, in that order; the rest are hidden but can be opened in Column settings', () => {
+    render(
+      <Masterlist<Row> title="Test" rows={rows} loading={false} error={null} columns={columns} storageKey={`t-${Math.random()}`}
+        defaultColumns={['qty', 'serial']} selectedId={null} onSelect={vi.fn()} exportName="test" />,
+    );
+    const headers = () => within(screen.getByRole('table')).getAllByRole('columnheader').map((h) => h.textContent ?? '');
+    expect(headers().some((h) => h.includes('Qty'))).toBe(true);
+    expect(headers().some((h) => h.includes('Type'))).toBe(false);
+    expect(headers().findIndex((h) => h.includes('Qty'))).toBeLessThan(headers().findIndex((h) => h.includes('Serial')));
+    fireEvent.click(screen.getByRole('button', { name: /ml.columns|Columns/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Type/ }));
+    expect(headers().some((h) => h.includes('Type'))).toBe(true);
+  });
+
   it('hides a column from Column settings and keeps the others', () => {
     setup();
     fireEvent.click(screen.getByRole('button', { name: /ml.columns/ }));

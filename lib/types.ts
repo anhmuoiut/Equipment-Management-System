@@ -18,15 +18,15 @@ export type Audit = {
 // ---------------------------------------------------------------- Lựa chọn
 export type OptionItem = { id: string; display_name: string; sort_order: number; is_active: boolean };
 /** Part number + Type mà mọi thiết bị mang part number này có. */
-export type PartNumberOption = OptionItem & { type_id: string };
-/** Trang có cột trạng thái (Dashboard đếm theo từng trang). Một danh sách trạng thái chung cho mọi trang. */
-export type StatusPage = 'equipment' | 'calibration' | 'golden_sample';
-/** 5 màu hệ thống của trạng thái (statuses.color) — mã màu ở globals.css. */
+export type PartNumberOption = OptionItem & { type_id: string; usage_needs_parent: boolean };
+/** Trang có Status do hệ thống tự quản (Dashboard đếm theo từng trang): Equipment = In use / Not in use; Calibration = tự tính. */
+export type StatusPage = 'equipment' | 'calibration';
+/** 5 màu hệ thống của thẻ (tags.color) — mã màu ở globals.css. */
 export type StatusColor = 'green' | 'yellow' | 'red' | 'blue' | 'gray';
-export type StatusOption = {
-  id: string; display_name: string; sort_order: number;
-  requires_remark: boolean; color: StatusColor;
-};
+/** Thẻ (Configuration › Tag) để chọn trong phần Remark của Equipment / Calibration / Golden sample. */
+export type TagOption = { id: string; display_name: string; sort_order: number; color: StatusColor };
+/** Thẻ đang gắn trên một bản ghi (đã xếp theo thứ tự cấu hình). */
+export type TagItem = { id: string; display_name: string; color: StatusColor };
 export type Options = {
   part_numbers: PartNumberOption[];
   locations: OptionItem[];
@@ -34,7 +34,7 @@ export type Options = {
   levels: OptionItem[];
   departments: OptionItem[];
   calibration_vendors: OptionItem[];
-  statuses: StatusOption[];
+  tags: TagOption[];
 };
 
 // --------------------------------------------------------------- Equipment
@@ -43,6 +43,9 @@ export type Options = {
  * 'stay' = con ở lại chỗ cũ, gắn vào thiết bị đến thay (Swap) hoặc cha cũ.
  */
 export type ChildrenMode = 'follow' | 'stay';
+
+/** Đang dùng / không dùng — đổi bằng Check-out / Check-in và đổi theo chỗ khi Swap (không phải Status). */
+export type Usage = 'in_use' | 'not_in_use';
 
 export type EquipmentRow = Audit & {
   id: string;
@@ -53,14 +56,15 @@ export type EquipmentRow = Audit & {
   asset: string | null;
   type_id: string | null;
   type: string | null;
-  status_id: string | null;
-  status: string | null;
-  status_color: StatusColor | null;
+  /** Status của thiết bị: In use / Not in use (hệ thống tự quản; đổi bằng Check-out / Check-in). */
+  usage: Usage;
   level_id: string | null;
   level: string | null;
   location_id: string;
   location: string | null;
   remark: string | null;
+  tag_ids: string[];
+  tags: TagItem[];
   parent_id: string | null;
   parent_serial: string | null;
   has_children: boolean;
@@ -72,6 +76,8 @@ export type EquipmentTreeNode = {
 
 // ------------------------------------------------------------- Calibration
 export type DueState = 'overdue' | 'due_soon' | 'ok' | 'none' | 'no_interval';
+/** Calibration Status (hệ thống tự tính): chưa có ngày hiệu chuẩn = under_calibration; có ngày thì theo hạn. */
+export type CalibrationStatus = 'under_calibration' | 'valid' | 'due_soon' | 'overdue';
 
 export type CalibrationRow = Audit & {
   id: string;
@@ -80,9 +86,7 @@ export type CalibrationRow = Audit & {
   part_number: string | null;
   type: string | null;
   location: string | null;
-  status_id: string | null;
-  status: string | null;
-  status_color: StatusColor | null;
+  status: CalibrationStatus;
   vendor_id: string | null;
   vendor: string | null;
   calibration_date: string | null;
@@ -91,6 +95,8 @@ export type CalibrationRow = Audit & {
   warning_days: number | null;
   due_state: DueState;
   remark: string | null;
+  tag_ids: string[];
+  tags: TagItem[];
 };
 
 
@@ -102,17 +108,16 @@ export type GoldenRow = Audit & {
   utd_part_number: string | null;
   location_id: string;
   location: string | null;
-  status_id: string | null;
-  status: string | null;
-  status_color: StatusColor | null;
   origin: string | null;
   purpose: string | null;
   remark: string | null;
+  tag_ids: string[];
+  tags: TagItem[];
 };
 
 // ---------------------------------------------------------- Configuration
 export type ConfigList =
-  | 'part-numbers' | 'locations' | 'types' | 'statuses' | 'levels' | 'departments'
+  | 'part-numbers' | 'locations' | 'types' | 'tags' | 'levels' | 'departments'
   | 'calibration-setup' | 'calibration-vendors';
 
 export type ConfigRow = Audit & {
@@ -122,9 +127,9 @@ export type ConfigRow = Audit & {
   is_active: boolean;
   description?: string | null;                 // types
   type_id?: string;                            // part-numbers
+  usage_needs_parent?: boolean;                // part-numbers
   type?: string | null;                        // part-numbers
-  requires_remark?: boolean;                   // statuses
-  color?: StatusColor;                         // statuses
+  color?: StatusColor;                         // tags
   part_number_id?: string;                     // calibration-setup
   interval_months?: number;                    // calibration-setup
   warning_days?: number;                       // calibration-setup
@@ -183,13 +188,14 @@ export type NotificationRow = {
 
 // --------------------------------------------------------------- Dashboard
 export type CountItem = { id: string | null; label: string | null; count: number };
-export type StatusCountItem = CountItem & { color: StatusColor | null };
+/** `id`: khóa Status (in_use / not_in_use; under_calibration / valid / due_soon / overdue) — màn hình dịch ra chữ. */
+export type StatusCountItem = CountItem & { color: StatusColor };
 export type DashboardData = {
   equipment_total: number;
   golden_total: number;
   calibration_total: number;
   pending_users: number | null;
-  /** Số lượng theo trạng thái của từng trang dùng trạng thái. */
+  /** Số lượng theo Status của Equipment (In use / Not in use) và Calibration (Calibration Status). */
   by_status: Record<StatusPage, StatusCountItem[]>;
   by_location: CountItem[];
   by_type: CountItem[];

@@ -14,7 +14,6 @@ import { api } from '@/lib/client/api';
 import { toSelect, useOptions } from '@/lib/client/options';
 import { Notice } from '@/components/ui';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { StatusTag } from '@/components/ui/tags';
 import { ActionField, ActionScreen, type ActionCtx } from '@/components/ui/detail/RecordDetail';
 import type { ChildrenMode, EquipmentRow } from '@/lib/types';
 
@@ -162,8 +161,9 @@ export function SwapScreen({ ctx, rows }: ScreenProps) {
   const { childrenOf, subtree, ancestors } = useMemo(() => equipmentFamily(rows, ctx.record.id), [rows, ctx.record.id]);
   const [other, setOther] = useState('');
   const [mode, setMode] = useState<ChildrenMode | null>(null);
-  const choices = useMemo(() => (rows ?? []).filter((r) => !subtree.has(r.id) && !ancestors.has(r.id))
-    .map((r) => ({ value: r.id, label: label(r) })), [rows, subtree, ancestors]);
+  // Chỉ đổi chỗ với thiết bị cùng Type (Fixture với Fixture, Base với Base…).
+  const choices = useMemo(() => (rows ?? []).filter((r) => !subtree.has(r.id) && !ancestors.has(r.id) && r.type_id === ctx.record.type_id)
+    .map((r) => ({ value: r.id, label: label(r) })), [rows, subtree, ancestors, ctx.record.type_id]);
   const target = rows?.find((r) => r.id === other);
   const a = ctx.record;
   const aKids = childrenOf.get(a.id) ?? [];
@@ -185,7 +185,8 @@ export function SwapScreen({ ctx, rows }: ScreenProps) {
   return (
     <ActionScreen title={t('eq.swap')} description={t('eq.swapDesc')} onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('eq.swap')}
       confirmDisabled={!other || (hasKids && !mode) || noChange}>
-      <ActionField label={t('eq.swapWith')} required>
+      {rows && choices.length === 0 && <Notice tone="warn">{t('eq.swapNoSameType', { type: a.type ?? '—' })}</Notice>}
+      <ActionField label={t('eq.swapWith')} required hint={t('eq.swapSameType', { type: a.type ?? '—' })}>
         <SearchableSelect value={other} onChange={(v) => { setOther(v); setMode(null); }} options={choices}
           placeholder={rows ? t('dp.selectPlaceholder') : t('common.loadingEllipsis')} ariaLabel={t('eq.swapWith')} />
       </ActionField>
@@ -197,9 +198,8 @@ export function SwapScreen({ ctx, rows }: ScreenProps) {
       {target && !noChange && (
         <ActionField label={t('eq.preview')}>
           <ul className="dp-preview">
-            {/* Trạng thái đi theo chỗ: mỗi bên nhận trạng thái của bên kia. */}
-            <li><strong>{a.serial_number}</strong> → {place(target)} · <StatusTag name={target.status} color={target.status_color} /></li>
-            <li><strong>{target.serial_number}</strong> → {place(a)} · <StatusTag name={a.status} color={a.status_color} /></li>
+            <li><strong>{a.serial_number}</strong> → {place(target)}</li>
+            <li><strong>{target.serial_number}</strong> → {place(a)}</li>
             {mode && groups.map((g) => {
               const newcomer = g.owner.id === a.id ? target : a;
               return (
@@ -227,6 +227,7 @@ export function DetachScreen({ ctx, rows }: ScreenProps) {
     <ActionScreen title={t('eq.detach')} onCancel={ctx.cancel} onConfirm={confirm} confirmLabel={t('eq.detach')}
       confirmDisabled={!rows || (kids.length > 0 && !mode)}
       description={t('eq.detachDesc', { serial: ctx.record.parent_serial ?? '—', location: ctx.record.location ?? '—' })}>
+      {ctx.record.usage === 'in_use' && <Notice tone="info">{t('eq.detachInUseNote')}</Notice>}
       {kids.length > 0 && (
         <ChildrenChoice groups={[{ owner: ctx.record, kids }]} value={mode} onChange={setMode}
           followHint={t('eq.followDetach', { serial: ctx.record.serial_number })}

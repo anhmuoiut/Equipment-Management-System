@@ -33,13 +33,13 @@ function toRow(list: ConfigListDef, r: DbRow, lookups: Lookups): ConfigRow {
     ...auditOf(lookups, r),
   };
   if (list.hasDescription) return { ...base, description: (r.description as string | null) ?? null };
-  if (list.hasType) return { ...base, type_id: r.type_id as string, type: nameOf(lookups.types, r.type_id as string) };
-  if (list.isStatus) {
+  if (list.hasType) {
     return {
-      ...base, requires_remark: r.requires_remark as boolean,
-      color: (r.color as ConfigRow['color']) ?? 'gray',
+      ...base, type_id: r.type_id as string, type: nameOf(lookups.types, r.type_id as string),
+      usage_needs_parent: Boolean(r.usage_needs_parent),
     };
   }
+  if (list.isTag) return { ...base, color: (r.color as ConfigRow['color']) ?? 'gray' };
   if (list.isCalibration) {
     return {
       ...base, part_number_id: r.part_number_id as string,
@@ -74,17 +74,12 @@ export async function updateConfig(list: ConfigListDef, id: string, input: Recor
 }
 
 /**
- * Xóa thật — chỉ statuses và calibration_configurations. Status đang được dùng thì database chặn;
+ * Xóa thật — chỉ tags và calibration_configurations. Thẻ đang được dùng thì database chặn (TAG_IN_USE);
  * xóa Setup hiệu chuẩn thì thiết bị của PN đó rời Dashboard hiệu chuẩn (database tự làm, lịch sử giữ).
  */
 export async function deleteConfig(list: ConfigListDef, id: string, actor: string): Promise<void> {
   if (!list.deletable) throw new AppError('FORBIDDEN');
-  try {
-    await appWrite(list.table, 'delete', id, null, actor);
-  } catch (e) {
-    if (e instanceof AppError && e.code === 'IN_USE' && list.isStatus) throw new AppError('STATUS_IN_USE');
-    throw e;
-  }
+  await appWrite(list.table, 'delete', id, null, actor);
 }
 
 async function assertPartNumberActive(id: string | undefined) {
